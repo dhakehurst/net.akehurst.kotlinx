@@ -1,2 +1,3 @@
 # net.akehurst.kotlinx
-Extensions for kotlin stdlib mostly Multiplatfom 
+
+A collection of useful extensions to the kotlin stdlib
