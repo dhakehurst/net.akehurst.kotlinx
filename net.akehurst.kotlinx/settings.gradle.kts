@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2018 Dr. David H. Akehurst (http://dr.david.h.akehurst.net)
+ * Copyright (C) 2019 Dr. David H. Akehurst (http://dr.david.h.akehurst.net)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,18 @@
  * limitations under the License.
  */
 
-rootProject.name = file('.').name
+rootProject.name = file(".").name
 
-include 'net-akehurst-kotlinx'
-enableFeaturePreview('GRADLE_METADATA')
+fileTree(".") {
+    include ("**/build.gradle")
+    include ("**/build.gradle.kts")
+    exclude ("build.gradle") // Exclude the root build file.
+    exclude ("build.gradle.kts") // Exclude the root build file.
+}.forEach {
+    val prj = it.parentFile.name
+    println( "including $prj at "+relativePath(it.parent))
+    include(prj)
+    project(":$prj").projectDir = File(relativePath(it.parent))
+}
 
+enableFeaturePreview("GRADLE_METADATA")

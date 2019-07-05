@@ -1,5 +1,0 @@
-dependencies {
-
-        jvm8MainImplementation "org.jetbrains.kotlin:kotlin-reflect:${version_kotlin}"
-
-}
