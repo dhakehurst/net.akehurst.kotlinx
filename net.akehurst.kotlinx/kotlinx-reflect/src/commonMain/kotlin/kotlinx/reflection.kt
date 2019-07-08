@@ -8,12 +8,21 @@ expect class Reflection<T : Any>(clazz: KClass<T>) {
 
     val allPropertyNames: List<String>
 
-    fun createInstance() : T
+    fun construct(vararg constructorArgs: Any?): T
 
     fun <S : Any> isSupertypeOf(subtype: KClass<S>): Boolean
 
-    fun callProperty(propertyName:String, obj:Any) : Any?
+    fun allPropertyNames(obj: Any): List<String>
 
+    fun getProperty(propertyName: String, obj: Any): Any?
+
+    fun setProperty(propertyName: String, obj: Any, value: Any?)
 }
 
 fun KClass<*>.reflect() = Reflection(this)
+
+expect object ModuleRegistry {
+
+    fun classForName(qualifiedName:String) :KClass<*>
+
+}
