@@ -43,11 +43,14 @@ actual class Reflection<T : Any> actual constructor(val clazz: KClass<T>) {
 
     actual fun getProperty(propertyName:String, obj:Any) : Any? {
         val prop = obj::class.memberProperties.first { propertyName==it.name } as KProperty1<Any, *>
-        return prop.get(obj)
+        isAccessable?
+        return prop.getter.call(obj)
+        //return prop.get(obj)
     }
     actual fun setProperty(propertyName:String, obj:Any, value:Any?)  {
         val prop = obj::class.memberProperties.first { propertyName==it.name } as KMutableProperty1<Any, Any?>
-        prop.set(obj, value)
+        prop.setter.call(obj, value)
+        //prop.set(obj, value)
     }
 }
 
