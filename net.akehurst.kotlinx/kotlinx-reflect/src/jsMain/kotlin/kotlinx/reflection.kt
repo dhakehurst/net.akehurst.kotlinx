@@ -46,7 +46,7 @@ actual class Reflection<T : Any> actual constructor(val clazz:KClass<T>) {
 
 
     actual val isAbstract:Boolean get() {
-        TODO()
+        return this.clazz.simpleName!!.endsWith("Abstract")
     }
 
     actual val allPropertyNames:List<String> by lazy {
@@ -54,8 +54,9 @@ actual class Reflection<T : Any> actual constructor(val clazz:KClass<T>) {
     }
 
     actual fun construct(vararg constructorArgs:Any?) : T {
-        val cls = this.clazz
-        val obj = js("Reflect.construct(cls, constructorArgs)")
+        val cls = this.clazz.js
+        //val obj = js("Reflect.construct(cls, ...constructorArgs)")  // ES6
+        val obj = js("new (Function.prototype.bind.apply(cls, [null].concat(constructorArgs)))")
         return obj as T
     }
 
