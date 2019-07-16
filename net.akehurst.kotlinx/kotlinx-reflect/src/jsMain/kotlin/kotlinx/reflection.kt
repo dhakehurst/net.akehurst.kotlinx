@@ -7,7 +7,7 @@ actual object ModuleRegistry {
 
     val modules = mutableSetOf<Any>()
 
-    fun register(module:Any) {
+    actual fun register(module:Any) {
         modules.add(module)
     }
 

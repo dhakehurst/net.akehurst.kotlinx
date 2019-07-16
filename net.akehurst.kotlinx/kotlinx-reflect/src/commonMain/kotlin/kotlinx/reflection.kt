@@ -23,6 +23,8 @@ fun KClass<*>.reflect() = Reflection(this)
 
 expect object ModuleRegistry {
 
+    fun register(module:Any)
+
     fun classForName(qualifiedName:String) :KClass<*>
 
 }

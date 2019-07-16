@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
+import com.jfrog.bintray.gradle.BintrayExtension
 import org.gradle.internal.impldep.org.apache.commons.io.output.ByteArrayOutputStream
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import java.io.File
 
 plugins {
     kotlin("multiplatform") version("1.3.41") apply false
+    id("com.jfrog.bintray") version("1.8.4") apply false
 }
 
 allprojects {
@@ -33,6 +35,9 @@ allprojects {
     buildDir = File(rootProject.projectDir, ".gradle-build/${project.name}")
 
 }
+
+
+fun getProjectProperty(s: String) = project.findProperty(s) as String?
 
 fun getPassword(currentUser:String , location:String ) : String {
     return if (project.hasProperty("maclocal")) {
@@ -54,6 +59,7 @@ fun getPassword(currentUser:String , location:String ) : String {
 subprojects {
     apply(plugin="org.jetbrains.kotlin.multiplatform")
     apply(plugin = "maven-publish")
+    apply(plugin = "com.jfrog.bintray")
 
     val version_kotlin: String by project
 
@@ -115,5 +121,19 @@ subprojects {
 
     }
 
+    configure<com.jfrog.bintray.gradle.BintrayExtension> {
+        user = getProjectProperty("bintrayUser")
+        key = getProjectProperty("bintrayApiKey")
+        publish = true
+        pkg(delegateClosureOf<BintrayExtension.PackageConfig> {
+            repo = "maven"
+            name = "${rootProject.name}"
+            userOrg = user
+            websiteUrl = "https://kotlinexpertise.com"
+            vcsUrl = "https://github.com/dhakehurst/net.akehurst.kotlinx"
+            setLabels("kotlin")
+            setLicenses("Apache-2.0")
+        })
+    }
 
 }

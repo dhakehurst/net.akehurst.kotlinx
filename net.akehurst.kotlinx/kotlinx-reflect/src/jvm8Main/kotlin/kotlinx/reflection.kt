@@ -85,6 +85,10 @@ actual class Reflection<T : Any> actual constructor(val clazz: KClass<T>) {
 
 actual object ModuleRegistry {
 
+    actual fun register(module:Any) {
+        //Not needed for JVM
+    }
+
     actual fun classForName(qualifiedName: String): KClass<*> {
         //TODO: should we register for java also?
         return Class.forName(qualifiedName).kotlin
