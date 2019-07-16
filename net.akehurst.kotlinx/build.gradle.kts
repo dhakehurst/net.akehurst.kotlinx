@@ -40,23 +40,6 @@ allprojects {
 
 fun getProjectProperty(s: String) = project.findProperty(s) as String?
 
-fun getPassword(currentUser:String , location:String ) : String {
-    return if (project.hasProperty("maclocal")) {
-        println("Getting password using local mac login credentials")
-        val stdout =  ByteArrayOutputStream()
-        val stderr =  ByteArrayOutputStream()
-        exec {
-            commandLine = listOf("security", "-q", "find-internet-password", "-a", currentUser, "-s", location, "-w")
-            standardOutput = stdout
-            errorOutput = stderr
-            setIgnoreExitValue(true)
-        }
-        stdout.toString().trim()
-    } else {
-        ""
-    }
-}
-
 subprojects {
     apply(plugin="org.jetbrains.kotlin.multiplatform")
     apply(plugin = "maven-publish")
@@ -105,21 +88,6 @@ subprojects {
 
         "jsMainImplementation"(kotlin("stdlib-js"))
         "jsTestImplementation"(kotlin("test-js"))
-    }
-
-
-    configure<PublishingExtension> {
-        repositories {
-            maven {
-                name = "itemis-akehurst"
-                url = uri("https://projects.itemis.de/nexus/content/repositories/akehurst/")
-                credentials {
-                    username = if (project.hasProperty("username")) project.property("username") as String else System.getenv("USER")
-                    password = if (project.hasProperty("password")) project.property("password") as String else if (project.hasProperty("maclocal")) getPassword(System.getenv("USER"), "projects.itemis.de") else System.getenv("PASSWORD")
-                }
-            }
-        }
-
     }
 
     configure<com.jfrog.bintray.gradle.BintrayExtension> {
