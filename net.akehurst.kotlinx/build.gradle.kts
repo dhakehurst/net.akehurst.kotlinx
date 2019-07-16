@@ -15,8 +15,6 @@
  */
 
 import com.jfrog.bintray.gradle.BintrayExtension
-import com.jfrog.bintray.gradle.tasks.BintrayPublishTask
-import org.gradle.internal.impldep.org.apache.commons.io.output.ByteArrayOutputStream
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import java.io.File
 
@@ -45,8 +43,6 @@ subprojects {
     apply(plugin = "maven-publish")
     apply(plugin = "com.jfrog.bintray")
 
-    val version_kotlin: String by project
-
     repositories {
         mavenLocal()
         mavenCentral()
@@ -67,15 +63,9 @@ subprojects {
             }
         }
         js("js") {
-            //val main by compilations.getting {
-            //    kotlinOptions {
-            //        moduleKind = "plain"
-            //    }
-            // }
             nodejs()
             browser()
         }
-
     }
 
     dependencies {
@@ -100,7 +90,7 @@ subprojects {
             repo = "maven"
             name = "${rootProject.name}"
             userOrg = user
-            websiteUrl = "https://kotlinexpertise.com"
+            websiteUrl = "https://github.com/dhakehurst/net.akehurst.kotlinx"
             vcsUrl = "https://github.com/dhakehurst/net.akehurst.kotlinx"
             setLabels("kotlin")
             setLicenses("Apache-2.0")
