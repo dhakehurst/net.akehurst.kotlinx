@@ -4,7 +4,7 @@ before_install:
   - chmod -R +x src
   - chmod +x gradlew
 
-script: ./gradlew clean build
+script: cd net.akehurst.kotlinx; ./gradlew clean build
 deploy:
   provider: script
   script: ./gradlew bintrayUpload -PbintrayUser=$BINTRAY_USER -PbintrayApiKey=$BINTRAY_KEY
