@@ -1,10 +1,10 @@
 language: java
 
 before_install:
-  - chmod -R +x src
+  - cd net.akehurst.kotlinx
   - chmod +x gradlew
 
-script: cd net.akehurst.kotlinx; ./gradlew clean build
+script: ./gradlew clean build
 deploy:
   provider: script
   script: ./gradlew bintrayUpload -PbintrayUser=$BINTRAY_USER -PbintrayApiKey=$BINTRAY_KEY
