@@ -15,6 +15,7 @@
  */
 
 import com.jfrog.bintray.gradle.BintrayExtension
+import com.jfrog.bintray.gradle.tasks.BintrayPublishTask
 import org.gradle.internal.impldep.org.apache.commons.io.output.ByteArrayOutputStream
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import java.io.File
@@ -125,6 +126,8 @@ subprojects {
         user = getProjectProperty("bintrayUser")
         key = getProjectProperty("bintrayApiKey")
         publish = true
+        override = true
+        setPublications("kotlinMultiplatform","metadata","js","jvm8")
         pkg(delegateClosureOf<BintrayExtension.PackageConfig> {
             repo = "maven"
             name = "${rootProject.name}"
