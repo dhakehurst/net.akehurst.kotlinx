@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/dhakehurst/net.akehurst.kotlinx.svg?branch=master)](https://travisci.org/dhakehurst/net.akehurst.kotlinx)
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/net.akehurst.kotlinx/kotlinx-collections/badge.svg?style=plastic)](https://maven-badges.herokuapp.com/maven-central/net.akehurst.kotlinx/kotlinx-collections)
-[![Bintray](https://api.bintray.com/packages/dhakehurst/maven/net.akehurst.kotlinx/images/download.svg)](https://bintray.com/dhakehurst/maven/net.akehurst.kotlinx/_latestVersion)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/net.akehurst.kotlinx/kotlinx-collections/badge.svg)](https://maven-badges.herokuapp.com/maven-central/net.akehurst.kotlinx/kotlinx-collections)
+![Bintray](https://img.shields.io/bintray/v/dhakehurst/maven/net.akehurst.kotlinx.svg)
 
 # net.akehurst.kotlinx
 
