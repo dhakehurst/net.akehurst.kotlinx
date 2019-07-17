@@ -39,7 +39,7 @@ fun KClass<*>.reflect() = Reflection(this)
 
 expect object ModuleRegistry {
 
-    fun register(module:Any)
+    fun register(moduleName:String)
 
     fun classForName(qualifiedName:String) :KClass<*>
 

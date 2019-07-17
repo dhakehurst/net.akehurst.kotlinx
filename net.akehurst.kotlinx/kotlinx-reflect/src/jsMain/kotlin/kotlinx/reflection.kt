@@ -23,7 +23,8 @@ actual object ModuleRegistry {
 
     val modules = mutableSetOf<Any>()
 
-    actual fun register(module:Any) {
+    actual fun register(moduleName:String) {
+        val module = js("window[moduleName]")
         modules.add(module)
     }
 
@@ -39,7 +40,7 @@ actual object ModuleRegistry {
             if (null==child) {
                 null
             } else {
-                getJsOb(names.take(1),child)
+                getJsOb(names.drop(1),child)
             }
         }
     }
@@ -49,7 +50,7 @@ actual object ModuleRegistry {
         modules.forEach {
             val cls = getJsOb(path, it)
             if (null!=cls) {
-                return cls as KClass<*>
+                return (cls as JsClass<*>).kotlin
             }
         }
 

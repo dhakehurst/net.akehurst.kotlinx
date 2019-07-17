@@ -101,7 +101,7 @@ actual class Reflection<T : Any> actual constructor(val clazz: KClass<T>) {
 
 actual object ModuleRegistry {
 
-    actual fun register(module:Any) {
+    actual fun register(moduleName:String) {
         //Not needed for JVM
     }
 
