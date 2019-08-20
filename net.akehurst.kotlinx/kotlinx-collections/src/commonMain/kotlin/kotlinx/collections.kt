@@ -35,19 +35,25 @@ fun <T> Set<T>.transitveClosure(function: (T) -> Set<T>): Set<T> {
 
 class Stack<T> {
 
-    private val list = mutableListOf<T>()
+    private val _elements = mutableListOf<T>()
+
+    val elements:List<T> = this._elements
+
+    fun clear() {
+        this._elements.clear()
+    }
 
     fun push(element:T) {
-        list.add(element)
+        _elements.add(element)
     }
 
     fun pop() : T {
-        val v = list.last()
-        list.removeAt(list.size-1)
+        val v = _elements.last()
+        _elements.removeAt(_elements.size-1)
         return v
     }
 
     fun peek() :T {
-        return list.last()
+        return _elements.last()
     }
 }
