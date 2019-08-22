@@ -33,6 +33,8 @@ expect class Reflection<T : Any>(clazz: KClass<T>) {
     fun getProperty(propertyName: String, obj: Any): Any?
 
     fun setProperty(propertyName: String, obj: Any, value: Any?)
+
+    fun isPropertyMutable(propertyName: String): Boolean
 }
 
 fun KClass<*>.reflect() = Reflection(this)

@@ -63,6 +63,16 @@ actual class Reflection<T : Any> actual constructor(val clazz: KClass<T>) {
         }
     }
 
+    actual fun isPropertyMutable(propertyName: String): Boolean {
+        val mprop = this.clazz.memberProperties.firstOrNull { propertyName == it.name }
+        if (null != mprop) {
+            return mprop is KMutableProperty1<*,*>
+        } else {
+            val mmeth = this.clazz.memberFunctions.firstOrNull { it.name == "set${propertyName.capitalize()}" && it.valueParameters.size == 1 }
+            return mmeth != null
+        }
+    }
+
     actual fun getProperty(propertyName: String, obj: Any): Any? {
         val mprop = obj::class.memberProperties.firstOrNull { propertyName == it.name }
         if (null != mprop) {
@@ -81,7 +91,7 @@ actual class Reflection<T : Any> actual constructor(val clazz: KClass<T>) {
     }
 
     actual fun setProperty(propertyName: String, obj: Any, value: Any?) {
-        val mprop = obj::class.memberProperties.first { propertyName == it.name }
+        val mprop = obj::class.memberProperties.firstOrNull { propertyName == it.name }
         if (mprop != null) {
             val prop = mprop as KMutableProperty1<Any, Any?>
             prop.setter.isAccessible = true

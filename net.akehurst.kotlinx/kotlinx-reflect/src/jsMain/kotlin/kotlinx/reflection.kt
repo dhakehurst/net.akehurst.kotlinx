@@ -82,8 +82,13 @@ actual class Reflection<T : Any> actual constructor(val clazz:KClass<T>) {
     }
 
     actual fun allPropertyNames(obj:Any):List<String> {
-        val js:Array<String> = js("Object.keys(obj)")
+        val js:Array<String> = js("Object.getOwnPropertyNames(obj)")
         return js.toList()
+    }
+
+    actual fun isPropertyMutable(propertyName: String): Boolean {
+        // FIXME: when JS reflection is sufficient
+        return true
     }
 
     actual fun getProperty(propertyName:String, obj:Any) : Any? {
