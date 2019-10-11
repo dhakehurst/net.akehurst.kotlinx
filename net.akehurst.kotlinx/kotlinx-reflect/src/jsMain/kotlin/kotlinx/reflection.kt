@@ -16,40 +16,42 @@
 
 package net.akehurst.kotlinx.reflect
 
+import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
+import kotlin.reflect.KFunction
 import kotlin.reflect.KMutableProperty1
 
 actual object ModuleRegistry {
 
     val modules = mutableSetOf<Any>()
 
-    actual fun register(moduleName:String) {
+    actual fun register(moduleName: String) {
         val module = js("window[moduleName]")
         modules.add(module)
     }
 
-    fun getJsOb(name:String, obj:Any) : Any? {
+    fun getJsOb(name: String, obj: Any): Any? {
         return js("obj[name]")
     }
 
-    fun getJsOb(names:List<String>, obj:Any) : Any? {
+    fun getJsOb(names: List<String>, obj: Any): Any? {
         return if (names.isEmpty()) {
             obj
         } else {
             val child = getJsOb(names[0], obj)
-            if (null==child) {
+            if (null == child) {
                 null
             } else {
-                getJsOb(names.drop(1),child)
+                getJsOb(names.drop(1), child)
             }
         }
     }
 
-    actual fun classForName(qualifiedName:String) :KClass<*> {
+    actual fun classForName(qualifiedName: String): KClass<*> {
         val path = qualifiedName.split(".")
         modules.forEach {
             val cls = getJsOb(path, it)
-            if (null!=cls) {
+            if (null != cls) {
                 return (cls as JsClass<*>).kotlin
             }
         }
@@ -59,19 +61,19 @@ actual object ModuleRegistry {
 
 }
 
-actual class Reflection<T : Any> actual constructor(val clazz:KClass<T>) {
+actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) {
 
+    actual val isAbstract: Boolean
+        get() {
+            return this.kclass.simpleName!!.endsWith("Abstract")
+        }
 
-    actual val isAbstract:Boolean get() {
-        return this.clazz.simpleName!!.endsWith("Abstract")
-    }
-
-    actual val allPropertyNames:List<String> by lazy {
+    actual val allPropertyNames: List<String> by lazy {
         TODO()
     }
 
-    actual fun construct(vararg constructorArgs:Any?) : T {
-        val cls = this.clazz.js
+    actual fun construct(vararg constructorArgs: Any?): T {
+        val cls = this.kclass.js
         //val obj = js("Reflect.construct(cls, ...constructorArgs)")  // ES6
         val obj = js("new (Function.prototype.bind.apply(cls, [null].concat(constructorArgs)))")
         return obj as T
@@ -81,8 +83,8 @@ actual class Reflection<T : Any> actual constructor(val clazz:KClass<T>) {
         TODO()
     }
 
-    actual fun allPropertyNames(obj:Any):List<String> {
-        val js:Array<String> = js("Object.getOwnPropertyNames(obj)")
+    actual fun allPropertyNames(self: T): List<String> {
+        val js: Array<String> = js("Object.getOwnPropertyNames(obj)")
         return js.toList()
     }
 
@@ -91,13 +93,59 @@ actual class Reflection<T : Any> actual constructor(val clazz:KClass<T>) {
         return true
     }
 
-    actual fun getProperty(propertyName:String, obj:Any) : Any? {
-        return js("obj[propertyName]")
+    actual fun getProperty(self: T, propertyName: String): Any? {
+        return js("self[propertyName]")
         //return "Reflect.get(obj, propertyName)"
     }
-    actual fun setProperty(propertyName:String, obj:Any, value:Any?)  {
-        js("obj[propertyName] = value")
+
+    actual fun setProperty(self: T, propertyName: String, value: Any?) {
+        js("self[propertyName] = value")
     }
 
+    actual fun call(self: T, methodName: String, vararg args: Any?) : Any? {
+        return js("self[methodName](args)")
+    }
 }
 
+actual class ObjectReflection<T : Any> actual constructor(val self: T) {
+
+    actual val kclass: KClass<T> = self::class as KClass<T>
+    actual val isAbstract: Boolean
+        get() {
+            return this.kclass.simpleName!!.endsWith("Abstract")
+        }
+
+    actual val allPropertyNames: List<String> by lazy {
+        val js: Array<String> = js("Object.getOwnPropertyNames(self)")
+        js.toList()
+    }
+
+    actual fun construct(vararg constructorArgs: Any?): T {
+        val cls = this.kclass.js
+        //val obj = js("Reflect.construct(cls, ...constructorArgs)")  // ES6
+        val obj = js("new (Function.prototype.bind.apply(cls, [null].concat(constructorArgs)))")
+        return obj as T
+    }
+
+    actual fun <S : Any> isSupertypeOf(subtype: KClass<S>): Boolean {
+        TODO()
+    }
+
+    actual fun isPropertyMutable(propertyName: String): Boolean {
+        // FIXME: when JS reflection is sufficient
+        return true
+    }
+
+    actual fun getProperty(propertyName: String): Any? {
+        return js("self[propertyName]")
+        //return "Reflect.get(obj, propertyName)"
+    }
+
+    actual fun setProperty(propertyName: String, value: Any?) {
+        js("self[propertyName] = value")
+    }
+
+    actual fun call(methodName: String, vararg args: Any?) : Any? {
+        return js("self[methodName](args)")
+    }
+}

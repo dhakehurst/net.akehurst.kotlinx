@@ -16,9 +16,11 @@
 
 package net.akehurst.kotlinx.reflect
 
+import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
+import kotlin.reflect.KFunction
 
-expect class Reflection<T : Any>(clazz: KClass<T>) {
+expect class ClassReflection<T : Any>(kclass: KClass<T>) {
 
     val isAbstract: Boolean
 
@@ -28,21 +30,45 @@ expect class Reflection<T : Any>(clazz: KClass<T>) {
 
     fun <S : Any> isSupertypeOf(subtype: KClass<S>): Boolean
 
-    fun allPropertyNames(obj: Any): List<String>
+    fun allPropertyNames(self: T): List<String>
 
-    fun getProperty(propertyName: String, obj: Any): Any?
+    fun getProperty(self: T, propertyName: String): Any?
 
-    fun setProperty(propertyName: String, obj: Any, value: Any?)
+    fun setProperty(self: T, propertyName: String, value: Any?)
 
     fun isPropertyMutable(propertyName: String): Boolean
+
+    fun call(self: T, methodName: String, vararg args: Any?) : Any?
 }
 
-fun KClass<*>.reflect() = Reflection(this)
+expect class ObjectReflection<T : Any>(self: T) {
+
+    val kclass: KClass<T>
+
+    val isAbstract: Boolean
+
+    val allPropertyNames: List<String>
+
+    fun construct(vararg constructorArgs: Any?): T
+
+    fun <S : Any> isSupertypeOf(subtype: KClass<S>): Boolean
+
+    fun getProperty(propertyName: String): Any?
+
+    fun setProperty(propertyName: String, value: Any?)
+
+    fun isPropertyMutable(propertyName: String): Boolean
+
+    fun call(methodName: String, vararg args: Any?) : Any?
+}
+
+fun Any.reflect() = ObjectReflection(this)
+fun KClass<*>.reflect() = ClassReflection(this)
 
 expect object ModuleRegistry {
 
-    fun register(moduleName:String)
+    fun register(moduleName: String)
 
-    fun classForName(qualifiedName:String) :KClass<*>
+    fun classForName(qualifiedName: String): KClass<*>
 
 }

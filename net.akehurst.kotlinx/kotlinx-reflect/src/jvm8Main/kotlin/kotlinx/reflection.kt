@@ -24,27 +24,26 @@ import kotlin.reflect.full.memberProperties
 import kotlin.reflect.full.valueParameters
 import kotlin.reflect.jvm.isAccessible
 
+actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) {
 
-actual class Reflection<T : Any> actual constructor(val clazz: KClass<T>) {
-
-    actual val isAbstract: Boolean = this.clazz.isAbstract
+    actual val isAbstract: Boolean = this.kclass.isAbstract
 
     actual val allPropertyNames: List<String> by lazy {
         //find get methods, for java defined classes/properties
-        val methProps = this.clazz.memberFunctions.filter { it.name.startsWith("get") && it.valueParameters.size == 0 }.map { it.name.substring(3).decapitalize() }
-        val publicProps = this.clazz.memberProperties.filter { it.visibility == KVisibility.PUBLIC }.map { it.name }
+        val methProps = this.kclass.memberFunctions.filter { it.name.startsWith("get") && it.valueParameters.size == 0 }.map { it.name.substring(3).decapitalize() }
+        val publicProps = this.kclass.memberProperties.filter { it.visibility == KVisibility.PUBLIC }.map { it.name }
         (publicProps + methProps).toSet().toList()
     }
 
     actual fun construct(vararg constructorArgs: Any?): T {
-        return this.clazz.constructors.first {
+        return this.kclass.constructors.first {
             //TODO: check types match
             it.parameters.size == constructorArgs.size
         }.call(*constructorArgs)
     }
 
     actual fun <S : Any> isSupertypeOf(subtype: KClass<S>): Boolean {
-        return this.clazz == subtype
+        return this.kclass == subtype
                 || subtype.supertypes.toSet().transitveClosure {
             val cls = it.classifier
             if (cls is KClass<*>) {
@@ -52,66 +51,163 @@ actual class Reflection<T : Any> actual constructor(val clazz: KClass<T>) {
             } else {
                 emptySet<KType>()
             }
-        }.any { it.classifier == this.clazz }
+        }.any { it.classifier == this.kclass }
     }
 
-    actual fun allPropertyNames(obj: Any): List<String> {
-        if (this.clazz.isInstance(obj)) {
+    actual fun allPropertyNames(self: T): List<String> {
+        if (this.kclass.isInstance(self)) {
             return this.allPropertyNames
         } else {
-            throw RuntimeException("$obj is not an instance of ${this.clazz}")
+            throw RuntimeException("$self is not an instance of ${this.kclass}")
         }
     }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
-        val mprop = this.clazz.memberProperties.firstOrNull { propertyName == it.name }
+        val mprop = this.kclass.memberProperties.firstOrNull { propertyName == it.name }
         if (null != mprop) {
-            return mprop is KMutableProperty1<*,*>
+            return mprop is KMutableProperty1<*, *>
         } else {
-            val mmeth = this.clazz.memberFunctions.firstOrNull { it.name == "set${propertyName.capitalize()}" && it.valueParameters.size == 1 }
+            val mmeth = this.kclass.memberFunctions.firstOrNull { it.name == "set${propertyName.capitalize()}" && it.valueParameters.size == 1 }
             return mmeth != null
         }
     }
 
-    actual fun getProperty(propertyName: String, obj: Any): Any? {
-        val mprop = obj::class.memberProperties.firstOrNull { propertyName == it.name }
+    actual fun getProperty(self: T, propertyName: String): Any? {
+        val mprop = self::class.memberProperties.firstOrNull { propertyName == it.name }
         if (null != mprop) {
             val prop = mprop as KProperty1<Any, *>
             prop.getter.isAccessible = true
-            return prop.getter.call(obj)
+            return prop.getter.call(self)
         } else {
-            val mmeth = obj::class.memberFunctions.firstOrNull { it.name == "get${propertyName.capitalize()}" && it.valueParameters.size == 0 }
+            val mmeth = self::class.memberFunctions.firstOrNull { it.name == "get${propertyName.capitalize()}" && it.valueParameters.size == 0 }
             if (mmeth == null) {
-                throw RuntimeException("Property ${propertyName} not found on object ${obj}")
+                throw RuntimeException("Property ${propertyName} not found on object ${self}")
             } else {
                 mmeth.isAccessible = true
-                return mmeth.call(obj)
+                return mmeth.call(self)
             }
         }
     }
 
-    actual fun setProperty(propertyName: String, obj: Any, value: Any?) {
-        val mprop = obj::class.memberProperties.firstOrNull { propertyName == it.name }
+    actual fun setProperty(self: T, propertyName: String, value: Any?) {
+        val mprop = self::class.memberProperties.firstOrNull { propertyName == it.name }
         if (mprop != null) {
             val prop = mprop as KMutableProperty1<Any, Any?>
             prop.setter.isAccessible = true
-            prop.setter.call(obj, value)
+            prop.setter.call(self, value)
         } else {
-            val mmeth = obj::class.memberFunctions.firstOrNull { it.name == "set${propertyName.capitalize()}" && it.valueParameters.size == 1 }
+            val mmeth = self::class.memberFunctions.firstOrNull { it.name == "set${propertyName.capitalize()}" && it.valueParameters.size == 1 }
             //TODO: check type of parameter!
             if (mmeth == null) {
-                throw RuntimeException("Property ${propertyName} not settable on object ${obj}")
+                throw RuntimeException("Property ${propertyName} not settable on object ${self}")
             } else {
                 mmeth.isAccessible = true
-                mmeth.call(obj, value)
+                mmeth.call(self, value)
             }
+        }
+    }
+
+    actual fun call(self: T, methodName: String, vararg args: Any?): Any? {
+        val mem = kclass.memberProperties.firstOrNull { methodName == it.name }
+        if (null != mem) {
+            val m = mem as KCallable<*>
+            return m.call(self, *args)
+        } else {
+            throw RuntimeException("Method ${methodName} not found on object ${self}")
+        }
+    }
+}
+
+actual class ObjectReflection<T : Any> actual constructor(val self: T) {
+
+    actual val kclass: KClass<T> = self::class as KClass<T>
+    actual val isAbstract: Boolean = this.kclass.isAbstract
+
+    actual val allPropertyNames: List<String> by lazy {
+        //find get methods, for java defined classes/properties
+        val methProps = this.kclass.memberFunctions.filter { it.name.startsWith("get") && it.valueParameters.size == 0 }.map { it.name.substring(3).decapitalize() }
+        val publicProps = this.kclass.memberProperties.filter { it.visibility == KVisibility.PUBLIC }.map { it.name }
+        (publicProps + methProps).toSet().toList()
+    }
+
+    actual fun construct(vararg constructorArgs: Any?): T {
+        return this.kclass.constructors.first {
+            //TODO: check types match
+            it.parameters.size == constructorArgs.size
+        }.call(*constructorArgs)
+    }
+
+    actual fun <S : Any> isSupertypeOf(subtype: KClass<S>): Boolean {
+        return this.kclass == subtype
+                || subtype.supertypes.toSet().transitveClosure {
+            val cls = it.classifier
+            if (cls is KClass<*>) {
+                cls.supertypes.toSet()
+            } else {
+                emptySet<KType>()
+            }
+        }.any { it.classifier == this.kclass }
+    }
+
+    actual fun isPropertyMutable(propertyName: String): Boolean {
+        val mprop = this.kclass.memberProperties.firstOrNull { propertyName == it.name }
+        if (null != mprop) {
+            return mprop is KMutableProperty1<*, *>
+        } else {
+            val mmeth = this.kclass.memberFunctions.firstOrNull { it.name == "set${propertyName.capitalize()}" && it.valueParameters.size == 1 }
+            return mmeth != null
+        }
+    }
+
+    actual fun getProperty(propertyName: String): Any? {
+        val mprop = kclass.memberProperties.firstOrNull { propertyName == it.name }
+        if (null != mprop) {
+            val prop = mprop as KProperty1<Any, *>
+            prop.getter.isAccessible = true
+            return prop.getter.call(self)
+        } else {
+            val mmeth = kclass.memberFunctions.firstOrNull { it.name == "get${propertyName.capitalize()}" && it.valueParameters.size == 0 }
+            if (mmeth == null) {
+                throw RuntimeException("Property ${propertyName} not found on object ${self}")
+            } else {
+                mmeth.isAccessible = true
+                return mmeth.call(self)
+            }
+        }
+    }
+
+    actual fun setProperty(propertyName: String, value: Any?) {
+        val mprop = kclass.memberProperties.firstOrNull { propertyName == it.name }
+        if (mprop != null) {
+            val prop = mprop as KMutableProperty1<Any, Any?>
+            prop.setter.isAccessible = true
+            prop.setter.call(self, value)
+        } else {
+            val mmeth = kclass.memberFunctions.firstOrNull { it.name == "set${propertyName.capitalize()}" && it.valueParameters.size == 1 }
+            //TODO: check type of parameter!
+            if (mmeth == null) {
+                throw RuntimeException("Property ${propertyName} not settable on object ${self}")
+            } else {
+                mmeth.isAccessible = true
+                mmeth.call(self, value)
+            }
+        }
+    }
+
+    actual fun call(methodName: String, vararg args: Any?): Any? {
+        val mem = kclass.memberProperties.firstOrNull { methodName == it.name }
+        if (null != mem) {
+            val m = mem as KCallable<*>
+            return m.call(self, *args)
+        } else {
+            throw RuntimeException("Method ${methodName} not found on object ${self}")
         }
     }
 }
 
 actual object ModuleRegistry {
 
-    actual fun register(moduleName:String) {
+    actual fun register(moduleName: String) {
         //Not needed for JVM
     }
 
@@ -120,3 +216,4 @@ actual object ModuleRegistry {
         return Class.forName(qualifiedName).kotlin
     }
 }
+

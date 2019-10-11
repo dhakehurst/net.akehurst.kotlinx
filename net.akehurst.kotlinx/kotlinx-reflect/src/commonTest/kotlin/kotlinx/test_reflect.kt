@@ -58,7 +58,7 @@ class test_reflect {
     fun allPropertyNames() {
 
         val obj1 = A()
-        val actual = obj1::class.reflect().allPropertyNames(obj1)
+        val actual = obj1::class.reflect().allPropertyNames
         assertEquals(listOf("prop1"), actual)
 
     }
@@ -67,7 +67,7 @@ class test_reflect {
     fun getProperty() {
 
         val obj1 = A()
-        val actual = obj1::class.reflect().getProperty("prop1", obj1)
+        val actual = obj1.reflect().getProperty("prop1")
         assertEquals(obj1.prop1, actual)
 
     }

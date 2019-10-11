@@ -16,19 +16,27 @@
 
 package net.akehurst.kotlinx.collections
 
-fun <T> Set<T>.transitveClosure(function: (T) -> Set<T>): Set<T> {
-    var result:MutableSet<T> = this.toMutableSet()
-    var newThings:MutableSet<T> = this.toMutableSet()
-    var newStuff = true
-    while (newStuff) {
-        val temp = newThings.toSet()
-        newThings.clear()
-        for (nt:T in temp) {
-            val s:Set<T> = function.invoke(nt)
-            newThings.addAll(s)
-        }
-        newThings.removeAll(result)
-        newStuff = result.addAll(newThings)
+class Stack<T> {
+
+    private val _elements = mutableListOf<T>()
+
+    val elements:List<T> = this._elements
+
+    fun clear() {
+        this._elements.clear()
     }
-    return result
+
+    fun push(element:T) {
+        _elements.add(element)
+    }
+
+    fun pop() : T {
+        val v = _elements.last()
+        _elements.removeAt(_elements.size-1)
+        return v
+    }
+
+    fun peek() :T {
+        return _elements.last()
+    }
 }

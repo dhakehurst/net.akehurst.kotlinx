@@ -16,19 +16,16 @@
 
 package net.akehurst.kotlinx.collections
 
-fun <T> Set<T>.transitveClosure(function: (T) -> Set<T>): Set<T> {
-    var result:MutableSet<T> = this.toMutableSet()
-    var newThings:MutableSet<T> = this.toMutableSet()
-    var newStuff = true
-    while (newStuff) {
-        val temp = newThings.toSet()
-        newThings.clear()
-        for (nt:T in temp) {
-            val s:Set<T> = function.invoke(nt)
-            newThings.addAll(s)
-        }
-        newThings.removeAll(result)
-        newStuff = result.addAll(newThings)
-    }
-    return result
+inline fun <K, V> mutableMapNonNullOf() = MutableMapNonNullDefault(mutableMapOf<K,V>())
+
+interface MapNonNull<K, out V> : Map<K, V> {
+    override operator fun get(key: K): V
+}
+
+interface MutableMapNonNull<K, V> : MapNonNull<K, V>, MutableMap<K,V> {
+    override operator fun get(key: K): V
+}
+
+class MutableMapNonNullDefault<K, V>(private val map:MutableMap<K,V>) : MutableMapNonNull<K,V>, MutableMap<K,V> by map {
+    override fun get(key: K): V = this.map[key]!!
 }
