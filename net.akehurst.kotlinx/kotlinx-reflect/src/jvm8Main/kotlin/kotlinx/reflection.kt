@@ -108,7 +108,7 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual fun call(self: T, methodName: String, vararg args: Any?): Any? {
-        val mem = kclass.memberProperties.firstOrNull { methodName == it.name }
+        val mem = kclass.memberFunctions.firstOrNull { methodName == it.name }
         if (null != mem) {
             val m = mem as KCallable<*>
             return m.call(self, *args)
@@ -195,7 +195,7 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     }
 
     actual fun call(methodName: String, vararg args: Any?): Any? {
-        val mem = kclass.memberProperties.firstOrNull { methodName == it.name }
+        val mem = kclass.memberFunctions.firstOrNull { methodName == it.name }
         if (null != mem) {
             val m = mem as KCallable<*>
             return m.call(self, *args)
