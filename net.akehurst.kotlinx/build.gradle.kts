@@ -21,7 +21,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import java.io.File
 
 plugins {
-    kotlin("multiplatform") version("1.3.41") apply false
+    kotlin("multiplatform") version("1.3.50") apply false
     id("com.jfrog.bintray") version("1.8.4") apply false
 }
 
