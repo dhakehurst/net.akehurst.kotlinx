@@ -25,8 +25,17 @@ actual object ModuleRegistry {
 
     val modules = mutableSetOf<Any>()
 
-    actual fun register(moduleName: String) {
-        val module = js("window[moduleName]")
+    // must be inline so that the generated code can find the module as the imported JS name
+    actual inline fun register(moduleName: String) {
+        val module = js("""
+            (function() {
+              if (typeof __webpack_require__ === 'function') {
+                return __webpack_require__('./node_modules/'+moduleName+'/'+moduleName+'.js')
+              } else {
+                return window[moduleName]
+              }
+            })()   
+        """)
         modules.add(module)
     }
 
@@ -84,7 +93,7 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual fun allPropertyNames(self: T): List<String> {
-        val js: Array<String> = js("Object.getOwnPropertyNames(obj)")
+        val js: Array<String> = js("Object.getOwnPropertyNames(self)")
         return js.toList()
     }
 
@@ -102,6 +111,7 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         js("self[propertyName] = value")
     }
 
+
     actual fun call(self: T, methodName: String, vararg args: Any?) : Any? {
         return js("self[methodName](args)")
     }
@@ -116,7 +126,7 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
         }
 
     actual val allPropertyNames: List<String> by lazy {
-        val js: Array<String> = js("Object.getOwnPropertyNames(self)")
+        val js: Array<String> = js("Object.getOwnPropertyNames(this.self)")
         js.toList()
     }
 
@@ -137,15 +147,15 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     }
 
     actual fun getProperty(propertyName: String): Any? {
-        return js("self[propertyName]")
+        return js("this.self[propertyName]")
         //return "Reflect.get(obj, propertyName)"
     }
 
     actual fun setProperty(propertyName: String, value: Any?) {
-        js("self[propertyName] = value")
+        js("this.self[propertyName] = value")
     }
 
     actual fun call(methodName: String, vararg args: Any?) : Any? {
-        return js("self[methodName](args)")
+        return js("this.self[methodName](args)")
     }
 }

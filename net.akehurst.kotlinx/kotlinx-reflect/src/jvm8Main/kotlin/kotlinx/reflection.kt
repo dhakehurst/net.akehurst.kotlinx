@@ -207,7 +207,7 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
 
 actual object ModuleRegistry {
 
-    actual fun register(moduleName: String) {
+    actual inline fun register(moduleName: String) {
         //Not needed for JVM
     }
 
