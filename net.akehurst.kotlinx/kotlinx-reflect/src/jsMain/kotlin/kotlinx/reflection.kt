@@ -111,7 +111,6 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         js("self[propertyName] = value")
     }
 
-
     actual fun call(self: T, methodName: String, vararg args: Any?) : Any? {
         return js("self[methodName](args)")
     }
