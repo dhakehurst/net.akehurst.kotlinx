@@ -121,11 +121,12 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     actual val kclass: KClass<T> = self::class as KClass<T>
     actual val isAbstract: Boolean
         get() {
-            return this.kclass.simpleName!!.endsWith("Abstract")
+            return this.kclass.simpleName!!.endsWith("Abstract") //TODO !! need something better than this
         }
 
     actual val allPropertyNames: List<String> by lazy {
-        val js: Array<String> = js("Object.getOwnPropertyNames(this.self)")
+        val self = this.self
+        val js: Array<String> = js("Object.getOwnPropertyNames(self)")
         js.toList()
     }
 
@@ -146,15 +147,18 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     }
 
     actual fun getProperty(propertyName: String): Any? {
-        return js("this.self[propertyName]")
+        val self = this.self
+        return js("self[propertyName]")
         //return "Reflect.get(obj, propertyName)"
     }
 
     actual fun setProperty(propertyName: String, value: Any?) {
-        js("this.self[propertyName] = value")
+        val self = this.self
+        js("self[propertyName] = value")
     }
 
     actual fun call(methodName: String, vararg args: Any?) : Any? {
-        return js("this.self[methodName](args)")
+        val self = this.self
+        return js("self[methodName](args)")
     }
 }
