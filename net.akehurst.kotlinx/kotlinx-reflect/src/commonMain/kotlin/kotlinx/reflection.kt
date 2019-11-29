@@ -67,8 +67,7 @@ fun KClass<*>.reflect() = ClassReflection(this)
 
 expect object ModuleRegistry {
 
-    // must be inline so that the generated code can find the module as the imported JS name
-    inline fun register(moduleName: String)
+    fun register(moduleName: String)
 
     fun classForName(qualifiedName: String): KClass<*>
 

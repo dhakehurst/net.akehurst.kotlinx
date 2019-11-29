@@ -26,7 +26,8 @@ actual object ModuleRegistry {
     val modules = mutableSetOf<Any>()
 
     // must be inline so that the generated code can find the module as the imported JS name
-    actual inline fun register(moduleName: String) {
+    actual fun register(moduleName: String) {
+        /*
         val module = js("""
             (function() {
               if (typeof __webpack_require__ === 'function') {
@@ -36,6 +37,29 @@ actual object ModuleRegistry {
               }
             })()   
         """)
+         */
+        /* TODO: not sure which order is best!
+        First try the 'global/window' namespace
+        Then try 'dynamicModule' which should be generated
+         */
+        val module = js("""
+            (function() {
+                if (window[moduleName]) {
+                    return window[moduleName]
+                }
+                var generatedRequire = require('./generatedRequire.js')
+                if (typeof generatedRequire === 'function') {
+                    return generatedRequire(moduleName)
+                }
+            })()
+        """)
+        /*
+        val module = js("""
+            (function() {
+                return await import(moduleName)
+            })()   
+        """)
+        */
         modules.add(module)
     }
 
@@ -83,7 +107,7 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
 
     actual fun construct(vararg constructorArgs: Any?): T {
         val cls = this.kclass.js
-        //val obj = js("Reflect.construct(cls, ...constructorArgs)")  // ES6
+//val obj = js("Reflect.construct(cls, ...constructorArgs)")  // ES6
         val obj = js("new (Function.prototype.bind.apply(cls, [null].concat(constructorArgs)))")
         return obj as T
     }
@@ -98,20 +122,20 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
-        // FIXME: when JS reflection is sufficient
+// FIXME: when JS reflection is sufficient
         return true
     }
 
     actual fun getProperty(self: T, propertyName: String): Any? {
         return js("self[propertyName]")
-        //return "Reflect.get(obj, propertyName)"
+//return "Reflect.get(obj, propertyName)"
     }
 
     actual fun setProperty(self: T, propertyName: String, value: Any?) {
         js("self[propertyName] = value")
     }
 
-    actual fun call(self: T, methodName: String, vararg args: Any?) : Any? {
+    actual fun call(self: T, methodName: String, vararg args: Any?): Any? {
         return js("self[methodName](args)")
     }
 }
@@ -132,7 +156,7 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
 
     actual fun construct(vararg constructorArgs: Any?): T {
         val cls = this.kclass.js
-        //val obj = js("Reflect.construct(cls, ...constructorArgs)")  // ES6
+//val obj = js("Reflect.construct(cls, ...constructorArgs)")  // ES6
         val obj = js("new (Function.prototype.bind.apply(cls, [null].concat(constructorArgs)))")
         return obj as T
     }
@@ -142,14 +166,14 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
-        // FIXME: when JS reflection is sufficient
+// FIXME: when JS reflection is sufficient
         return true
     }
 
     actual fun getProperty(propertyName: String): Any? {
         val self = this.self
         return js("self[propertyName]")
-        //return "Reflect.get(obj, propertyName)"
+//return "Reflect.get(obj, propertyName)"
     }
 
     actual fun setProperty(propertyName: String, value: Any?) {
@@ -157,7 +181,7 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
         js("self[propertyName] = value")
     }
 
-    actual fun call(methodName: String, vararg args: Any?) : Any? {
+    actual fun call(methodName: String, vararg args: Any?): Any? {
         val self = this.self
         return js("self[methodName](args)")
     }
