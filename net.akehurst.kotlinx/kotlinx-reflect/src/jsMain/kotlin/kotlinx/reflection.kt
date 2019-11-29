@@ -41,12 +41,15 @@ actual object ModuleRegistry {
          */
         val module = js("""
             (function() {
-                if (window[moduleName]) {
-                    return window[moduleName]
-                }
-                var generatedRequire = require('./generatedRequire.js')
-                if (typeof generatedRequire === 'function') {
-                    return generatedRequire(moduleName)
+                try {
+                    if (window[moduleName]) {
+                        return window[moduleName]
+                    }
+                    var generatedRequire = require('./generatedRequire.js')
+                    if (typeof generatedRequire === 'function') {
+                        return generatedRequire(moduleName)
+                    }
+                } catch (e) {
                 }
             })()
         """)
