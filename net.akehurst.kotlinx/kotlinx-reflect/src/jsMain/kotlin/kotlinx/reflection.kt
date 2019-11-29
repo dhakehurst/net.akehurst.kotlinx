@@ -16,10 +16,7 @@
 
 package net.akehurst.kotlinx.reflect
 
-import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
-import kotlin.reflect.KFunction
-import kotlin.reflect.KMutableProperty1
 
 actual object ModuleRegistry {
 
