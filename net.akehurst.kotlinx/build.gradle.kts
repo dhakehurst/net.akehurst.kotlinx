@@ -22,6 +22,7 @@ import java.io.File
 
 plugins {
     kotlin("multiplatform") version("1.3.60") apply false
+    id("net.akehurst.kotlin.kt2ts") version("1.3.0") apply false
     id("com.jfrog.bintray") version("1.8.4") apply false
 }
 
@@ -42,6 +43,7 @@ fun getProjectProperty(s: String) = project.findProperty(s) as String?
 
 subprojects {
     apply(plugin="org.jetbrains.kotlin.multiplatform")
+    apply(plugin="net.akehurst.kotlin.kt2ts")
     apply(plugin = "maven-publish")
     apply(plugin = "com.jfrog.bintray")
 
