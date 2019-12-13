@@ -20,17 +20,28 @@ import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 
+expect fun KFunction<*>.isSuspend() : Boolean
+
+expect fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler:Any, proxy: Any?, callable: KCallable<*>, methodName:String, args: Array<out Any>) -> Any?): T
+
+expect fun Any.reflect() : ObjectReflection<Any>
+expect fun KClass<*>.reflect() : ClassReflection<*>
+
 expect class ClassReflection<T : Any>(kclass: KClass<T>) {
 
     val isAbstract: Boolean
 
     val allPropertyNames: List<String>
 
+    val allMemberFunctions: List<KFunction<*>>
+
     fun construct(vararg constructorArgs: Any?): T
 
     fun <S : Any> isSupertypeOf(subtype: KClass<S>): Boolean
 
-    fun allPropertyNames(self: T): List<String>
+    fun allPropertyNamesFor(self: T): List<String>
+
+    fun allMemberFunctionsFor(self: T): List<KFunction<*>>
 
     fun getProperty(self: T, propertyName: String): Any?
 
@@ -61,9 +72,6 @@ expect class ObjectReflection<T : Any>(self: T) {
 
     fun call(methodName: String, vararg args: Any?) : Any?
 }
-
-fun Any.reflect() = ObjectReflection(this)
-fun KClass<*>.reflect() = ClassReflection(this)
 
 expect object ModuleRegistry {
 

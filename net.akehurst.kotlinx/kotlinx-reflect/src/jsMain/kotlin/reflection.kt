@@ -16,7 +16,18 @@
 
 package net.akehurst.kotlinx.reflect
 
+import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
+import kotlin.reflect.KFunction
+
+actual fun KFunction<*>.isSuspend() : Boolean = TODO() //this.isSuspend
+
+actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler:Any, proxy: Any?, callable: KCallable<*>, methodName:String, args: Array<out Any>) -> Any?): T {
+    TODO()
+}
+
+actual fun Any.reflect() = ObjectReflection(this)
+actual fun KClass<*>.reflect() = ClassReflection(this)
 
 actual object ModuleRegistry {
 
@@ -105,6 +116,10 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         TODO()
     }
 
+    actual val allMemberFunctions: List<KFunction<*>> by lazy {
+        TODO()
+    }
+
     actual fun construct(vararg constructorArgs: Any?): T {
         val cls = this.kclass.js
 //val obj = js("Reflect.construct(cls, ...constructorArgs)")  // ES6
@@ -116,9 +131,13 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         TODO()
     }
 
-    actual fun allPropertyNames(self: T): List<String> {
+    actual fun allPropertyNamesFor(self: T): List<String> {
         val js: Array<String> = js("Object.getOwnPropertyNames(self)")
         return js.toList()
+    }
+
+    actual fun allMemberFunctionsFor(self: T): List<KFunction<*>> {
+        TODO()
     }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
