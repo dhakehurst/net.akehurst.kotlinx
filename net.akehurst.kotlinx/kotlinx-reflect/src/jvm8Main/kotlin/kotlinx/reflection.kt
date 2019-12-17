@@ -18,18 +18,16 @@ package net.akehurst.kotlinx.reflect
 
 import net.akehurst.kotlinx.collections.transitveClosure
 import java.lang.reflect.InvocationHandler
+import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import kotlin.reflect.*
-import kotlin.reflect.full.createInstance
-import kotlin.reflect.full.memberFunctions
-import kotlin.reflect.full.memberProperties
-import kotlin.reflect.full.valueParameters
 import kotlin.reflect.jvm.isAccessible
 import kotlin.reflect.jvm.javaMethod
 import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
+import kotlin.reflect.full.*
 
-fun < T : Any> defaultValue(): T {
+fun <T : Any> defaultValue(): T {
     return castNull()
 }
 
@@ -47,17 +45,17 @@ fun <T : Any> createInstance(kClass: KClass<T>): T {
 @Suppress("UNCHECKED_CAST")
 private fun <T> castNull(): T = null as T
 
-fun <R> methodLiteral(call:KCallable<R>) : Method? {
-    return when(call) {
+fun <R> methodLiteral(call: KCallable<R>): Method? {
+    return when (call) {
         is KFunction<R> -> call.javaMethod
         else -> null
     }
 }
 
-actual fun KFunction<*>.isSuspend() : Boolean = this.isSuspend
+actual fun KFunction<*>.isSuspend(): Boolean = this.isSuspend
 
-actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler:Any, proxy: Any?, callable: KCallable<*>, methodName:String, args: Array<out Any>) -> Any?): T {
-    val handler = object: InvocationHandler {
+actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler: Any, proxy: Any?, callable: KCallable<*>, methodName: String, args: Array<out Any>) -> Any?): T {
+    val handler = object : InvocationHandler {
         override fun invoke(proxy: Any?, method: Method?, args: Array<out Any>?): Any? {
             val args2 = args ?: emptyArray<Any>()
             //this throws an error if one of the parameters is an inline class
@@ -68,7 +66,7 @@ actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler:An
             val callable = method?.declaringClass?.kotlin?.members?.firstOrNull {
                 //need to handle jvm name mangling!!
 
-                if (it.name.contains('-') or method.name.contains('-') ) {
+                if (it.name.contains('-') or method.name.contains('-')) {
                     it.name.substringBefore('-') == method.name.substringBefore('-')
                 } else {
                     it.name == method.name
@@ -181,13 +179,7 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual fun call(self: T, methodName: String, vararg args: Any?): Any? {
-        val mem = kclass.memberFunctions.firstOrNull { methodName == it.name }
-        if (null != mem) {
-            val m = mem as KCallable<*>
-            return m.call(self, *args)
-        } else {
-            throw RuntimeException("Method ${methodName} not found on object ${self}")
-        }
+        return self.reflect().call(methodName, *args)
     }
 }
 
@@ -268,16 +260,130 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     }
 
     actual fun call(methodName: String, vararg args: Any?): Any? {
-        // because of methods created by kotlin to support suspend functions and inline classes, we must look for the jvm method direct
-        //val mem = kclass.memberFunctions.firstOrNull { methodName == it.name }
-        val mem = kclass.java.methods.firstOrNull { methodName == it.name }
-        if (null != mem) {
-            //val m = mem. as KCallable<*>
-            //return m.call(self, *args)
-            return mem.invoke(self, *args)
-        } else {
-            throw RuntimeException("Method ${methodName} not found on object ${self}")
+        // because of methods created by kotlin to support suspend functions and inline classes, we must look for the jvm method direct,
+        // and check for a mangled name version if normal one fails!
+
+        // First try it the nice way
+        try {
+            val meth = kclass.memberFunctions.firstOrNull { methodName == it.name }
+            if (null != meth) {
+                return meth.call(self, *args)
+            } else {
+                throw RuntimeException("Method ${methodName} not found on object ${self}")
+            }
+        } catch (t: Throwable) {
+            val e = if (t is InvocationTargetException && null==t.cause) t else t.cause
+            val msg = "call($methodName) failed: ${e}"
+            println(msg)
         }
+
+        //then try the JVM way
+        try {
+            val meth = kclass.java.methods.firstOrNull { methodName == it.name }
+            if (null != meth) {
+                return meth.invoke(self, *args)
+            } else {
+                throw RuntimeException("Method ${methodName} not found on object ${self}")
+            }
+        } catch (t: Throwable) {
+            val e = if (t is InvocationTargetException && null==t.cause) t else t.cause
+            val msg = "call($methodName) failed: ${e}"
+            println(msg)
+        }
+
+        // finally try for a mangled name version
+        try {
+            val meth = kclass.java.methods.firstOrNull { it.name.startsWith(methodName+"-") }
+            val unBoxedArgs = meth!!.parameterTypes.mapIndexed { index, clazz ->
+                        val arg = args[index]
+                        when {
+                            null==arg -> null
+                            clazz.isInstance(arg) -> arg
+                            else -> arg::class.memberProperties.first().call(arg) //their should only be one property on an inline class
+                        }
+                    }
+            if (null != meth) {
+                return meth.invoke(self, *unBoxedArgs.toTypedArray())
+            } else {
+                throw RuntimeException("Method ${methodName} not found on object ${self}")
+            }
+        } catch (t: Throwable) {
+            if (t is InvocationTargetException && null!=t.cause) {
+                throw t
+            } else {
+                val msg = "call($methodName) failed: ${t}"
+                println(msg)
+            }
+        }
+
+        throw RuntimeException("Method ${methodName} not found on object ${self}")
+    }
+
+    actual suspend fun callSuspend(methodName: String, vararg args: Any?) : Any? {
+        // because of methods created by kotlin to support suspend functions and inline classes, we must look for the jvm method direct,
+        // and check for a mangled name version if normal one fails!
+
+        // First try it the nice way
+        try {
+            val meth = kclass.memberFunctions.firstOrNull { methodName == it.name }
+            if (null != meth) {
+                return suspendCoroutineUninterceptedOrReturn { cont ->
+                    return@suspendCoroutineUninterceptedOrReturn meth.call(self, *args, cont)
+                }
+            } else {
+                throw RuntimeException("Method ${methodName} not found on object ${self}")
+            }
+        } catch (t: Throwable) {
+            val e = if (t is InvocationTargetException && null==t.cause) t else t.cause
+            val msg = "callSuspend($methodName) failed: ${e}"
+            println(msg)
+        }
+
+        //then try the JVM way
+        try {
+            val meth = kclass.java.methods.firstOrNull { methodName == it.name }
+            if (null != meth) {
+                return suspendCoroutineUninterceptedOrReturn { cont ->
+                    return@suspendCoroutineUninterceptedOrReturn meth.invoke(self, *args, cont)
+                }
+            } else {
+                throw RuntimeException("Method ${methodName} not found on object ${self}")
+            }
+        } catch (t: Throwable) {
+            val e = if (t is InvocationTargetException && null==t.cause) t else t.cause
+            val msg = "callSuspend($methodName) failed: ${e}"
+            println(msg)
+        }
+
+        // finally try for a mangled name version
+        try {
+            val meth = kclass.java.methods.firstOrNull { it.name.startsWith(methodName+"-") }
+            val unBoxedArgs = meth!!.parameterTypes.dropLast(1) //drop the 'Continuation' parameter, no need to check that
+                    .mapIndexed { index, clazz ->
+                val arg = args[index]
+                when {
+                    null==arg -> null
+                    clazz.isInstance(arg) -> arg
+                    else -> arg::class.memberProperties.first().call(arg) //their should only be one property on an inline class
+                }
+            }
+            if (null != meth) {
+                return suspendCoroutineUninterceptedOrReturn { cont ->
+                    return@suspendCoroutineUninterceptedOrReturn meth.invoke(self, *unBoxedArgs.toTypedArray(), cont)
+                }
+            } else {
+                throw RuntimeException("Method ${methodName} not found on object ${self}")
+            }
+        } catch (t: Throwable) {
+            if (t is InvocationTargetException && null!=t.cause) {
+                throw t
+            } else {
+                val msg = "callSuspend($methodName) failed: ${t}"
+                println(msg)
+            }
+        }
+
+        throw RuntimeException("Method ${methodName} not found on object ${self}")
     }
 
 }

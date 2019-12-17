@@ -204,4 +204,8 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
         val self = this.self
         return js("self[methodName](args)")
     }
+
+    actual suspend fun callSuspend(methodName: String, vararg args: Any?) : Any? {
+        TODO()
+    }
 }

@@ -71,6 +71,8 @@ expect class ObjectReflection<T : Any>(self: T) {
     fun isPropertyMutable(propertyName: String): Boolean
 
     fun call(methodName: String, vararg args: Any?) : Any?
+
+    suspend fun callSuspend(methodName: String, vararg args: Any?) : Any?
 }
 
 expect object ModuleRegistry {
