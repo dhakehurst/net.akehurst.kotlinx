@@ -169,6 +169,38 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
 
     actual val allPropertyNames: List<String> by lazy {
         val self = this.self
+        /*
+        val js: Array<String> = js("""(function(){
+            var props = [];
+            var proto = Object.getPrototypeOf(self);
+            Object.getOwnPropertyNames(proto).forEach(function(name) {
+                if (typeof self[name] === 'function') {
+                    // ignore it
+                } else if (self.hasOwnProperty(name) && props.indexOf(name) === -1) {
+                    props.push(name);
+                }
+                var descriptor = Object.getOwnPropertyDescriptor(proto, name);
+                if (typeof descriptor.get === 'function' && props.indexOf(name) === -1) {
+                    props.push(name);
+                }
+            });
+            Object.getOwnPropertyNames(self).forEach(function(name) {
+                if (typeof self[name] === 'function') {
+                    // ignore it
+                } else if (self.hasOwnProperty(name) && props.indexOf(name) === -1) {
+                    props.push(name);
+                }
+                var descriptor = Object.getOwnPropertyDescriptor(self, name);
+                if (typeof descriptor.get === 'function' && props.indexOf(name) === -1) {
+                    props.push(name);
+                }
+            });
+            props
+        })();""")
+        */
+        //FIXME: this does not seem to get all properties from a Kotlin object!!
+        // tried above code but it made no difference/
+        // problem seems to be getting properties that are defined using Object.defineProperty in Kotlin generated code
         val js: Array<String> = js("Object.getOwnPropertyNames(self)")
         js.toList()
     }
