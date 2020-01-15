@@ -26,6 +26,7 @@ import kotlin.reflect.jvm.isAccessible
 import kotlin.reflect.jvm.javaMethod
 import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
 import kotlin.reflect.full.*
+import kotlin.reflect.jvm.javaGetter
 
 fun <T : Any> defaultValue(): T {
     return castNull()
@@ -227,6 +228,10 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     actual fun getProperty(propertyName: String): Any? {
         val mprop = kclass.memberProperties.firstOrNull { propertyName == it.name }
         if (null != mprop) {
+            //first do null check because of bug with properties with type inline class
+            if (null==mprop.javaGetter?.invoke(self)) {
+                return null;
+            }
             val prop = mprop as KProperty1<Any, *>
             prop.getter.isAccessible = true
             return prop.getter.call(self)
