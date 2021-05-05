@@ -20,6 +20,12 @@ import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 
+val IR:Boolean by lazy {
+    val pair = Pair(1,2)
+    val result:Boolean = js("pair.hasOwnProperty('_first')")
+    result
+}
+
 actual fun KFunction<*>.isSuspend() : Boolean = TODO() //this.isSuspend
 
 actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler:Any, proxy: Any?, callable: KCallable<*>, methodName:String, args: Array<out Any>) -> Any?): T {
@@ -146,16 +152,27 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual fun getProperty(self: T, propertyName: String): Any? {
-        return js("self[propertyName]")
-//return "Reflect.get(obj, propertyName)"
+        return if(IR) {
+            js("self['_'+propertyName]")
+        } else {
+            js("self[propertyName]")
+        }
     }
 
     actual fun setProperty(self: T, propertyName: String, value: Any?) {
-        js("self[propertyName] = value")
+        if(IR) {
+            js("self['_'+propertyName] = value")
+        } else {
+            js("self[propertyName] = value")
+        }
     }
 
     actual fun call(self: T, methodName: String, vararg args: Any?): Any? {
-        return js("self[methodName](args)")
+        return if (IR) {
+            js("self[methodName](args)")
+        } else {
+            js("self[methodName](args)")
+        }
     }
 }
 
@@ -222,19 +239,31 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     }
 
     actual fun getProperty(propertyName: String): Any? {
-        val self = this.self
-        return js("self[propertyName]")
+        val self = this.self //ensures self is available in the js script below
+        return if (IR) {
+            js("self['_'+propertyName]")
+        } else {
+            js("self[propertyName]")
+        }
 //return "Reflect.get(obj, propertyName)"
     }
 
     actual fun setProperty(propertyName: String, value: Any?) {
-        val self = this.self
-        js("self[propertyName] = value")
+        val self = this.self //ensures self is available in the js script below
+        if(IR) {
+            js("self['_'+propertyName] = value")
+        } else {
+            js("self[propertyName] = value")
+        }
     }
 
     actual fun call(methodName: String, vararg args: Any?): Any? {
-        val self = this.self
-        return js("self[methodName](args)")
+        val self = this.self //ensures self is available in the js script below
+        return if (IR) {
+            js("self[methodName](args)")
+        } else {
+            js("self[methodName](args)")
+        }
     }
 
     actual suspend fun callSuspend(methodName: String, vararg args: Any?) : Any? {

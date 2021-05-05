@@ -27,6 +27,7 @@ import kotlin.reflect.jvm.javaMethod
 import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
 import kotlin.reflect.full.*
 import kotlin.reflect.jvm.javaGetter
+import kotlin.reflect.jvm.kotlinFunction
 
 fun <T : Any> defaultValue(): T {
     return castNull()
@@ -61,8 +62,8 @@ actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler: A
             val args2 = args ?: emptyArray<Any>()
             //this throws an error if one of the parameters is an inline class
             // see [https://youtrack.jetbrains.com/issue/KT-34024]
-//              val callable = method?.kotlinFunction!!
-
+              val callable = method?.kotlinFunction!!
+/*
             //FIXME using workaround by just checking for method name, might fail if duplicate names
             val callable = method?.declaringClass?.kotlin?.members?.firstOrNull {
                 //need to handle jvm name mangling!!
@@ -74,6 +75,8 @@ actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler: A
                 }
 
             } ?: throw RuntimeException("method not found $method")
+
+ */
             return invokeMethod.invoke(this, proxy, callable, method.name, args2)
         }
     }

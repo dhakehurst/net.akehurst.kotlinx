@@ -18,10 +18,15 @@ package net.akehurst.kotlinx.reflect
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.fail
 
 
 open class A {
     val prop1 = "hello"
+    val prop2 = "world"
+    val prop3 = true
+    val prop4 = 1
+    val prop5 = 3.141
 
     override fun hashCode(): Int {
         return prop1.hashCode()
@@ -65,21 +70,24 @@ class test_reflect {
     }
 
     @Test
-    fun getProperty() {
+    fun getProperty_KotlinReflection() {
+        val obj1 = A()
+        fail("Until/If kotlin reflection JS is possible!")
+        //val actual = obj1::class.
+    }
 
+    @Test
+    fun getProperty_myReflection() {
         val obj1 = A()
         val actual = obj1.reflect().getProperty("prop1")
         assertEquals(obj1.prop1, actual)
-
     }
 
     @Test
     fun construct() {
-
         val obj1 = A()
         val actual = obj1::class.reflect().construct()
         assertEquals(obj1, actual)
-
     }
 
     //TODO: not currently sure how to test
