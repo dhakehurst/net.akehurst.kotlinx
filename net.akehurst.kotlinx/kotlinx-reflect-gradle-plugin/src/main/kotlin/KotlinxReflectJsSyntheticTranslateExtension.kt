@@ -10,14 +10,25 @@ import org.jetbrains.kotlin.js.translate.extensions.JsSyntheticTranslateExtensio
 import org.jetbrains.kotlin.psi.KtPureClassOrObject
 
 class KotlinxReflectJsSyntheticTranslateExtension(
-    val messageCollector: MessageCollector
+    val messageCollector: MessageCollector,
+    val forReflection:String
 ): JsSyntheticTranslateExtension {
 
     override fun generateClassSyntheticParts(declaration: KtPureClassOrObject, descriptor: ClassDescriptor, translator: DeclarationBodyVisitor, context: TranslationContext) {
-        println(context.currentModule.allDependencyModules)
-        messageCollector.report(CompilerMessageSeverity.INFO,"KotlinxReflect")
-        messageCollector.report(CompilerMessageSeverity.INFO,"Modules")
-        messageCollector.report(CompilerMessageSeverity.INFO,"${context.currentModule.allDependencyModules}")
+        messageCollector.report(CompilerMessageSeverity.WARNING,"KotlinxReflect")
+        messageCollector.report(CompilerMessageSeverity.WARNING,"Modules")
+        for(it in context.config.libraries) {
+            messageCollector.report(CompilerMessageSeverity.WARNING,"$it")
+        }
+
+        val refLibs = forReflection.split(java.io.File.pathSeparator).filterNot(String::isEmpty)
+
+        messageCollector.report(CompilerMessageSeverity.WARNING,"defaultReflectionLibs")
+        for(it in refLibs) {
+            messageCollector.report(CompilerMessageSeverity.WARNING,"$it")
+        }
+
+        //context.config.
     }
 
 }
