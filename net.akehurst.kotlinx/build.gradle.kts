@@ -48,7 +48,7 @@ subprojects {
         mavenCentral()
     }
 
-    if ("kotlinx-reflect-gradle-plugin" != name) {
+    if (name!="kotlinx-reflect-gradle-plugin") {
         apply(plugin = "org.jetbrains.kotlin.multiplatform")
         apply(plugin = "net.akehurst.kotlin.kt2ts")
         apply(plugin = "maven-publish")

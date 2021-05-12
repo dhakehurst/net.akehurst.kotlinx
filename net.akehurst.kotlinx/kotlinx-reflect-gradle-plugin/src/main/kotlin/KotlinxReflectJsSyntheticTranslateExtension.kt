@@ -28,7 +28,8 @@ class KotlinxReflectJsSyntheticTranslateExtension(
             messageCollector.report(CompilerMessageSeverity.WARNING,"$it")
         }
 
-        //context.config.
+        //context.currentModule.
     }
+
 
 }

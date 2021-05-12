@@ -78,6 +78,7 @@ expect class ObjectReflection<T : Any>(self: T) {
 expect object ModuleRegistry {
 
     fun register(moduleName: String)
+    fun registerClass(qualifiedName: String,cls:KClass<*>)
 
     fun classForName(qualifiedName: String): KClass<*>
 

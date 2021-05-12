@@ -14,15 +14,8 @@
  * limitations under the License.
  */
 
-pluginManagement {
-    repositories {
-        mavenLocal()
-        gradlePluginPortal()
-    }
-}
 rootProject.name = file(".").name
 
-include("kotlinx-collections")
-include("kotlinx-reflect")
-include("kotlinx-reflect-gradle-plugin")
-
+include("kotlinx-reflect-gradle-plugin-test")
+include("kotlinx-reflect-gradle-plugin-test-moduleForReflection")
+includeBuild("..")
