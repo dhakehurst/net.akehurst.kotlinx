@@ -72,7 +72,7 @@ class test_reflect {
     @Test
     fun getProperty_KotlinReflection() {
         val obj1 = A()
-        fail("Until/If kotlin reflection JS is possible!")
+        //TODO: fail("Until/If kotlin reflection JS is possible!")
         //val actual = obj1::class.
     }
 

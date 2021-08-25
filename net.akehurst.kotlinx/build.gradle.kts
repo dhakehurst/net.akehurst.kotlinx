@@ -19,9 +19,11 @@ import com.github.gmazzo.gradle.plugins.BuildConfigExtension
 import java.io.File
 
 plugins {
-    kotlin("multiplatform") version("1.5.0") apply false
-    id("net.akehurst.kotlin.kt2ts") version("1.7.0") apply false
+    kotlin("multiplatform") version ("1.5.30") apply false
+    id("net.akehurst.kotlin.gradle.plugin.exportPublic") version("1.3.0") apply false
+    id("org.jetbrains.dokka") version ("1.4.32") apply false
     id("com.github.gmazzo.buildconfig") version("3.0.0") apply false
+    id("nu.studer.credentials") version ("2.1")
 }
 
 allprojects {
@@ -41,6 +43,9 @@ fun getProjectProperty(s: String) = project.findProperty(s) as String?
 
 subprojects {
 
+    apply(plugin = "maven-publish")
+    apply(plugin = "signing")
+    apply(plugin = "org.jetbrains.dokka")
     apply(plugin = "com.github.gmazzo.buildconfig")
 
     repositories {
@@ -50,12 +55,7 @@ subprojects {
 
     if (name!="kotlinx-reflect-gradle-plugin") {
         apply(plugin = "org.jetbrains.kotlin.multiplatform")
-        apply(plugin = "net.akehurst.kotlin.kt2ts")
-        apply(plugin = "maven-publish")
-
-        repositories {
-            mavenCentral()
-        }
+        apply(plugin = "net.akehurst.kotlin.gradle.plugin.exportPublic")
 
         configure<BuildConfigExtension> {
             val now = java.time.Instant.now()
@@ -82,7 +82,8 @@ subprojects {
                     }
                 }
             }
-            js("js") {
+            js("js", IR) {
+                binaries.library()
                 nodejs()
                 browser()
             }

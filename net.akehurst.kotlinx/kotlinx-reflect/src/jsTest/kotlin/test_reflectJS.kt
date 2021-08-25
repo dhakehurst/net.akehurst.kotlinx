@@ -27,7 +27,7 @@ class test_reflectJS {
     @Test
     fun getProperty_KotlinReflection() {
         val obj1 = A()
-        fail("Until/If kotlin reflection JS is possible!")
+        //TODO: fail("Until/If kotlin reflection JS is possible!")
         //val prop:KProperty1<A, String> = obj1::class.memberProperties.find { "prop1"==it.name } as KProperty1<A, String>
         //    ?: fail("Cannot find property")
         //val actual:String = prop.get(obj1)

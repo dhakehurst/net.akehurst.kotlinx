@@ -54,6 +54,7 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
         val extension = project.extensions.getByType(KotlinxReflectGradlePluginExtension::class.java)
         // TODO: ensure kotlinx-reflect lib is a dependency
 
+        /*
         // get classes required for reflection (TODO: can we deduce this from code analysis)
         val forReflection = project.configurations.getByName("forReflection")
         //TODO: remove kotlin stdlib stuff
@@ -67,10 +68,13 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
                 SubpluginOption(key = "forReflection", value = forRefFiles)
             )
         }
+         */
+        return project.provider {
+            extension.forReflection.get().map {
+                SubpluginOption(key = "forReflection", value = it)
+            }
+        }
     }
-
-
-
 
 }
 
@@ -79,6 +83,8 @@ open class KotlinxReflectGradlePluginExtension(objects: ObjectFactory) {
     companion object {
         val NAME = "kotlinxReflect"
     }
+
+    val forReflection = objects.listProperty(String::class.java)
 
 }
 
@@ -128,7 +134,7 @@ class KotlinxReflectComponentRegistrar(
 
         //JsSyntheticTranslateExtension.registerExtension(project, KotlinxReflectJsSyntheticTranslateExtension(messageCollector, forReflection))
         //AnalysisHandlerExtension.registerExtension(project, KotlinxReflectAnalysisHandlerExtension(messageCollector, forReflection))
-        //ExtraImportsProviderExtension.registerExtension(project, KotlinxReflectExtraImportsProviderExtension(messageCollector, forReflection))
+        ExtraImportsProviderExtension.registerExtension(project, KotlinxReflectExtraImportsProviderExtension(messageCollector, forReflection))
         IrGenerationExtension.registerExtension(project, KotlinxReflectIrGenerationExtension(messageCollector, forReflection))
 
     }

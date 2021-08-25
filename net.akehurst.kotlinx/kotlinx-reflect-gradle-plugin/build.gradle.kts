@@ -5,8 +5,9 @@ plugins {
     kotlin("jvm")
     kotlin("kapt") // does not respect buildDir, fixed in kotlin 1.5.20
 }
+import com.github.gmazzo.gradle.plugins.BuildConfigExtension
 
-buildConfig {
+configure<BuildConfigExtension>  {
     //val project = project(":kotlinx-gradle-plugin")
     packageName("${project.group}.reflect.gradle.plugin")
     className("KotlinPluginInfo")

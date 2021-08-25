@@ -11,6 +11,8 @@ import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.IrElement
+import org.jetbrains.kotlin.ir.IrStatement
+import org.jetbrains.kotlin.ir.backend.js.utils.isJsExport
 import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.builders.declarations.*
 import org.jetbrains.kotlin.ir.declarations.*
@@ -152,7 +154,7 @@ fun buildKotlinxReflectObject(pluginContext: IrPluginContext, pkgOwner: IrPackag
         addValueParameter("qualifiedName", pluginContext.irBuiltIns.stringType)
         body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
             val c1 = irCall(fun_registerClasses)
-            c1.dispatchReceiver = irGet(class_KotlixReflect.thisReceiver!!)
+            c1.dispatchReceiver = irGet(dispatchReceiverParameter!!)
             +c1
             val obj = irGetObject(class_ModuleRegistry)
             val call = irCall(fun_classForName, obj.type)
