@@ -31,11 +31,12 @@ import org.jetbrains.kotlin.name.Name
 
 class KotlinxReflectIrGenerationExtension(
     private val messageCollector: MessageCollector,
-    val forReflection: String
+    val forReflection: List<String>
 ) : IrGenerationExtension {
+
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
         messageCollector.report(CompilerMessageSeverity.WARNING, "forReflection = $forReflection")
-        messageCollector.report(CompilerMessageSeverity.WARNING, "forReflection = ${moduleFragment.files.map { it.fqName }}")
+        messageCollector.report(CompilerMessageSeverity.WARNING, "moduleFragment.files = ${moduleFragment.files.map { it.fqName }}")
 
         lateinit var packageFragment: IrPackageFragment
         moduleFragment.acceptVoid(object : IrElementVisitorVoid {
@@ -50,11 +51,13 @@ class KotlinxReflectIrGenerationExtension(
 
         })
 
+        //TODO: allow glob patterns
 
         val (class_KotlixReflect, fun_classForNameAfterRegistration) = buildKotlinxReflectObject(
             pluginContext,
             packageFragment,
-            listOf("net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.A")
+            forReflection
+//            listOf("net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.AAAA") //FIXME:
         )
 
         /*
@@ -104,74 +107,84 @@ class KotlinxReflectIrGenerationExtension(
 
     }
 
+    fun buildKotlinxReflectObject(pluginContext: IrPluginContext, pkgOwner: IrPackageFragment, classes: List<String>): Pair<IrClass, IrSimpleFunction> {
+        val class_ModuleRegistry = pluginContext.referenceClass(FqName("net.akehurst.kotlinx.reflect.ModuleRegistry")) ?: error("Cannot find ModuleRegistry class")
+        val fun_registerClass = pluginContext.referenceFunctions(FqName("net.akehurst.kotlinx.reflect.ModuleRegistry.registerClass")).single() // should be only one
+        val fun_classForName = pluginContext.referenceFunctions(FqName("net.akehurst.kotlinx.reflect.ModuleRegistry.classForName")).single() // should be only one
 
-}
-
-fun buildKotlinxReflectObject(pluginContext: IrPluginContext, pkgOwner: IrPackageFragment, classes: List<String>): Pair<IrClass, IrSimpleFunction> {
-    val class_ModuleRegistry = pluginContext.referenceClass(FqName("net.akehurst.kotlinx.reflect.ModuleRegistry")) ?: error("Cannot find ModuleRegistry class")
-    val fun_registerClass = pluginContext.referenceFunctions(FqName("net.akehurst.kotlinx.reflect.ModuleRegistry.registerClass")).single() // should be only one
-    val fun_classForName = pluginContext.referenceFunctions(FqName("net.akehurst.kotlinx.reflect.ModuleRegistry.classForName")).single() // should be only one
-
-    val class_KotlixReflect = pluginContext.irFactory.buildClass {
-        name = Name.identifier("KotlinxReflect")
-        modality = Modality.FINAL
-        kind = ClassKind.OBJECT
-    }
-    class_KotlixReflect.superTypes = listOf(pluginContext.irBuiltIns.anyType)
-    pkgOwner.addChild(class_KotlixReflect)
-    class_KotlixReflect.createImplicitParameterDeclarationWithWrappedDescriptor()
-    val cons = class_KotlixReflect.addSimpleDelegatingConstructor(
-        superConstructor = pluginContext.irBuiltIns.anyClass.owner.constructors.single(),
-        irBuiltIns = pluginContext.irBuiltIns,
-        isPrimary = true
-    )
-    cons.visibility = DescriptorVisibilities.PRIVATE
-    val fun_registerClasses = class_KotlixReflect.addFunction(
-        name = "registerClasses",
-        visibility = DescriptorVisibilities.PRIVATE,
-        returnType = pluginContext.irBuiltIns.unitType
-    ).apply {
-        body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
-            val obj = irGetObject(class_ModuleRegistry)
-            val call = irCall(fun_registerClass, obj.type)
-            for (refClsName in classes) {
-                val refCls = pluginContext.referenceClass(FqName(refClsName))!!
-                val qn = irString(refClsName)
-                val cls = classReference(refCls, pluginContext.irBuiltIns.kClassClass.typeWith(refCls.defaultType))
-                call.dispatchReceiver = obj
-                call.putValueArgument(0, qn)
-                call.putValueArgument(1, cls)
-                +call
+        val class_KotlixReflect = pluginContext.irFactory.buildClass {
+            name = Name.identifier("KotlinxReflect")
+            modality = Modality.FINAL
+            kind = ClassKind.OBJECT
+        }
+        class_KotlixReflect.superTypes = listOf(pluginContext.irBuiltIns.anyType)
+        pkgOwner.addChild(class_KotlixReflect)
+        class_KotlixReflect.createImplicitParameterDeclarationWithWrappedDescriptor()
+        val cons = class_KotlixReflect.addSimpleDelegatingConstructor(
+            superConstructor = pluginContext.irBuiltIns.anyClass.owner.constructors.single(),
+            irBuiltIns = pluginContext.irBuiltIns,
+            isPrimary = true
+        )
+        cons.visibility = DescriptorVisibilities.PRIVATE
+        val fun_registerClasses = class_KotlixReflect.addFunction(
+            name = "registerClasses",
+            visibility = DescriptorVisibilities.PRIVATE,
+            returnType = pluginContext.irBuiltIns.unitType
+        ).apply {
+            body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
+                val obj = irGetObject(class_ModuleRegistry)
+                val call = irCall(fun_registerClass, obj.type)
+                for (refClsName in classes) {
+                    if (refClsName.isNullOrBlank()) {
+                        messageCollector.report(CompilerMessageSeverity.WARNING, "Ignored null or blank class name!")
+                    } else {
+                        messageCollector.report(CompilerMessageSeverity.LOGGING, "looking for '$refClsName'")
+                        val refCls = pluginContext.referenceClass(FqName(refClsName))
+                        if (null == refCls) {
+                            messageCollector.report(CompilerMessageSeverity.ERROR, "Class '$refClsName' is not found! Cannot create reflection code to access it.")
+                        } else {
+                            messageCollector.report(CompilerMessageSeverity.LOGGING, "found '$refClsName'")
+                            val qn = irString(refClsName)
+                            val cls = classReference(refCls, pluginContext.irBuiltIns.kClassClass.typeWith(refCls.defaultType))
+                            call.dispatchReceiver = obj
+                            call.putValueArgument(0, qn)
+                            call.putValueArgument(1, cls)
+                            +call
+                        }
+                    }
+                }
             }
         }
+
+        val fun_classForNameAfterRegistration = class_KotlixReflect.addFunction(
+            name = "classForNameAfterRegistration",
+            returnType = pluginContext.irBuiltIns.kClassClass.starProjectedType,
+            visibility = DescriptorVisibilities.INTERNAL
+        ).apply {
+            addValueParameter("qualifiedName", pluginContext.irBuiltIns.stringType)
+            body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
+                val c1 = irCall(fun_registerClasses)
+                c1.dispatchReceiver = irGet(dispatchReceiverParameter!!)
+                +c1
+                val obj = irGetObject(class_ModuleRegistry)
+                val call = irCall(fun_classForName, obj.type)
+                val qn = irGet(valueParameters[0])
+                call.dispatchReceiver = obj
+                call.putValueArgument(0, qn)
+                //+call
+                +irReturn(call)
+            }
+        }
+        //fun_registerClasses.parent = class_KotlixReflect
+        //fun_classForNameAfterRegistration.parent = class_KotlixReflect
+        //class_KotlixReflect.addChild(fun_registerClasses)
+        //class_KotlixReflect.addChild(fun_classForNameAfterRegistration)
+        class_KotlixReflect.addFakeOverrides(pluginContext.irBuiltIns)
+        return Pair(class_KotlixReflect, fun_classForNameAfterRegistration)
     }
 
-    val fun_classForNameAfterRegistration = class_KotlixReflect.addFunction(
-        name = "classForNameAfterRegistration",
-        returnType = pluginContext.irBuiltIns.kClassClass.starProjectedType,
-        visibility = DescriptorVisibilities.INTERNAL
-    ).apply {
-        addValueParameter("qualifiedName", pluginContext.irBuiltIns.stringType)
-        body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
-            val c1 = irCall(fun_registerClasses)
-            c1.dispatchReceiver = irGet(dispatchReceiverParameter!!)
-            +c1
-            val obj = irGetObject(class_ModuleRegistry)
-            val call = irCall(fun_classForName, obj.type)
-            val qn = irGet(valueParameters[0])
-            call.dispatchReceiver = obj
-            call.putValueArgument(0, qn)
-            //+call
-            +irReturn(call)
-        }
-    }
-    //fun_registerClasses.parent = class_KotlixReflect
-    //fun_classForNameAfterRegistration.parent = class_KotlixReflect
-    //class_KotlixReflect.addChild(fun_registerClasses)
-    //class_KotlixReflect.addChild(fun_classForNameAfterRegistration)
-    class_KotlixReflect.addFakeOverrides(pluginContext.irBuiltIns)
-    return Pair(class_KotlixReflect, fun_classForNameAfterRegistration)
 }
+
 
 class KotlinxReflectRegisterTransformer(
     private val messageCollector: MessageCollector,

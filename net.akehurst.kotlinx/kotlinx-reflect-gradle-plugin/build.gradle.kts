@@ -17,6 +17,14 @@ configure<BuildConfigExtension>  {
     buildConfigField("String", "PROJECT_VERSION", "\"${project.version}\"")
 }
 
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_1_8.toString()
+    }
+}
+
+
+
 gradlePlugin {
     plugins {
         create("kotlinx-reflect") {

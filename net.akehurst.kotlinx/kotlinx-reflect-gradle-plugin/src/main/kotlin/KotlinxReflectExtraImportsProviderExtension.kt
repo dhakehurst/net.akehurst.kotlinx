@@ -15,12 +15,12 @@ import org.jetbrains.kotlin.resolve.extensions.ExtraImportsProviderExtension
 
 class KotlinxReflectExtraImportsProviderExtension(
     val messageCollector: MessageCollector,
-    val forReflection:String
+    val forReflection:List<String>
 ): ExtraImportsProviderExtension {
 
     override fun getExtraImports(ktFile: KtFile): Collection<KtImportInfo> {
         messageCollector.report(CompilerMessageSeverity.WARNING,"getExtraImports $ktFile")
-        val imports = forReflection.split(java.io.File.pathSeparator)
+        val imports = forReflection
         val infos = imports.map {
             object : KtImportInfo{
                 override val aliasName: String? = null

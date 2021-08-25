@@ -3,6 +3,7 @@ package net.akehurst.kotlinx.reflect.gradle.plugin
 import com.google.auto.service.AutoService
 import org.gradle.api.Project
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.logging.Logger
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
@@ -27,6 +28,8 @@ import org.jetbrains.kotlin.resolve.jvm.extensions.AnalysisHandlerExtension
 
 class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
 
+    private lateinit var logger: Logger
+
     override fun getCompilerPluginId(): String = KotlinPluginInfo.KOTLIN_PLUGIN_ID
 
     override fun getPluginArtifact(): SubpluginArtifact = SubpluginArtifact(
@@ -46,33 +49,30 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
     override fun apply(target: Project) {
         val ext = target.extensions.create(KotlinxReflectGradlePluginExtension.NAME, KotlinxReflectGradlePluginExtension::class.java)
         target.configurations.create("forReflection")
+        this.logger=target.logger
     }
 
 
     override fun applyToCompilation(kotlinCompilation: KotlinCompilation<*>): Provider<List<SubpluginOption>> {
         val project = kotlinCompilation.target.project
-        val extension = project.extensions.getByType(KotlinxReflectGradlePluginExtension::class.java)
+        val extension:KotlinxReflectGradlePluginExtension = project.extensions.getByType(KotlinxReflectGradlePluginExtension::class.java)
         // TODO: ensure kotlinx-reflect lib is a dependency
 
-        /*
+
         // get classes required for reflection (TODO: can we deduce this from code analysis)
-        val forReflection = project.configurations.getByName("forReflection")
+        //val forReflection = project.configurations.getByName("forReflection")
+
         //TODO: remove kotlin stdlib stuff
-        val forRefFiles=forReflection.distinct().let {
+        val forRefFiles=extension.forReflection.get().distinct().let {
             if (it.isNotEmpty())
                 it.joinToString(java.io.File.pathSeparator) else
                 null
         } ?: ""
+        logger.warn("forRefFiles = $forRefFiles")
         return project.provider {
             listOf(
-                SubpluginOption(key = "forReflection", value = forRefFiles)
+                SubpluginOption(key = KotlinxReflectCommandLineProcessor.OPTION_forReflection, value = forRefFiles)
             )
-        }
-         */
-        return project.provider {
-            extension.forReflection.get().map {
-                SubpluginOption(key = "forReflection", value = it)
-            }
         }
     }
 
@@ -91,7 +91,7 @@ open class KotlinxReflectGradlePluginExtension(objects: ObjectFactory) {
 @AutoService(CommandLineProcessor::class)
 class KotlinxReflectCommandLineProcessor : CommandLineProcessor {
     companion object {
-        private const val OPTION_forReflection = "forReflection"
+         const val OPTION_forReflection = "forReflection"
         val ARG_forReflection = CompilerConfigurationKey<String>(OPTION_forReflection)
     }
 
@@ -130,7 +130,7 @@ class KotlinxReflectComponentRegistrar(
 
     override fun registerProjectComponents(project: MockProject, configuration: CompilerConfiguration) {
         val messageCollector = configuration.get(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
-        val forReflection = configuration.get(KotlinxReflectCommandLineProcessor.ARG_forReflection, defaultReflectionLibs)
+        val forReflection = configuration.get(KotlinxReflectCommandLineProcessor.ARG_forReflection, defaultReflectionLibs).split(java.io.File.pathSeparator).toList()
 
         //JsSyntheticTranslateExtension.registerExtension(project, KotlinxReflectJsSyntheticTranslateExtension(messageCollector, forReflection))
         //AnalysisHandlerExtension.registerExtension(project, KotlinxReflectAnalysisHandlerExtension(messageCollector, forReflection))
