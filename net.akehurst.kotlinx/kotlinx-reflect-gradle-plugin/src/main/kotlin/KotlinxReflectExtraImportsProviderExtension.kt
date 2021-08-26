@@ -19,7 +19,7 @@ class KotlinxReflectExtraImportsProviderExtension(
 ): ExtraImportsProviderExtension {
 
     override fun getExtraImports(ktFile: KtFile): Collection<KtImportInfo> {
-        messageCollector.report(CompilerMessageSeverity.WARNING,"getExtraImports $ktFile")
+        messageCollector.report(CompilerMessageSeverity.LOGGING,"getExtraImports for $ktFile")
         val imports = forReflection
         val infos = imports.map {
             object : KtImportInfo{
@@ -30,7 +30,7 @@ class KotlinxReflectExtraImportsProviderExtension(
 
             }
         }
-        messageCollector.report(CompilerMessageSeverity.WARNING,"importedNames ${infos.map{it.importedName}}")
+        messageCollector.report(CompilerMessageSeverity.LOGGING,"importedNames ${infos.map{it.importedName}}")
         return infos
     }
 

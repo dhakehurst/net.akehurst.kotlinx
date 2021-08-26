@@ -77,6 +77,8 @@ expect class ObjectReflection<T : Any>(self: T) {
 
 expect object ModuleRegistry {
 
+    val registeredClasses:Map<String, KClass<*>>
+
     fun register(moduleName: String)
     fun registerClass(qualifiedName: String,cls:KClass<*>)
 

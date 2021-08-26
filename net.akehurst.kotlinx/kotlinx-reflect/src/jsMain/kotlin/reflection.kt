@@ -37,8 +37,10 @@ actual fun KClass<*>.reflect() = ClassReflection(this)
 
 actual object ModuleRegistry {
 
+    private val _registeredClasses = mutableMapOf<String, KClass<*>>()
+
     val modules = mutableSetOf<Any>()
-    val registeredClasses = mutableMapOf<String, KClass<*>>()
+    actual val registeredClasses:Map<String, KClass<*>> = _registeredClasses
 
     // must be inline so that the generated code can find the module as the imported JS name
     actual fun register(moduleName: String) {
@@ -82,7 +84,7 @@ actual object ModuleRegistry {
     }
 
     actual fun registerClass(qualifiedName: String, cls:KClass<*>) {
-        registeredClasses[qualifiedName] = cls
+        _registeredClasses[qualifiedName] = cls
     }
 
     fun getJsOb(name: String, obj: Any): Any? {
@@ -110,7 +112,7 @@ actual object ModuleRegistry {
         //        return (cls as JsClass<*>).kotlin
         //    }
         //}
-        return registeredClasses[qualifiedName] ?:error("Cannot find class $qualifiedName, is the module registered?")
+        return registeredClasses[qualifiedName] ?:error("Cannot find class $qualifiedName, is the class registered?")
     }
 
 }

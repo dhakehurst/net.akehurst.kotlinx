@@ -68,7 +68,7 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
                 it.joinToString(java.io.File.pathSeparator) else
                 null
         } ?: ""
-        logger.warn("forRefFiles = $forRefFiles")
+        logger.debug("To compiler, forReflection = $forRefFiles")
         return project.provider {
             listOf(
                 SubpluginOption(key = KotlinxReflectCommandLineProcessor.OPTION_forReflection, value = forRefFiles)

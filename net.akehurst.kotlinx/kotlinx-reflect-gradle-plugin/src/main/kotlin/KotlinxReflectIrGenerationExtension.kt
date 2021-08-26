@@ -34,10 +34,20 @@ class KotlinxReflectIrGenerationExtension(
     val forReflection: List<String>
 ) : IrGenerationExtension {
 
-    override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
-        messageCollector.report(CompilerMessageSeverity.WARNING, "forReflection = $forReflection")
-        messageCollector.report(CompilerMessageSeverity.WARNING, "moduleFragment.files = ${moduleFragment.files.map { it.fqName }}")
+    private val globRegexes = forReflection.mapNotNull {
+        if (it.isNullOrBlank()) {
+            messageCollector.report(CompilerMessageSeverity.WARNING, "InternalError: Got and ignored null or blank class name!")
+            null
+        } else {
+            it.toRegexFromGlob('.')
+        }
+    }
 
+    override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
+        messageCollector.report(CompilerMessageSeverity.LOGGING, "forReflection = $forReflection")
+        messageCollector.report(CompilerMessageSeverity.LOGGING, "moduleFragment.files = ${moduleFragment.files.map { it.fqName }}")
+
+        val classesToRegisterForReflection = mutableListOf<IrClass>()
         lateinit var packageFragment: IrPackageFragment
         moduleFragment.acceptVoid(object : IrElementVisitorVoid {
             override fun visitElement(element: IrElement) {
@@ -49,6 +59,14 @@ class KotlinxReflectIrGenerationExtension(
                 packageFragment = declaration
             }
 
+            override fun visitClass(declaration: IrClass) {
+                super.visitClass(declaration)
+                globRegexes.forEach { regex ->
+                    if (regex.matches( declaration.kotlinFqName.asString() ) ) {
+                            classesToRegisterForReflection.add(declaration)
+                    }
+                }
+            }
         })
 
         //TODO: allow glob patterns
@@ -56,8 +74,7 @@ class KotlinxReflectIrGenerationExtension(
         val (class_KotlixReflect, fun_classForNameAfterRegistration) = buildKotlinxReflectObject(
             pluginContext,
             packageFragment,
-            forReflection
-//            listOf("net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.AAAA") //FIXME:
+            classesToRegisterForReflection
         )
 
         /*
@@ -102,12 +119,12 @@ class KotlinxReflectIrGenerationExtension(
             ), null
         )
 
-        messageCollector.report(CompilerMessageSeverity.WARNING, moduleFragment.dump())
-        messageCollector.report(CompilerMessageSeverity.WARNING, moduleFragment.dumpKotlinLike())
+        messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dump())
+        messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dumpKotlinLike())
 
     }
 
-    fun buildKotlinxReflectObject(pluginContext: IrPluginContext, pkgOwner: IrPackageFragment, classes: List<String>): Pair<IrClass, IrSimpleFunction> {
+    fun buildKotlinxReflectObject(pluginContext: IrPluginContext, pkgOwner: IrPackageFragment, classes: List<IrClass>): Pair<IrClass, IrSimpleFunction> {
         val class_ModuleRegistry = pluginContext.referenceClass(FqName("net.akehurst.kotlinx.reflect.ModuleRegistry")) ?: error("Cannot find ModuleRegistry class")
         val fun_registerClass = pluginContext.referenceFunctions(FqName("net.akehurst.kotlinx.reflect.ModuleRegistry.registerClass")).single() // should be only one
         val fun_classForName = pluginContext.referenceFunctions(FqName("net.akehurst.kotlinx.reflect.ModuleRegistry.classForName")).single() // should be only one
@@ -134,24 +151,14 @@ class KotlinxReflectIrGenerationExtension(
             body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
                 val obj = irGetObject(class_ModuleRegistry)
                 val call = irCall(fun_registerClass, obj.type)
-                for (refClsName in classes) {
-                    if (refClsName.isNullOrBlank()) {
-                        messageCollector.report(CompilerMessageSeverity.WARNING, "Ignored null or blank class name!")
-                    } else {
-                        messageCollector.report(CompilerMessageSeverity.LOGGING, "looking for '$refClsName'")
-                        val refCls = pluginContext.referenceClass(FqName(refClsName))
-                        if (null == refCls) {
-                            messageCollector.report(CompilerMessageSeverity.ERROR, "Class '$refClsName' is not found! Cannot create reflection code to access it.")
-                        } else {
-                            messageCollector.report(CompilerMessageSeverity.LOGGING, "found '$refClsName'")
-                            val qn = irString(refClsName)
-                            val cls = classReference(refCls, pluginContext.irBuiltIns.kClassClass.typeWith(refCls.defaultType))
-                            call.dispatchReceiver = obj
-                            call.putValueArgument(0, qn)
-                            call.putValueArgument(1, cls)
-                            +call
-                        }
-                    }
+                for (refCls in classes) {
+                    val refClsSym = refCls.symbol
+                    val qn = irString(refCls.kotlinFqName.asString())
+                    val cls = classReference(refClsSym, pluginContext.irBuiltIns.kClassClass.typeWith(refCls.defaultType))
+                    call.dispatchReceiver = obj
+                    call.putValueArgument(0, qn)
+                    call.putValueArgument(1, cls)
+                    +call
                 }
             }
         }
@@ -201,9 +208,9 @@ class KotlinxReflectRegisterTransformer(
 
     override fun visitCall(expression: IrCall): IrExpression {
         //convert all ModuleRegistry.classForName calls EXCEPT the one in generated class KotlixReflect
-        val curClass = this.currentClass?.irElement as IrClass
+        val curClass = this.currentClass?.irElement as IrClass?
         if (expression.symbol == functionClassForName && curClass != class_KotlixReflect) {
-            messageCollector.report(CompilerMessageSeverity.WARNING, "called: ${expression.dumpKotlinLike()} on ${curClass.dumpKotlinLike()}")
+            messageCollector.report(CompilerMessageSeverity.LOGGING, "called: ${expression.dumpKotlinLike()} on ${curClass?.dumpKotlinLike()}")
             val curFun = this.currentFunction?.irElement as IrFunction?
             if (null != curFun) {
                 val b = DeclarationIrBuilder(pluginContext, curFun.symbol)
