@@ -75,13 +75,23 @@ expect class ObjectReflection<T : Any>(self: T) {
     suspend fun callSuspend(methodName: String, vararg args: Any?) : Any?
 }
 
-expect object ModuleRegistry {
+object ModuleRegistry {
+    private var _registeredClasses = mutableMapOf<String, KClass<*>>()
 
-    val registeredClasses:Map<String, KClass<*>>
+    val registeredClasses:Map<String, KClass<*>> = _registeredClasses
 
-    fun register(moduleName: String)
-    fun registerClass(qualifiedName: String,cls:KClass<*>)
+    fun registerClass(qualifiedName: String, cls:KClass<*>) {
+        _registeredClasses[qualifiedName] = cls
+    }
 
-    fun classForName(qualifiedName: String): KClass<*>
+    fun classForName(qualifiedName: String): KClass<*> {
+        if (registeredClasses.isEmpty()) {
+            this.registerUsedClasses()
+        }
+        return registeredClasses[qualifiedName] ?:error("Cannot find class $qualifiedName, is the class registered?")
+    }
 
+    fun registerUsedClasses() {
+        // This function is populated by the kotlinx-reflect-gradle-plugin
+    }
 }

@@ -1,15 +1,19 @@
 package net.akehurst.kotlinx.reflect.gradle.plugin
 
+import org.jetbrains.kotlin.analyzer.moduleInfo
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
+import org.jetbrains.kotlin.backend.common.extensions.IrPluginContextImpl
 import org.jetbrains.kotlin.backend.common.ir.*
 import org.jetbrains.kotlin.backend.common.lower.DeclarationIrBuilder
+import org.jetbrains.kotlin.backend.common.serialization.KotlinIrLinker
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.descriptors.konan.kotlinLibrary
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.backend.js.utils.isJsExport
@@ -19,6 +23,7 @@ import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrClassReference
 import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.types.starProjectedType
 import org.jetbrains.kotlin.ir.types.typeWith
@@ -28,14 +33,22 @@ import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.resolve.descriptorUtil.module
 
 class KotlinxReflectIrGenerationExtension(
     private val messageCollector: MessageCollector,
     val forReflection: List<String>
 ) : IrGenerationExtension {
 
+    companion object {
+        val fq_ModuleRegistry = FqName("net.akehurst.kotlinx.reflect.ModuleRegistry")
+        val fq_registerClass = FqName("net.akehurst.kotlinx.reflect.ModuleRegistry.registerClass")
+        val fq_registerUsedClasses = FqName("net.akehurst.kotlinx.reflect.ModuleRegistry.registerUsedClasses")
+    }
+
+
     private val globRegexes = forReflection.mapNotNull {
-        if (it.isNullOrBlank()) {
+        if (it.isBlank()) {
             messageCollector.report(CompilerMessageSeverity.WARNING, "InternalError: Got and ignored null or blank class name!")
             null
         } else {
@@ -44,11 +57,15 @@ class KotlinxReflectIrGenerationExtension(
     }
 
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
-        messageCollector.report(CompilerMessageSeverity.LOGGING, "forReflection = $forReflection")
-        messageCollector.report(CompilerMessageSeverity.LOGGING, "moduleFragment.files = ${moduleFragment.files.map { it.fqName }}")
+        messageCollector.report(CompilerMessageSeverity.WARNING, "forReflection = $forReflection")
+        messageCollector.report(CompilerMessageSeverity.WARNING, "moduleFragment.files = ${moduleFragment.files.map { it.fqName }}")
 
-        val classesToRegisterForReflection = mutableListOf<IrClass>()
+        var irclass_ModuleRegistry:IrClass? = null
+        val usedClasses = mutableListOf<IrClass>()
         lateinit var packageFragment: IrPackageFragment
+
+        //pluginContext.
+
         moduleFragment.acceptVoid(object : IrElementVisitorVoid {
             override fun visitElement(element: IrElement) {
                 element.acceptChildrenVoid(this)
@@ -61,142 +78,75 @@ class KotlinxReflectIrGenerationExtension(
 
             override fun visitClass(declaration: IrClass) {
                 super.visitClass(declaration)
+                if (declaration.kotlinFqName == fq_ModuleRegistry) {
+                    irclass_ModuleRegistry = declaration
+                }
                 globRegexes.forEach { regex ->
                     if (regex.matches( declaration.kotlinFqName.asString() ) ) {
-                            classesToRegisterForReflection.add(declaration)
+                        usedClasses.add(declaration)
                     }
                 }
             }
         })
-
-        //TODO: allow glob patterns
-
-        val (class_KotlixReflect, fun_classForNameAfterRegistration) = buildKotlinxReflectObject(
-            pluginContext,
-            packageFragment,
-            classesToRegisterForReflection
-        )
-
-        /*
-        val cls = pluginContext.irFactory.buildClass {
-            name = Name.identifier("KotlinxReflect")
-            modality = Modality.FINAL
-            kind = ClassKind.OBJECT
-        }
-        cls.superTypes = listOf(pluginContext.irBuiltIns.anyType)
-        packageFragment.addChild(cls)
-        cls.createImplicitParameterDeclarationWithWrappedDescriptor()
-        val cons = cls.addSimpleDelegatingConstructor(
-            superConstructor = pluginContext.irBuiltIns.anyClass.owner.constructors.single(),
-            irBuiltIns = pluginContext.irBuiltIns,
-            isPrimary = true
-        )
-        cons.visibility = DescriptorVisibilities.PRIVATE
-
-        cls.addAnonymousInitializer().also { irInitializer ->
-            irInitializer.body =
-                DeclarationIrBuilder(pluginContext, irInitializer.symbol).irBlockBody {
-                    val obj = irGetObject(classModuleRegistry)
-                    val call = irCall(functionRegisterClass, obj.type)
-                    val qn = irString("net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.A")
-                    val cls = kClassReference(refCls.typeWith())
-                    call.dispatchReceiver = obj
-                    call.putValueArgument(0, qn)
-                    call.putValueArgument(1, cls)
-                    +call
-                }
-        }
-        cls.addFakeOverrides(pluginContext.irBuiltIns)
-        cls.patchDeclarationParents(cls.parent)
-         */
-
-        moduleFragment.transform(
-            KotlinxReflectRegisterTransformer(
-                messageCollector,
-                pluginContext,
-                class_KotlixReflect,
-                fun_classForNameAfterRegistration
-            ), null
-        )
-
-        messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dump())
-        messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dumpKotlinLike())
+        val f = pluginContext.referenceFunctions(fq_registerUsedClasses).single().owner
+        registerUsedClasses(pluginContext, f, usedClasses)
 
     }
 
-    fun buildKotlinxReflectObject(pluginContext: IrPluginContext, pkgOwner: IrPackageFragment, classes: List<IrClass>): Pair<IrClass, IrSimpleFunction> {
-        val class_ModuleRegistry = pluginContext.referenceClass(FqName("net.akehurst.kotlinx.reflect.ModuleRegistry")) ?: error("Cannot find ModuleRegistry class")
-        val fun_registerClass = pluginContext.referenceFunctions(FqName("net.akehurst.kotlinx.reflect.ModuleRegistry.registerClass")).single() // should be only one
-        val fun_classForName = pluginContext.referenceFunctions(FqName("net.akehurst.kotlinx.reflect.ModuleRegistry.classForName")).single() // should be only one
+    fun registerUsedClasses(pluginContext: IrPluginContext, fun_registerUsedClasses:IrFunction, usedClasses: List<IrClass>) {
+        messageCollector.report(CompilerMessageSeverity.WARNING, "registering classes $usedClasses")
+        val classSym_ModuleRegistry = pluginContext.referenceClass(fq_ModuleRegistry) ?: error("Cannot find ModuleRegistry class")
+        val funSym_registerClass = pluginContext.referenceFunctions(fq_registerClass).single() // should be only one
 
-        val class_KotlixReflect = pluginContext.irFactory.buildClass {
-            name = Name.identifier("KotlinxReflect")
-            modality = Modality.FINAL
-            kind = ClassKind.OBJECT
-        }
-        class_KotlixReflect.superTypes = listOf(pluginContext.irBuiltIns.anyType)
-        pkgOwner.addChild(class_KotlixReflect)
-        class_KotlixReflect.createImplicitParameterDeclarationWithWrappedDescriptor()
-        val cons = class_KotlixReflect.addSimpleDelegatingConstructor(
-            superConstructor = pluginContext.irBuiltIns.anyClass.owner.constructors.single(),
-            irBuiltIns = pluginContext.irBuiltIns,
-            isPrimary = true
-        )
-        cons.visibility = DescriptorVisibilities.PRIVATE
-        val fun_registerClasses = class_KotlixReflect.addFunction(
-            name = "registerClasses",
-            visibility = DescriptorVisibilities.PRIVATE,
-            returnType = pluginContext.irBuiltIns.unitType
-        ).apply {
-            body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
-                val obj = irGetObject(class_ModuleRegistry)
-                val call = irCall(fun_registerClass, obj.type)
-                for (refCls in classes) {
-                    val refClsSym = refCls.symbol
-                    val qn = irString(refCls.kotlinFqName.asString())
-                    val cls = classReference(refClsSym, pluginContext.irBuiltIns.kClassClass.typeWith(refCls.defaultType))
-                    call.dispatchReceiver = obj
-                    call.putValueArgument(0, qn)
-                    call.putValueArgument(1, cls)
-                    +call
+        val body = fun_registerUsedClasses.body!!
+        val plgCtx = pluginContext as IrPluginContextImpl
+        val reflexModuleDescriptor = classSym_ModuleRegistry.descriptor.module
+        val reflexIrModule = (plgCtx.linker as KotlinIrLinker).deserializeFullModule(reflexModuleDescriptor,reflexModuleDescriptor.kotlinLibrary)
+        var irclass_ModuleRegistry:IrClass? = null
+        reflexIrModule.acceptVoid(object : IrElementVisitorVoid {
+                override fun visitElement(element: IrElement) {
+                    element.acceptChildrenVoid(this)
                 }
-            }
-        }
 
-        val fun_classForNameAfterRegistration = class_KotlixReflect.addFunction(
-            name = "classForNameAfterRegistration",
-            returnType = pluginContext.irBuiltIns.kClassClass.starProjectedType,
-            visibility = DescriptorVisibilities.INTERNAL
-        ).apply {
-            addValueParameter("qualifiedName", pluginContext.irBuiltIns.stringType)
-            body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
-                val c1 = irCall(fun_registerClasses)
-                c1.dispatchReceiver = irGet(dispatchReceiverParameter!!)
-                +c1
-                val obj = irGetObject(class_ModuleRegistry)
-                val call = irCall(fun_classForName, obj.type)
-                val qn = irGet(valueParameters[0])
+                override fun visitClass(declaration: IrClass) {
+                    super.visitClass(declaration)
+                    if (declaration.kotlinFqName == fq_ModuleRegistry) {
+                        irclass_ModuleRegistry = declaration
+                    }
+                }
+            })
+
+
+        messageCollector.report(CompilerMessageSeverity.WARNING, "registerUsedClasses should be deserialized")
+        val newBody = DeclarationIrBuilder(pluginContext, fun_registerUsedClasses.symbol).irBlockBody {
+            val obj = irGetObject(classSym_ModuleRegistry)
+            val call = irCall(funSym_registerClass, obj.type)
+
+                for (statement in body.statements) {
+                    +statement
+                }
+
+            for (refCls in usedClasses) {
+                val refClsSym = refCls.symbol
+                val qn = irString(refCls.kotlinFqName.asString())
+                val cls = classReference(refClsSym, pluginContext.irBuiltIns.kClassClass.typeWith(refCls.defaultType))
                 call.dispatchReceiver = obj
                 call.putValueArgument(0, qn)
-                //+call
-                +irReturn(call)
+                call.putValueArgument(1, cls)
+                +call
             }
         }
-        //fun_registerClasses.parent = class_KotlixReflect
-        //fun_classForNameAfterRegistration.parent = class_KotlixReflect
-        //class_KotlixReflect.addChild(fun_registerClasses)
-        //class_KotlixReflect.addChild(fun_classForNameAfterRegistration)
-        class_KotlixReflect.addFakeOverrides(pluginContext.irBuiltIns)
-        return Pair(class_KotlixReflect, fun_classForNameAfterRegistration)
+        messageCollector.report(CompilerMessageSeverity.WARNING, fun_registerUsedClasses.dump())
+        messageCollector.report(CompilerMessageSeverity.WARNING, fun_registerUsedClasses.dumpKotlinLike())
+        fun_registerUsedClasses.body = newBody
     }
-
 }
 
 
 class KotlinxReflectRegisterTransformer(
     private val messageCollector: MessageCollector,
     private val pluginContext: IrPluginContext,
-    private val class_KotlixReflect: IrClass,
+    private val class_KotlixReflect_sym: IrClassSymbol,
     private val fun_classForNameAfterRegistration: IrFunction
 ) : IrElementTransformerVoidWithContext() {
 
@@ -208,14 +158,14 @@ class KotlinxReflectRegisterTransformer(
 
     override fun visitCall(expression: IrCall): IrExpression {
         //convert all ModuleRegistry.classForName calls EXCEPT the one in generated class KotlixReflect
-        val curClass = this.currentClass?.irElement as IrClass?
-        if (expression.symbol == functionClassForName && curClass != class_KotlixReflect) {
-            messageCollector.report(CompilerMessageSeverity.LOGGING, "called: ${expression.dumpKotlinLike()} on ${curClass?.dumpKotlinLike()}")
+        val curClass_sym = (this.currentClass?.irElement as IrClass?)?.symbol
+        if (expression.symbol == functionClassForName && curClass_sym != class_KotlixReflect_sym) {
+            messageCollector.report(CompilerMessageSeverity.LOGGING, "called: ${expression.dumpKotlinLike()} on ${curClass_sym}")
             val curFun = this.currentFunction?.irElement as IrFunction?
             if (null != curFun) {
                 val b = DeclarationIrBuilder(pluginContext, curFun.symbol)
                 val call = b.irCall(fun_classForNameAfterRegistration)
-                call.dispatchReceiver = b.irGetObject(class_KotlixReflect.symbol)
+                call.dispatchReceiver = b.irGetObject(class_KotlixReflect_sym)
                 call.putValueArgument(0, expression.getValueArgument(0))
                 return call
             } else {

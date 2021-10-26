@@ -396,26 +396,4 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
 
 }
 
-actual object ModuleRegistry {
-
-    private val _registeredClasses = mutableMapOf<String, KClass<*>>()
-
-    actual val registeredClasses:Map<String, KClass<*>> = _registeredClasses
-
-    actual fun register(moduleName: String) {
-        //Not needed for JVM
-    }
-
-    actual fun registerClass(qualifiedName: String,cls:KClass<*>) {
-        //Not needed for JVM
-        _registeredClasses[qualifiedName] = cls
-    }
-
-    actual fun classForName(qualifiedName: String): KClass<*> {
-        //TODO: should we register for java also?
-        //return Class.forName(qualifiedName).kotlin
-
-        return registeredClasses[qualifiedName] ?:error("Cannot find class $qualifiedName, is the class registered?")
-    }
-}
 
