@@ -75,7 +75,17 @@ expect class ObjectReflection<T : Any>(self: T) {
     suspend fun callSuspend(methodName: String, vararg args: Any?) : Any?
 }
 
-object ModuleRegistry {
+interface KotlinxReflectModuleRegistry {
+    fun registerClasses()
+}
+
+object KotlinxReflect {
+
+    var registerModules: KotlinxReflectModuleRegistry = object : KotlinxReflectModuleRegistry{
+        override fun registerClasses() {}
+    }
+
+    private var _registeredModules = false
     private var _registeredClasses = mutableMapOf<String, KClass<*>>()
 
     val registeredClasses:Map<String, KClass<*>> = _registeredClasses
@@ -85,6 +95,10 @@ object ModuleRegistry {
     }
 
     fun classForName(qualifiedName: String): KClass<*> {
+        if (!_registeredModules) {
+            registerModules.registerClasses()
+            _registeredModules=true
+        }
         if (registeredClasses.isEmpty()) {
             this.registerUsedClasses()
         }
