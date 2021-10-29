@@ -75,10 +75,7 @@ class KotlinxReflectIrGenerationExtension(
 
     @OptIn(ObsoleteDescriptorBasedAPI::class)
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
-        messageCollector.report(CompilerMessageSeverity.WARNING, "moduleFragment.name = ${moduleFragment.name}")
-        messageCollector.report(CompilerMessageSeverity.WARNING, "moduleFragment.safeName = ${moduleFragment.safeName}")
         messageCollector.report(CompilerMessageSeverity.WARNING, "forReflection = $forReflection")
-        messageCollector.report(CompilerMessageSeverity.WARNING, "moduleFragment.files = ${moduleFragment.files.map { it.fqName }}")
         val classesToRegisterForReflection = mutableSetOf<IrClassSymbol>()
         forReflection.forEach { pkgName ->
             val pkgFqName = FqName(pkgName)
