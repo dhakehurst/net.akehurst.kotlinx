@@ -12,10 +12,7 @@ import org.jetbrains.kotlin.backend.common.serialization.KotlinIrLinker
 import org.jetbrains.kotlin.backend.common.serialization.signature.IdSignatureDescriptor
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
-import org.jetbrains.kotlin.descriptors.ClassKind
-import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
-import org.jetbrains.kotlin.descriptors.Modality
-import org.jetbrains.kotlin.descriptors.ModuleDescriptor
+import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.impl.CompositePackageFragmentProvider
 import org.jetbrains.kotlin.descriptors.impl.EmptyPackageFragmentDescriptor
 import org.jetbrains.kotlin.descriptors.impl.ModuleDescriptorImpl
@@ -75,13 +72,13 @@ class KotlinxReflectIrGenerationExtension(
 
     @OptIn(ObsoleteDescriptorBasedAPI::class)
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
-        messageCollector.report(CompilerMessageSeverity.WARNING, "forReflection = $forReflection")
+        messageCollector.report(CompilerMessageSeverity.LOGGING, "forReflection = $forReflection")
         val classesToRegisterForReflection = mutableSetOf<IrClassSymbol>()
         forReflection.forEach { pkgName ->
             val pkgFqName = FqName(pkgName)
             moduleFragment.descriptor.getPackage(pkgFqName).fragments.forEach { frag ->
                 frag.getMemberScope().getClassifierNames()?.forEach { cls->
-                    messageCollector.report(CompilerMessageSeverity.WARNING, "check = ${frag.fqName} . ${cls}")
+                    messageCollector.report(CompilerMessageSeverity.LOGGING, "check = ${frag.fqName} . ${cls}")
                     val sym = pluginContext.referenceClass(frag.fqName.child(cls))
                     if (null != sym) {
                         classesToRegisterForReflection.add(sym)
@@ -172,8 +169,8 @@ class KotlinxReflectIrGenerationExtension(
             ), null
         )
 
-        messageCollector.report(CompilerMessageSeverity.WARNING, moduleFragment.dump())
-        messageCollector.report(CompilerMessageSeverity.WARNING, moduleFragment.dumpKotlinLike())
+        messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dump())
+        messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dumpKotlinLike())
     }
 /*
     fun registerUsedClasses(pluginContext: IrPluginContext, fun_registerUsedClasses:IrFunction, usedClasses: List<IrClass>) {
@@ -251,7 +248,7 @@ class KotlinxReflectIrGenerationExtension(
 
     // build the module specific KotlinxReflectModuleRegistry object
     fun buildKotlinxReflectModuleRegistry(pluginContext: IrPluginContext, owningPackage: IrPackageFragment, classes: List<IrClassSymbol>): Pair<IrClass, IrSimpleFunction> {
-        messageCollector.report(CompilerMessageSeverity.WARNING, "registering classes $classes")
+        messageCollector.report(CompilerMessageSeverity.LOGGING, "registering classes $classes")
 
         val class_ModuleRegistry = pluginContext.referenceClass(fq_KotlinxReflect) ?: error("Cannot find ModuleRegistry class")
         val fun_registerClass = pluginContext.referenceFunctions(fq_registerClass).single() // should be only one
@@ -280,11 +277,11 @@ class KotlinxReflectIrGenerationExtension(
                 val obj = irGetObject(class_ModuleRegistry)
                 for (refCls in classes) {
                     val call = irCall(fun_registerClass, obj.type)
-                    messageCollector.report(CompilerMessageSeverity.WARNING, "sym = $refCls")
+                    messageCollector.report(CompilerMessageSeverity.LOGGING, "sym = $refCls")
                     val refClsSym = refCls//.symbol
                     val qns = refCls.signature?.packageFqName()?.child(Name.identifier(refCls.signature?.asPublic()?.declarationFqName!!))
                     val qn = irString(qns!!.asString())
-                    messageCollector.report(CompilerMessageSeverity.WARNING, "qn = ${qns}")
+                    messageCollector.report(CompilerMessageSeverity.LOGGING, "qn = ${qns}")
                     val cls = classReference(refClsSym, pluginContext.irBuiltIns.kClassClass.typeWith(refClsSym.defaultType))
                     call.dispatchReceiver = obj
                     call.putValueArgument(0, qn)

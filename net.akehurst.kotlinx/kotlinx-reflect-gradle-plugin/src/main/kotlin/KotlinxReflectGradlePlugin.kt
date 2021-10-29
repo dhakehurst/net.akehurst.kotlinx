@@ -129,8 +129,10 @@ class KotlinxReflectComponentRegistrar(
     )
 
     override fun registerProjectComponents(project: MockProject, configuration: CompilerConfiguration) {
+
         val messageCollector = configuration.get(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
-        val forReflection = configuration.get(KotlinxReflectCommandLineProcessor.ARG_forReflection, defaultReflectionLibs).split(java.io.File.pathSeparator).toList()
+        val forReflection = configuration.get(KotlinxReflectCommandLineProcessor.ARG_forReflection, defaultReflectionLibs)
+            .split(java.io.File.pathSeparator).toList().filterNot { it.isNullOrBlank() }
 
         //JsSyntheticTranslateExtension.registerExtension(project, KotlinxReflectJsSyntheticTranslateExtension(messageCollector, forReflection))
         //AnalysisHandlerExtension.registerExtension(project, KotlinxReflectAnalysisHandlerExtension(messageCollector, forReflection))

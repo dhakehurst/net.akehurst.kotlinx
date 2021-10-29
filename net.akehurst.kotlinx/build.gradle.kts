@@ -20,7 +20,7 @@ import java.io.File
 
 plugins {
     kotlin("multiplatform") version ("1.6.0-RC") apply false
-    id("net.akehurst.kotlin.gradle.plugin.exportPublic") version("1.6.0-RC") apply false
+    id("net.akehurst.kotlin.gradle.plugin.exportPublic") version("1.4.0-1.6.0-RC") apply false
     id("org.jetbrains.dokka") version ("1.4.32") apply false
     id("com.github.gmazzo.buildconfig") version("3.0.0") apply false
     id("nu.studer.credentials") version ("2.1")

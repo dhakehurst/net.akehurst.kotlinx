@@ -1,5 +1,5 @@
 plugins {
-    id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") version("1.4.1")
+    id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") version("1.4.1-1.6.0-RC")
 }
 
 dependencies {
