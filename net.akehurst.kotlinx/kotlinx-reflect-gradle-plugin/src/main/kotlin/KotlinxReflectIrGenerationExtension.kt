@@ -1,52 +1,46 @@
 package net.akehurst.kotlinx.reflect.gradle.plugin
 
 import net.akehurst.kotlinx.reflect.KotlinxReflect
-import org.jetbrains.kotlin.analyzer.moduleInfo
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContextImpl
-import org.jetbrains.kotlin.backend.common.ir.*
+import org.jetbrains.kotlin.backend.common.ir.addChild
+import org.jetbrains.kotlin.backend.common.ir.addFakeOverrides
+import org.jetbrains.kotlin.backend.common.ir.addSimpleDelegatingConstructor
+import org.jetbrains.kotlin.backend.common.ir.createImplicitParameterDeclarationWithWrappedDescriptor
 import org.jetbrains.kotlin.backend.common.lower.DeclarationIrBuilder
 import org.jetbrains.kotlin.backend.common.serialization.KotlinIrLinker
-import org.jetbrains.kotlin.backend.common.serialization.signature.IdSignatureDescriptor
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
-import org.jetbrains.kotlin.descriptors.*
-import org.jetbrains.kotlin.descriptors.impl.CompositePackageFragmentProvider
+import org.jetbrains.kotlin.descriptors.ClassKind
+import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
+import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.impl.EmptyPackageFragmentDescriptor
-import org.jetbrains.kotlin.descriptors.impl.ModuleDescriptorImpl
-import org.jetbrains.kotlin.descriptors.impl.PackageViewDescriptorFactory
-import org.jetbrains.kotlin.descriptors.konan.DeserializedKlibModuleOrigin
-import org.jetbrains.kotlin.descriptors.konan.KlibModuleOrigin
-import org.jetbrains.kotlin.descriptors.konan.kotlinLibrary
 import org.jetbrains.kotlin.ir.*
-import org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir.JsIrLinker
-import org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir.JsManglerDesc
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.safeName
 import org.jetbrains.kotlin.ir.builders.*
-import org.jetbrains.kotlin.ir.builders.declarations.*
+import org.jetbrains.kotlin.ir.builders.declarations.addFunction
+import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
+import org.jetbrains.kotlin.ir.builders.declarations.buildClass
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.impl.IrFileImpl
-import org.jetbrains.kotlin.ir.declarations.impl.IrModuleFragmentImpl
-import org.jetbrains.kotlin.ir.declarations.persistent.PersistentIrFactory
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.ir.types.IrTypeSystemContextImpl
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.types.starProjectedType
 import org.jetbrains.kotlin.ir.types.typeWith
-import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.util.constructors
+import org.jetbrains.kotlin.ir.util.dumpKotlinLike
+import org.jetbrains.kotlin.ir.util.getSimpleFunction
+import org.jetbrains.kotlin.ir.util.kotlinFqName
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
-import org.jetbrains.kotlin.library.IrLibrary
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.psi2ir.generators.TypeTranslatorImpl
-import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
-import org.jetbrains.kotlin.resolve.descriptorUtil.module
-import org.jetbrains.kotlin.resolve.scopes.computeAllNames
 
 class KotlinxReflectIrGenerationExtension(
     private val messageCollector: MessageCollector,
@@ -56,9 +50,10 @@ class KotlinxReflectIrGenerationExtension(
     companion object {
         val fq_KotlinxReflect = FqName(KotlinxReflect::class.qualifiedName!!)
         val fq_registerClass = FqName("${fq_KotlinxReflect}.registerClass")
-        val fq_registerUsedClasses = FqName("${fq_KotlinxReflect}.registerUsedClasses")
         val fq_classForName = FqName("${fq_KotlinxReflect}.classForName")
-        val KotlinxReflectRegisterForModuleClassName = "KotlinxReflectRegisterForModule"
+        val KotlinxReflectRegisterForModuleClassName = "KotlinxReflectForModule"
+        val classForNameAfterRegistration = "classForNameAfterRegistration"
+        val registerUsedClasses = "registerUsedClasses"
     }
 
     private val globRegexes = forReflection.mapNotNull {
@@ -73,11 +68,12 @@ class KotlinxReflectIrGenerationExtension(
     @OptIn(ObsoleteDescriptorBasedAPI::class)
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
         messageCollector.report(CompilerMessageSeverity.LOGGING, "forReflection = $forReflection")
+
         val classesToRegisterForReflection = mutableSetOf<IrClassSymbol>()
         forReflection.forEach { pkgName ->
             val pkgFqName = FqName(pkgName)
             moduleFragment.descriptor.getPackage(pkgFqName).fragments.forEach { frag ->
-                frag.getMemberScope().getClassifierNames()?.forEach { cls->
+                frag.getMemberScope().getClassifierNames()?.forEach { cls ->
                     messageCollector.report(CompilerMessageSeverity.LOGGING, "check = ${frag.fqName} . ${cls}")
                     val sym = pluginContext.referenceClass(frag.fqName.child(cls))
                     if (null != sym) {
@@ -136,7 +132,7 @@ class KotlinxReflectIrGenerationExtension(
             }
         }
 */
-        //not sure we need to do this
+        var class_KotlixReflectForModule: IrClass? = null
         moduleFragment.acceptVoid(object : IrElementVisitorVoid {
             override fun visitElement(element: IrElement) {
                 element.acceptChildrenVoid(this)
@@ -144,83 +140,94 @@ class KotlinxReflectIrGenerationExtension(
 
             override fun visitClass(declaration: IrClass) {
                 super.visitClass(declaration)
+                if (declaration.name.identifier == KotlinxReflectRegisterForModuleClassName) {
+                    class_KotlixReflectForModule = declaration
+                }
+
 
                 globRegexes.forEach { regex ->
-                    if (regex.matches( declaration.kotlinFqName.asString() ) ) {
+                    if (regex.matches(declaration.kotlinFqName.asString())) {
                         classesToRegisterForReflection.add(declaration.symbol)
                     }
                 }
             }
         })
+        val krfm = class_KotlixReflectForModule
+        if (null == krfm) {
 
-        val modulePackage = syntheticFile(moduleFragment,pluginContext)
+        } else {
+           // val modulePackage = syntheticFile(moduleFragment, pluginContext)
 
-        val (class_KotlixReflect, fun_classForNameAfterRegistration) = buildKotlinxReflectModuleRegistry(
-            pluginContext,
-            modulePackage,
-            classesToRegisterForReflection.toList()
-        )
-        moduleFragment.transform(
-            KotlinxReflectRegisterTransformer(
-                messageCollector,
+            buildKotlinxReflectModuleRegistry(
                 pluginContext,
-                class_KotlixReflect.symbol,
-                fun_classForNameAfterRegistration
-            ), null
-        )
+                krfm,
+                classesToRegisterForReflection.toList()
+            )
+            val fun_classForNameAfterRegistration =
+                krfm.getSimpleFunction(classForNameAfterRegistration)?.owner ?: error("$classForNameAfterRegistration not found in generated class ${krfm.name.identifier}")
+            moduleFragment.transform(
+                KotlinxReflectRegisterTransformer(
+                    messageCollector,
+                    pluginContext,
+                    krfm.symbol,
+                    fun_classForNameAfterRegistration
+                ), null
+            )
 
-        messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dump())
-        messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dumpKotlinLike())
-    }
-/*
-    fun registerUsedClasses(pluginContext: IrPluginContext, fun_registerUsedClasses:IrFunction, usedClasses: List<IrClass>) {
-        messageCollector.report(CompilerMessageSeverity.WARNING, "registering classes $usedClasses")
-        val classSym_ModuleRegistry = pluginContext.referenceClass(fq_KotlinxReflect) ?: error("Cannot find ModuleRegistry class")
-        val funSym_registerClass = pluginContext.referenceFunctions(fq_registerClass).single() // should be only one
-
-        val body = fun_registerUsedClasses.body!!
-        val plgCtx = pluginContext as IrPluginContextImpl
-        val reflexModuleDescriptor = classSym_ModuleRegistry.descriptor.module
-        val reflexIrModule = (plgCtx.linker as KotlinIrLinker).deserializeFullModule(reflexModuleDescriptor,reflexModuleDescriptor.kotlinLibrary)
-        var irclass_ModuleRegistry:IrClass? = null
-        reflexIrModule.acceptVoid(object : IrElementVisitorVoid {
-                override fun visitElement(element: IrElement) {
-                    element.acceptChildrenVoid(this)
-                }
-
-                override fun visitClass(declaration: IrClass) {
-                    super.visitClass(declaration)
-                    if (declaration.kotlinFqName == fq_KotlinxReflect) {
-                        irclass_ModuleRegistry = declaration
-                    }
-                }
-            })
-
-
-        messageCollector.report(CompilerMessageSeverity.WARNING, "registerUsedClasses should be deserialized")
-        val newBody = DeclarationIrBuilder(pluginContext, fun_registerUsedClasses.symbol).irBlockBody {
-            val obj = irGetObject(classSym_ModuleRegistry)
-            val call = irCall(funSym_registerClass, obj.type)
-
-                for (statement in body.statements) {
-                    +statement
-                }
-
-            for (refCls in usedClasses) {
-                val refClsSym = refCls.symbol
-                val qn = irString(refCls.kotlinFqName.asString())
-                val cls = classReference(refClsSym, pluginContext.irBuiltIns.kClassClass.typeWith(refCls.defaultType))
-                call.dispatchReceiver = obj
-                call.putValueArgument(0, qn)
-                call.putValueArgument(1, cls)
-                +call
-            }
+            //messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dump())
+            messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dumpKotlinLike())
         }
-        messageCollector.report(CompilerMessageSeverity.WARNING, fun_registerUsedClasses.dump())
-        messageCollector.report(CompilerMessageSeverity.WARNING, fun_registerUsedClasses.dumpKotlinLike())
-        fun_registerUsedClasses.body = newBody
     }
-*/
+
+    /*
+        fun registerUsedClasses(pluginContext: IrPluginContext, fun_registerUsedClasses:IrFunction, usedClasses: List<IrClass>) {
+            messageCollector.report(CompilerMessageSeverity.WARNING, "registering classes $usedClasses")
+            val classSym_ModuleRegistry = pluginContext.referenceClass(fq_KotlinxReflect) ?: error("Cannot find ModuleRegistry class")
+            val funSym_registerClass = pluginContext.referenceFunctions(fq_registerClass).single() // should be only one
+
+            val body = fun_registerUsedClasses.body!!
+            val plgCtx = pluginContext as IrPluginContextImpl
+            val reflexModuleDescriptor = classSym_ModuleRegistry.descriptor.module
+            val reflexIrModule = (plgCtx.linker as KotlinIrLinker).deserializeFullModule(reflexModuleDescriptor,reflexModuleDescriptor.kotlinLibrary)
+            var irclass_ModuleRegistry:IrClass? = null
+            reflexIrModule.acceptVoid(object : IrElementVisitorVoid {
+                    override fun visitElement(element: IrElement) {
+                        element.acceptChildrenVoid(this)
+                    }
+
+                    override fun visitClass(declaration: IrClass) {
+                        super.visitClass(declaration)
+                        if (declaration.kotlinFqName == fq_KotlinxReflect) {
+                            irclass_ModuleRegistry = declaration
+                        }
+                    }
+                })
+
+
+            messageCollector.report(CompilerMessageSeverity.WARNING, "registerUsedClasses should be deserialized")
+            val newBody = DeclarationIrBuilder(pluginContext, fun_registerUsedClasses.symbol).irBlockBody {
+                val obj = irGetObject(classSym_ModuleRegistry)
+                val call = irCall(funSym_registerClass, obj.type)
+
+                    for (statement in body.statements) {
+                        +statement
+                    }
+
+                for (refCls in usedClasses) {
+                    val refClsSym = refCls.symbol
+                    val qn = irString(refCls.kotlinFqName.asString())
+                    val cls = classReference(refClsSym, pluginContext.irBuiltIns.kClassClass.typeWith(refCls.defaultType))
+                    call.dispatchReceiver = obj
+                    call.putValueArgument(0, qn)
+                    call.putValueArgument(1, cls)
+                    +call
+                }
+            }
+            messageCollector.report(CompilerMessageSeverity.WARNING, fun_registerUsedClasses.dump())
+            messageCollector.report(CompilerMessageSeverity.WARNING, fun_registerUsedClasses.dumpKotlinLike())
+            fun_registerUsedClasses.body = newBody
+        }
+    */
     private fun syntheticFile(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext): IrFile {
         val internalPackageFragmentDescriptor = EmptyPackageFragmentDescriptor(moduleFragment.descriptor.builtIns.builtInsModule, FqName(moduleFragment.safeName))
         return IrFileImpl(object : IrFileEntry {
@@ -245,9 +252,8 @@ class KotlinxReflectIrGenerationExtension(
         }
     }
 
-
     // build the module specific KotlinxReflectModuleRegistry object
-    fun buildKotlinxReflectModuleRegistry(pluginContext: IrPluginContext, owningPackage: IrPackageFragment, classes: List<IrClassSymbol>): Pair<IrClass, IrSimpleFunction> {
+    fun buildKotlinxReflectModuleRegistry1(pluginContext: IrPluginContext, owningPackage: IrPackageFragment, classes: List<IrClassSymbol>): Pair<IrClass, IrSimpleFunction> {
         messageCollector.report(CompilerMessageSeverity.LOGGING, "registering classes $classes")
 
         val class_ModuleRegistry = pluginContext.referenceClass(fq_KotlinxReflect) ?: error("Cannot find ModuleRegistry class")
@@ -310,13 +316,39 @@ class KotlinxReflectIrGenerationExtension(
             }
         }
 
-        // Does not seem to be needed in 1.6.0-RC ?  class_KotlixReflect.addFakeOverrides(pluginContext.irBuiltIns)
+        // Does not seem to be needed in 1.6.0-RC ?
+        class_KotlixReflect.addFakeOverrides(IrTypeSystemContextImpl(pluginContext.irBuiltIns))
         return Pair(class_KotlixReflect, fun_classForNameAfterRegistration)
     }
 
+    fun buildKotlinxReflectModuleRegistry(pluginContext: IrPluginContext, class_KotlixReflectForModule: IrClass, classes: List<IrClassSymbol>) {
+        messageCollector.report(CompilerMessageSeverity.LOGGING, "registering classes $classes")
+
+        val class_KotlinxReflect = pluginContext.referenceClass(fq_KotlinxReflect) ?: error("Cannot find ModuleRegistry class")
+        val fun_registerClass = pluginContext.referenceFunctions(fq_registerClass).single() // should be only one
+
+        val fun_classForNameAfterRegistration = class_KotlixReflectForModule.getSimpleFunction(registerUsedClasses)?.owner
+            ?: error("$registerUsedClasses not found in generated class ${class_KotlixReflectForModule.name.identifier}")
+
+        fun_classForNameAfterRegistration.body = DeclarationIrBuilder(pluginContext, class_KotlixReflectForModule.symbol).irBlockBody {
+            val obj = irGetObject(class_KotlinxReflect)
+            for (refCls in classes) {
+                val call = irCall(fun_registerClass, obj.type)
+                messageCollector.report(CompilerMessageSeverity.LOGGING, "sym = $refCls")
+                val refClsSym = refCls//.symbol
+                val qns = refCls.signature?.packageFqName()?.child(Name.identifier(refCls.signature?.asPublic()?.declarationFqName!!))
+                val qn = irString(qns!!.asString())
+                messageCollector.report(CompilerMessageSeverity.LOGGING, "qn = ${qns}")
+                val cls = classReference(refClsSym, pluginContext.irBuiltIns.kClassClass.typeWith(refClsSym.defaultType))
+                call.dispatchReceiver = obj
+                call.putValueArgument(0, qn)
+                call.putValueArgument(1, cls)
+                +call
+            }
+        }
+    }
+
 }
-
-
 
 
 class KotlinxReflectRegisterTransformer(

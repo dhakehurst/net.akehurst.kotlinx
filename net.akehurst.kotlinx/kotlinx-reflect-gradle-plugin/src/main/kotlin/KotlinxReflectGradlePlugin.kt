@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
+import org.jetbrains.kotlin.cli.jvm.config.jvmModularRoots
 import org.jetbrains.kotlin.com.intellij.mock.MockProject
 import org.jetbrains.kotlin.compiler.plugin.AbstractCliOption
 import org.jetbrains.kotlin.compiler.plugin.CliOption
@@ -22,9 +23,14 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilerPluginSupportPlugin
 import org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact
 import org.jetbrains.kotlin.gradle.plugin.SubpluginOption
+import org.jetbrains.kotlin.ir.backend.js.jsResolveLibraries
+import org.jetbrains.kotlin.ir.backend.js.moduleName
+import org.jetbrains.kotlin.ir.backend.js.toResolverLogger
+import org.jetbrains.kotlin.ir.util.IrMessageLogger
+import org.jetbrains.kotlin.js.config.JSConfigurationKeys
 import org.jetbrains.kotlin.js.translate.extensions.JsSyntheticTranslateExtension
 import org.jetbrains.kotlin.resolve.extensions.ExtraImportsProviderExtension
-import org.jetbrains.kotlin.resolve.jvm.extensions.AnalysisHandlerExtension
+import java.io.File
 
 class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
 
@@ -50,6 +56,7 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
         val ext = target.extensions.create(KotlinxReflectGradlePluginExtension.NAME, KotlinxReflectGradlePluginExtension::class.java)
         target.configurations.create("forReflection")
         this.logger=target.logger
+
     }
 
 
@@ -57,7 +64,27 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
         val project = kotlinCompilation.target.project
         val extension:KotlinxReflectGradlePluginExtension = project.extensions.getByType(KotlinxReflectGradlePluginExtension::class.java)
         // TODO: ensure kotlinx-reflect lib is a dependency
+        val genDir = File(project.buildDir,"kotlinxReflect/genSrc")
+        genDir.mkdirs()
+        val moduleFile = File(genDir,"KotlinxReflectForModule.kt")
+        moduleFile.createNewFile()
+        val moduleSafeName = project.name.replace(Regex("[^a-zA-Z0-9]"),"_")
+        moduleFile.printWriter().use { pw ->
+            pw.println("""
+                package $moduleSafeName
+                object ${KotlinxReflectIrGenerationExtension.KotlinxReflectRegisterForModuleClassName} {
+                    internal fun registerUsedClasses() { /* populated by IR generation */ }
+                    internal fun classForNameAfterRegistration(qualifiedName: String): kotlin.reflect.KClass<*> {
+                      this.registerUsedClasses()
+                      return net.akehurst.kotlinx.reflect.KotlinxReflect.classForName(qualifiedName = qualifiedName)
+                    }
+                }
+            """.trimIndent())
+        }
 
+        kotlinCompilation.defaultSourceSet {
+            this.kotlin.srcDir(genDir)
+        }
 
         // get classes required for reflection (TODO: can we deduce this from code analysis)
         //val forReflection = project.configurations.getByName("forReflection")
@@ -129,15 +156,34 @@ class KotlinxReflectComponentRegistrar(
     )
 
     override fun registerProjectComponents(project: MockProject, configuration: CompilerConfiguration) {
-
         val messageCollector = configuration.get(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
+
+        messageCollector.report(CompilerMessageSeverity.LOGGING, "modularRoot = ${configuration.jvmModularRoots}")
+
         val forReflection = configuration.get(KotlinxReflectCommandLineProcessor.ARG_forReflection, defaultReflectionLibs)
             .split(java.io.File.pathSeparator).toList().filterNot { it.isNullOrBlank() }
 
-        //JsSyntheticTranslateExtension.registerExtension(project, KotlinxReflectJsSyntheticTranslateExtension(messageCollector, forReflection))
-        //AnalysisHandlerExtension.registerExtension(project, KotlinxReflectAnalysisHandlerExtension(messageCollector, forReflection))
-        ExtraImportsProviderExtension.registerExtension(project, KotlinxReflectExtraImportsProviderExtension(messageCollector, forReflection))
-        IrGenerationExtension.registerExtension(project, KotlinxReflectIrGenerationExtension(messageCollector, forReflection))
+        messageCollector.report(CompilerMessageSeverity.LOGGING, "configuration = ${configuration}")
+       val dependencies =  configuration.get(JSConfigurationKeys.LIBRARIES)
+        if (null!=dependencies) {
+            val allResolvedDependencies = jsResolveLibraries(
+                dependencies,
+                configuration[JSConfigurationKeys.REPOSITORIES] ?: emptyList(),
+                configuration[IrMessageLogger.IR_MESSAGE_LOGGER].toResolverLogger()
+            )
+            allResolvedDependencies.forEach { kotlinLibrary, packageAccessHandler ->
+                messageCollector.report(CompilerMessageSeverity.LOGGING, "moduleName = ${kotlinLibrary.moduleName}")
+                if ("kotlin"!=kotlinLibrary.moduleName) {
+                    packageAccessHandler.loadModuleHeader(kotlinLibrary).packageFragmentNameList.forEach {
+                        messageCollector.report(CompilerMessageSeverity.LOGGING, "packageFragmentName = ${it}")
+                    }
+                }
+            }
+        }
+            //JsSyntheticTranslateExtension.registerExtension(project, KotlinxReflectJsSyntheticTranslateExtension(messageCollector, forReflection))
+            //AnalysisHandlerExtension.registerExtension(project, KotlinxReflectAnalysisHandlerExtension(messageCollector, forReflection))
+            ExtraImportsProviderExtension.registerExtension(project, KotlinxReflectExtraImportsProviderExtension(messageCollector, forReflection))
+            IrGenerationExtension.registerExtension(project, KotlinxReflectIrGenerationExtension(messageCollector, forReflection))
 
     }
 

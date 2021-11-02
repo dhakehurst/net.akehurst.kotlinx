@@ -26,11 +26,11 @@ class KotlinxReflectExtraImportsProviderExtension(
                 override val aliasName: String? = null
                 override val importedFqName: FqName = FqName(it)
                 override val importContent: KtImportInfo.ImportContent = KtImportInfo.ImportContent.FqNameBased(importedFqName)
-                override val isAllUnder: Boolean = false
+                override val isAllUnder: Boolean = true
 
             }
         }
-        messageCollector.report(CompilerMessageSeverity.LOGGING,"importedNames ${infos.map{it.importedName}}")
+        messageCollector.report(CompilerMessageSeverity.LOGGING,"importedNames ${infos.map{it.importedFqName}}")
         return infos
     }
 
