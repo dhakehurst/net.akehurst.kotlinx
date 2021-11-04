@@ -42,6 +42,8 @@ open class B : A()
 open class C : B()
 open class D : B()
 
+enum class Colour { RED, GREEN, BLUE }
+
 class test_reflect {
 
 
@@ -94,8 +96,14 @@ class test_reflect {
     //@Test
     fun classForName() {
 
-        val actual = ModuleRegistry.classForName("net.akehurst.kotlinx.reflect.A")
+        val actual = KotlinxReflect.classForName("net.akehurst.kotlinx.reflect.A")
         assertEquals(A::class, actual)
 
+    }
+
+    @Test
+    fun enumValueOf() {
+        val actual = Colour::class.reflect().enumValueOf("RED")
+        assertEquals(Colour.RED, actual)
     }
 }

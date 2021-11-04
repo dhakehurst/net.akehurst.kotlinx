@@ -91,6 +91,13 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         }
     }
 
+    actual fun <E:Enum<E>> enumValueOf(name:String): Enum<E> {
+        //FIXME: unsafe and fragile !
+        val funcName = this.kclass.js.name+"_"+name+"_getInstance()"
+        val e = js("eval(funcName)")
+        return e
+    }
+
     actual fun call(self: T, methodName: String, vararg args: Any?): Any? {
         return if (IR) {
             js("self[methodName](args)")

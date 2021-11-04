@@ -49,6 +49,8 @@ expect class ClassReflection<T : Any>(kclass: KClass<T>) {
 
     fun isPropertyMutable(propertyName: String): Boolean
 
+    fun <E:Enum<E>> enumValueOf(name:String): Enum<E>
+
     fun call(self: T, methodName: String, vararg args: Any?) : Any?
 }
 

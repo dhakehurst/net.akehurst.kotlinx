@@ -182,6 +182,10 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         }
     }
 
+    actual fun <E:Enum<E>> enumValueOf(name:String): Enum<E> {
+        return (this.kclass.java.enumConstants as Array<Enum<*>>).first { it.name == name } as Enum<E>
+    }
+
     actual fun call(self: T, methodName: String, vararg args: Any?): Any? {
         return self.reflect().call(methodName, *args)
     }
