@@ -48,8 +48,10 @@ class test_reflect {
 
 
     //TODO: not working for js
-    //@Test
+    @Test
     fun A_isSupertypeOf_B() {
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.A",A::class)
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.B",B::class)
         val actual = A::class.reflect().isSupertypeOf(B::class)
         assertEquals(true, actual)
     }
@@ -87,15 +89,15 @@ class test_reflect {
 
     @Test
     fun construct() {
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.A",A::class)
         val obj1 = A()
         val actual = obj1::class.reflect().construct()
         assertEquals(obj1, actual)
     }
 
-    //TODO: not currently sure how to test
-    //@Test
+    @Test
     fun classForName() {
-
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.A",A::class)
         val actual = KotlinxReflect.classForName("net.akehurst.kotlinx.reflect.A")
         assertEquals(A::class, actual)
 
@@ -103,6 +105,7 @@ class test_reflect {
 
     @Test
     fun enumValueOf() {
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.Colour",Colour::class)
         val actual = Colour::class.reflect().enumValueOf("RED")
         assertEquals(Colour.RED, actual)
     }

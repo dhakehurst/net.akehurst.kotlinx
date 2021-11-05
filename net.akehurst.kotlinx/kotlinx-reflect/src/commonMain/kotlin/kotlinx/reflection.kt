@@ -29,6 +29,8 @@ expect fun KClass<*>.reflect() : ClassReflection<*>
 
 expect class ClassReflection<T : Any>(kclass: KClass<T>) {
 
+    val qualifiedName:String
+
     val isAbstract: Boolean
 
     val allPropertyNames: List<String>
@@ -83,31 +85,23 @@ interface KotlinxReflectModuleRegistry {
 
 object KotlinxReflect {
 
-    var registerModules: KotlinxReflectModuleRegistry = object : KotlinxReflectModuleRegistry{
-        override fun registerClasses() {}
-    }
-
-    private var _registeredModules = false
     private var _registeredClasses = mutableMapOf<String, KClass<*>>()
+    private var _registeredClassesReverse = mutableMapOf<KClass<*>,String>()
 
     val registeredClasses:Map<String, KClass<*>> = _registeredClasses
 
     fun registerClass(qualifiedName: String, cls:KClass<*>) {
         _registeredClasses[qualifiedName] = cls
+        _registeredClassesReverse[cls]=qualifiedName
     }
 
     fun classForName(qualifiedName: String): KClass<*> {
-        if (!_registeredModules) {
-            registerModules.registerClasses()
-            _registeredModules=true
-        }
-        if (registeredClasses.isEmpty()) {
-            this.registerUsedClasses()
-        }
-        return registeredClasses[qualifiedName] ?:error("Cannot find class $qualifiedName, is the class registered?")
+        return registeredClasses[qualifiedName] ?:error("Cannot find class $qualifiedName, is the class registered with KotlinxReflect?")
     }
 
-    fun registerUsedClasses() {
-        // This function is populated by the kotlinx-reflect-gradle-plugin
+    fun qualifiedNameForClass(kclass: KClass<*>): String {
+        return _registeredClassesReverse[kclass]
+            ?: error("Cannot get qualifiedName of '${kclass}' is it registered with KotlinxReflect?")
     }
+
 }

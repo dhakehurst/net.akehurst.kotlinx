@@ -102,6 +102,8 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         this.kclass.memberFunctions.filter { it.visibility == KVisibility.PUBLIC }
     }
 
+    actual val qualifiedName:String = this.kclass.qualifiedName ?: error("Cannot get qualifiedName of '${this.kclass}'")
+
     actual fun construct(vararg constructorArgs: Any?): T {
         return this.kclass.constructors.first {
             //TODO: check types match

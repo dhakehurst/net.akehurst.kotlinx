@@ -50,6 +50,8 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         TODO()
     }
 
+    actual val qualifiedName:String = KotlinxReflect.qualifiedNameForClass(this.kclass)
+
     actual fun construct(vararg constructorArgs: Any?): T {
         val cls = this.kclass.js
 //val obj = js("Reflect.construct(cls, ...constructorArgs)")  // ES6
@@ -76,19 +78,19 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual fun getProperty(self: T, propertyName: String): Any? {
-        return if(IR) {
-            js("self['_'+propertyName]")
-        } else {
-            js("self[propertyName]")
-        }
+       // return if(IR) {
+       //     js("self['_'+propertyName]")
+       // } else {
+       return     js("self[propertyName]")
+      //  }
     }
 
     actual fun setProperty(self: T, propertyName: String, value: Any?) {
-        if(IR) {
+      //  if(IR) {
             js("self['_'+propertyName] = value")
-        } else {
+      //  } else {
             js("self[propertyName] = value")
-        }
+      //  }
     }
 
     actual fun <E:Enum<E>> enumValueOf(name:String): Enum<E> {
@@ -171,21 +173,21 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
 
     actual fun getProperty(propertyName: String): Any? {
         val self = this.self //ensures self is available in the js script below
-        return if (IR) {
-            js("self['_'+propertyName]")
-        } else {
-            js("self[propertyName]")
-        }
+        //return if (IR) {
+       //     js("self['_'+propertyName]")
+        //} else {
+        return    js("self[propertyName]")
+        //}
 //return "Reflect.get(obj, propertyName)"
     }
 
     actual fun setProperty(propertyName: String, value: Any?) {
         val self = this.self //ensures self is available in the js script below
-        if(IR) {
-            js("self['_'+propertyName] = value")
-        } else {
+        //if(IR) {
+        //    js("self['_'+propertyName] = value")
+        //} else {
             js("self[propertyName] = value")
-        }
+        //}
     }
 
     actual fun call(methodName: String, vararg args: Any?): Any? {
