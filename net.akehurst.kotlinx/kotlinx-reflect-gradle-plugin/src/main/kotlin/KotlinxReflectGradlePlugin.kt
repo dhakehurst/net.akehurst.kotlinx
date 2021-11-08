@@ -68,6 +68,8 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
         genDir.mkdirs()
         val moduleFile = File(genDir,"KotlinxReflectForModule.kt")
         moduleFile.createNewFile()
+        logger.debug("compilationName = ${kotlinCompilation.compilationName}")
+        kotlinCompilation.compilationName
         val moduleSafeName = project.name.replace(Regex("[^a-zA-Z0-9]"),"_")
         moduleFile.printWriter().use { pw ->
             pw.println("""

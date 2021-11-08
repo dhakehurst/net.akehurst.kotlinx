@@ -43,7 +43,14 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         }
 
     actual val allPropertyNames: List<String> by lazy {
-        TODO()
+        val cls = this.kclass.js
+        val js: Array<String> = js("""
+             var p=[];
+             var prt=cls.prototype; //Object.getPrototypeOf(cls);
+             var nms=Object.getOwnPropertyNames(prt);
+             for(var i=0; i<nms.length; i++ ) if (p.indexOf(nms[i]) == -1) p.push(nms[i])
+            """)
+        js.toList()
     }
 
     actual val allMemberFunctions: List<KFunction<*>> by lazy {
@@ -73,8 +80,8 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
-// FIXME: when JS reflection is sufficient
-        return true
+        val cls = this.kclass.js
+        return js("!!Object.getOwnPropertyDescriptor(cls.prototype, propertyName).set")
     }
 
     actual fun getProperty(self: T, propertyName: String): Any? {
@@ -87,7 +94,7 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
 
     actual fun setProperty(self: T, propertyName: String, value: Any?) {
       //  if(IR) {
-            js("self['_'+propertyName] = value")
+      //      js("self['_'+propertyName] = value")
       //  } else {
             js("self[propertyName] = value")
       //  }
@@ -101,11 +108,11 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual fun call(self: T, methodName: String, vararg args: Any?): Any? {
-        return if (IR) {
-            js("self[methodName](args)")
-        } else {
-            js("self[methodName](args)")
-        }
+ //       return if (IR) {
+          return  js("self[methodName](args)")
+ //       } else {
+//            js("self[methodName](args)")
+//        }
     }
 }
 
@@ -167,8 +174,8 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
-// FIXME: when JS reflection is sufficient
-        return true
+        val cls = this.self::class.js
+        return js("!!Object.getOwnPropertyDescriptor(cls.prototype, propertyName).set")
     }
 
     actual fun getProperty(propertyName: String): Any? {
@@ -192,11 +199,11 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
 
     actual fun call(methodName: String, vararg args: Any?): Any? {
         val self = this.self //ensures self is available in the js script below
-        return if (IR) {
-            js("self[methodName](args)")
-        } else {
-            js("self[methodName](args)")
-        }
+ //       return if (IR) {
+ //           js("self[methodName](args)")
+ //       } else {
+         return   js("self[methodName](args)")
+ //       }
     }
 
     actual suspend fun callSuspend(methodName: String, vararg args: Any?) : Any? {
