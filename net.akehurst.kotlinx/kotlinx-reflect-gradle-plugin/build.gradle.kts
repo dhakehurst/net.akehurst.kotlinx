@@ -38,6 +38,7 @@ gradlePlugin {
 dependencies {
     compileOnly("org.jetbrains.kotlin:kotlin-compiler-embeddable")
     implementation(kotlin("gradle-plugin-api"))
+    compileOnly(kotlin("gradle-plugin"))
     compileOnly("com.google.auto.service:auto-service:1.0.1")
     kapt("com.google.auto.service:auto-service:1.0.1")
     implementation(project(":kotlinx-reflect"))
