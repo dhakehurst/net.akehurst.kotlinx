@@ -18,7 +18,6 @@ package net.akehurst.kotlinx.reflect
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.fail
 
 
 open class KR_A {
@@ -40,6 +39,7 @@ open class KR_A {
 }
 
 enum class KR_Colour { RED, GREEN, BLUE }
+enum class KR_Colour2 { PINK, YELLOW, CYAN }
 
 class test_KotlinxReflect {
 
@@ -52,9 +52,26 @@ class test_KotlinxReflect {
     }
 
     @Test
+    fun isEnum() {
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.KR_A",KR_A::class)
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.KR_Colour",KR_Colour::class)
+        assertEquals(false, KR_A::class.reflect().isEnum)
+        assertEquals(true, KR_Colour::class.reflect().isEnum)
+    }
+
+    @Test
+    fun values() {
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.KR_Colour",KR_Colour::class,KR_Colour::values as EnumValuesFunction)
+        val actual = KR_Colour::class.reflect().enumValues()
+        val expected = KR_Colour.values().asList()
+        assertEquals(expected, actual)
+    }
+
+    @Test
     fun enumValueOf() {
         KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.KR_Colour",KR_Colour::class)
         val actual = KR_Colour::class.reflect().enumValueOf("RED")
         assertEquals(KR_Colour.RED, actual)
     }
+
 }

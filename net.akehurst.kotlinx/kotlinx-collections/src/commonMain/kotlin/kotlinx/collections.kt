@@ -104,9 +104,8 @@ class Stack<T> {
         return v
     }
 
-    fun peek(): T {
-        return _elements.last()
-    }
+    fun peek(): T = _elements.last()
+
 }
 
 fun <T> Set<T>.transitveClosure(function: (T) -> Set<T>): Set<T> {

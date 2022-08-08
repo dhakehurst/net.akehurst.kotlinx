@@ -51,7 +51,11 @@ expect class ClassReflection<T : Any>(kclass: KClass<T>) {
 
     fun isPropertyMutable(propertyName: String): Boolean
 
-    fun <E:Enum<E>> enumValueOf(name:String): Enum<E>
+    actual val isEnum:Boolean
+
+    fun <E:Enum<E>> enumValues(): List<E>
+
+    fun <E:Enum<E>> enumValueOf(name:String): E?
 
     fun call(self: T, methodName: String, vararg args: Any?) : Any?
 }
@@ -81,27 +85,4 @@ expect class ObjectReflection<T : Any>(self: T) {
 
 interface KotlinxReflectModuleRegistry {
     fun registerClasses()
-}
-
-object KotlinxReflect {
-
-    private var _registeredClasses = mutableMapOf<String, KClass<*>>()
-    private var _registeredClassesReverse = mutableMapOf<KClass<*>,String>()
-
-    val registeredClasses:Map<String, KClass<*>> = _registeredClasses
-
-    fun registerClass(qualifiedName: String, cls:KClass<*>) {
-        _registeredClasses[qualifiedName] = cls
-        _registeredClassesReverse[cls]=qualifiedName
-    }
-
-    fun classForName(qualifiedName: String): KClass<*> {
-        return registeredClasses[qualifiedName] ?:error("Cannot find class $qualifiedName, is the class registered with KotlinxReflect?")
-    }
-
-    fun qualifiedNameForClass(kclass: KClass<*>): String {
-        return _registeredClassesReverse[kclass]
-            ?: error("Cannot get qualifiedName of '${kclass}' is it registered with KotlinxReflect?")
-    }
-
 }

@@ -5,12 +5,10 @@ import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContextImpl
-import org.jetbrains.kotlin.backend.common.ir.addChild
-import org.jetbrains.kotlin.backend.common.ir.addFakeOverrides
-import org.jetbrains.kotlin.backend.common.ir.addSimpleDelegatingConstructor
-import org.jetbrains.kotlin.backend.common.ir.createImplicitParameterDeclarationWithWrappedDescriptor
+import org.jetbrains.kotlin.backend.common.ir.*
 import org.jetbrains.kotlin.backend.common.lower.DeclarationIrBuilder
 import org.jetbrains.kotlin.backend.common.serialization.KotlinIrLinker
+import org.jetbrains.kotlin.builtins.createFunctionType
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.descriptors.ClassKind
@@ -29,10 +27,7 @@ import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.types.*
-import org.jetbrains.kotlin.ir.util.constructors
-import org.jetbrains.kotlin.ir.util.dumpKotlinLike
-import org.jetbrains.kotlin.ir.util.getSimpleFunction
-import org.jetbrains.kotlin.ir.util.kotlinFqName
+import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
@@ -62,7 +57,6 @@ class KotlinxReflectIrGenerationExtension(
         }
     }
 
-    @OptIn(ObsoleteDescriptorBasedAPI::class)
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
         messageCollector.report(CompilerMessageSeverity.INFO, "KotlinxReflect: for moduleFragment - '${moduleFragment.name}'")
         messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: forReflection = $forReflection")
@@ -72,10 +66,12 @@ class KotlinxReflectIrGenerationExtension(
             val pkgFqName = FqName(pkgName)
             moduleFragment.descriptor.getPackage(pkgFqName).fragments.forEach { frag ->
                 frag.getMemberScope().getClassifierNames()?.forEach { cls ->
-                    messageCollector.report(CompilerMessageSeverity.LOGGING, "check = ${frag.fqName} . ${cls}")
                     val sym = pluginContext.referenceClass(frag.fqName.child(cls))
                     if (null != sym) {
+                        messageCollector.report(CompilerMessageSeverity.LOGGING, "include = ${frag.fqName} . ${cls}")
                         classesToRegisterForReflection.add(sym)
+                    } else {
+                        messageCollector.report(CompilerMessageSeverity.LOGGING, "exclude = ${frag.fqName} . ${cls}")
                     }
                 }
             }
@@ -326,6 +322,7 @@ class KotlinxReflectIrGenerationExtension(
     }
     */
 
+    @OptIn(ObsoleteDescriptorBasedAPI::class)
     fun buildKotlinxReflectModuleRegistry(pluginContext: IrPluginContext, class_KotlixReflectForModule: IrClass, classes: List<IrClassSymbol>) {
         messageCollector.report(CompilerMessageSeverity.LOGGING, "registering classes $classes")
 
@@ -350,9 +347,22 @@ class KotlinxReflectIrGenerationExtension(
                 val qn = irString(qns.asString())
                 messageCollector.report(CompilerMessageSeverity.INFO, "registered class ${qns.asString()} with ${fq_KotlinxReflect.shortName().asString()}")
                 val cls = classReference(refClsSym, pluginContext.irBuiltIns.kClassClass.typeWith(refClsSym.defaultType))
+
                 call.dispatchReceiver = obj
                 call.putValueArgument(0, qn)
                 call.putValueArgument(1, cls)
+
+                if ( refCls.descriptor.kind==ClassKind.ENUM_CLASS ) {
+                    val valuesFun = refCls.getSimpleFunction("values") ?: error("No function 'values' defined for '${refCls}'")
+                    //val valuesCall = irCall(valuesFun)
+                    val valuesFunType = pluginContext.irBuiltIns.getKFunctionType(pluginContext.irBuiltIns.listClass.starProjectedType, emptyList())
+                    val funRef = irRawFunctionReferefence(valuesFunType,valuesFun)
+                    call.putValueArgument(2, funRef)
+                    //call.putValueArgument(2, irNull())
+                } else {
+                    call.putValueArgument(2, irNull())
+                }
+
                 +call
             }
         }

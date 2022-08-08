@@ -100,11 +100,24 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
       //  }
     }
 
-    actual fun <E:Enum<E>> enumValueOf(name:String): Enum<E> {
-        //FIXME: unsafe and fragile !
-        val funcName = this.kclass.js.name+"_"+name+"_getInstance()"
-        val e = js("eval(funcName)")
-        return e
+    actual val isEnum:Boolean get() {
+        val jsCls = this.kclass.js.asDynamic()
+        val md = jsCls.`$metadata$`
+        return md.fastPrototype == Enum::class.js.asDynamic().prototype
+    }
+
+    actual fun <E:Enum<E>> enumValues(): List<E> {
+        return if (isEnum) {
+            //val jsCls = this.kclass.js.asDynamic()
+            //jsCls.values().unsafeCast<Array<E>>().asList()
+            KotlinxReflect.enumValues(this.qualifiedName) as List<E>
+        } else {
+            emptyList()
+        }
+    }
+
+    actual fun <E:Enum<E>> enumValueOf(name:String): E? {
+        return this.enumValues().firstOrNull { it.name == name } as E?
     }
 
     actual fun call(self: T, methodName: String, vararg args: Any?): Any? {
