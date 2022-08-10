@@ -7,6 +7,16 @@ plugins {
 }
 import com.github.gmazzo.gradle.plugins.BuildConfigExtension
 
+
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(8))
+    }
+}
+
+
+
 configure<BuildConfigExtension>  {
     //val project = project(":kotlinx-gradle-plugin")
     packageName("${project.group}.reflect.gradle.plugin")
@@ -23,7 +33,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     }
 }
 
-
+val testPlugin by sourceSets.creating{}
 
 gradlePlugin {
     plugins {
@@ -32,14 +42,36 @@ gradlePlugin {
             implementationClass = "net.akehurst.kotlinx.reflect.gradle.plugin.KotlinxReflectGradlePlugin"
         }
     }
+    testSourceSets(testPlugin)
 }
 
-
+val version_junit:String by project
 dependencies {
     compileOnly("org.jetbrains.kotlin:kotlin-compiler-embeddable")
-    implementation(kotlin("gradle-plugin-api"))
     compileOnly(kotlin("gradle-plugin"))
     compileOnly("com.google.auto.service:auto-service:1.0.1")
     kapt("com.google.auto.service:auto-service:1.0.1")
+
+    implementation(kotlin("gradle-plugin-api"))
     implementation(project(":kotlinx-reflect"))
+
+    // seem to need these to be able to run the pluginTest
+    //implementation(kotlin("gradle-plugin"))
+    //implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable")
+
+    "testPluginImplementation"(project)
+    "testPluginImplementation"(gradleTestKit())
+    "testPluginImplementation"("org.junit.jupiter:junit-jupiter:$version_junit")
+    "testPluginImplementation"(kotlin("gradle-plugin"))
+    "testPluginImplementation"("org.jetbrains.kotlin:kotlin-compiler-embeddable")
+}
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+}
+val testPluginTask = tasks.register<Test>("testPlugin") {
+    description = "Runs the plugin tests."
+    group = "verification"
+    testClassesDirs = testPlugin.output.classesDirs
+    classpath = testPlugin.runtimeClasspath
+    mustRunAfter(tasks.test)
 }

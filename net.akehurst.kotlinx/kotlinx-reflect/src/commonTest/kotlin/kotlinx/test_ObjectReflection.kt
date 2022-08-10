@@ -16,11 +16,12 @@
 
 package net.akehurst.kotlinx.reflect
 
+import kotlin.js.JsExport
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
-
+@JsExport
 open class OR_A {
     val prop1 = "hello"
     var prop2 = "world"
@@ -37,6 +38,10 @@ open class OR_A {
             else -> false
         }
     }
+}
+
+class OR_B : OR_A() {
+    val prop6 = 20
 }
 
 class test_ObjectReflection {
@@ -59,6 +64,26 @@ class test_ObjectReflection {
         val obj1 = OR_A()
         val actual = obj1.reflect().isPropertyMutable("prop2")
         assertEquals(true, actual)
+    }
+
+    @Test
+    fun isPropertyMutable_onSupertype_false() {
+        val obj1 = OR_B()
+        val actual = obj1.reflect().isPropertyMutable("prop1")
+        assertEquals(false, actual)
+    }
+    @Test
+    fun isPropertyMutable_onSupertype_true() {
+        val obj1 = OR_B()
+        val actual = obj1.reflect().isPropertyMutable("prop2")
+        assertEquals(true, actual)
+    }
+
+    @Test
+    fun setProperty() {
+        val obj1 = OR_A()
+        val actual = obj1.reflect().setProperty("prop2","xxx")
+        assertEquals(obj1.prop2, "xxx")
     }
 
 }

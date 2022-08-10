@@ -25,7 +25,10 @@ import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.impl.IrFileImpl
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.impl.IrFunctionReferenceImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrRawFunctionReferenceImpl
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
@@ -46,6 +49,9 @@ class KotlinxReflectIrGenerationExtension(
         val fq_classForName = FqName("${fq_KotlinxReflect}.classForName")
         const val classForNameAfterRegistration = "classForNameAfterRegistration"
         const val registerUsedClasses = "registerUsedClasses"
+
+        fun IrBuilderWithScope.irFunctionReference(type: IrType, symbol: IrFunctionSymbol, typeArgumentsCount:Int=0, valueArgumentsCount:Int=0) =
+            IrFunctionReferenceImpl(startOffset, endOffset, type, symbol, typeArgumentsCount, valueArgumentsCount)
     }
 
     private val globRegexes = forReflection.mapNotNull {
@@ -173,7 +179,7 @@ class KotlinxReflectIrGenerationExtension(
                 ), null
             )
 
-            //messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dump())
+            messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dump())
             messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dumpKotlinLike())
         }
     }
@@ -356,7 +362,7 @@ class KotlinxReflectIrGenerationExtension(
                     val valuesFun = refCls.getSimpleFunction("values") ?: error("No function 'values' defined for '${refCls}'")
                     //val valuesCall = irCall(valuesFun)
                     val valuesFunType = pluginContext.irBuiltIns.getKFunctionType(pluginContext.irBuiltIns.listClass.starProjectedType, emptyList())
-                    val funRef = irRawFunctionReferefence(valuesFunType,valuesFun)
+                    val funRef = irFunctionReference(valuesFunType,valuesFun)
                     call.putValueArgument(2, funRef)
                     //call.putValueArgument(2, irNull())
                 } else {

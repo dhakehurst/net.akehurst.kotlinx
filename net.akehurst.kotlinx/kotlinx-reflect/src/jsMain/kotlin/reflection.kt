@@ -187,8 +187,25 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
-        val cls = this.self::class.js
-        return js("!!Object.getOwnPropertyDescriptor(cls.prototype, propertyName).set")
+        //val cls = this.self::class.js
+        val self = this.self //ensures self is available in the js script below
+        return js("""
+            var proto = Object.getPrototypeOf(self);
+            var propDescriptor = null;
+            while(proto) {
+                propDescriptor = Object.getOwnPropertyDescriptor(proto, propertyName);
+                if (propDescriptor) {
+                    break;
+                } else {
+                    proto = Object.getPrototypeOf(proto);
+                }
+            }
+            var result = false
+            if (propDescriptor) {
+                result = typeof propDescriptor.set === 'function';
+            }
+            result
+        """)
     }
 
     actual fun getProperty(propertyName: String): Any? {

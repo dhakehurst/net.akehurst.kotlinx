@@ -41,8 +41,8 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
 
     private lateinit var logger: Logger
 
-    private lateinit var genDir:File
-    private lateinit var kotlinxReflectRegisterForModuleClassFqName:String
+    private lateinit var genDir: File
+    private lateinit var kotlinxReflectRegisterForModuleClassFqName: String
 
     override fun getCompilerPluginId(): String = KotlinPluginInfo.KOTLIN_PLUGIN_ID
 
@@ -76,7 +76,7 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
             it.kotlin.srcDir(genDir)
         }
 
-        kotlinSourceSets.forEach { ss->
+        kotlinSourceSets.forEach { ss ->
             if (ss.name.endsWith("Test")) {
                 //do nothing
             } else {
@@ -90,14 +90,19 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
                             """
                             // ${ss.name}
                             package $moduleSafeName
-                             object $KotlinxReflectRegisterForModuleClassName {
-                                 internal fun registerUsedClasses() { /* populated by IR generation */ }
+                            import net.akehurst.kotlinx.reflect.KotlinxReflect
+                            import net.akehurst.language.api.processor.LanguageIssueKind
+                            import net.akehurst.kotlinx.reflect.EnumValuesFunction
+                            object $KotlinxReflectRegisterForModuleClassName {
+                                 internal fun registerUsedClasses() { /* populated by IR generation */
+                                    KotlinxReflect.registerClass(qualifiedName = "net.akehurst.language.api.processor.LanguageIssueKind", cls = LanguageIssueKind::class, enumValuesFunction = LanguageIssueKind::values as EnumValuesFunction)
+                                  }
                                  internal fun classForNameAfterRegistration(qualifiedName: String): kotlin.reflect.KClass<*> {
                                   this.registerUsedClasses()
                                   return net.akehurst.kotlinx.reflect.KotlinxReflect.classForName(qualifiedName = qualifiedName)
                                 }
                             }
-                        """.trimIndent()
+                            """.trimIndent()
                         )
                     }
                 } else {
@@ -125,7 +130,10 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
         logger.debug("To compiler, forReflection = $forRefFiles")
         return project.provider {
             listOf(
-                SubpluginOption(key = KotlinxReflectCommandLineProcessor.OPTION_kotlinxReflectRegisterForModuleClassFqName, value = this.kotlinxReflectRegisterForModuleClassFqName),
+                SubpluginOption(
+                    key = KotlinxReflectCommandLineProcessor.OPTION_kotlinxReflectRegisterForModuleClassFqName,
+                    value = this.kotlinxReflectRegisterForModuleClassFqName
+                ),
                 SubpluginOption(key = KotlinxReflectCommandLineProcessor.OPTION_forReflection, value = forRefFiles)
             )
         }
