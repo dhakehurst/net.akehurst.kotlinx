@@ -16,6 +16,8 @@
 
 package net.akehurst.kotlinx.reflect
 
+import net.akehurst.kotlinx.collections.MapExportable
+import net.akehurst.kotlinx.collections.mutableMapExportableOf
 import kotlin.reflect.KClass
 
 
@@ -23,11 +25,11 @@ typealias EnumValuesFunction = ()->Array<Enum<*>>
 
 object KotlinxReflect {
 
-    private var _registeredClasses = mutableMapOf<String, KClass<*>>()
-    private var _registeredClassesReverse = mutableMapOf<KClass<*>,String>()
-    private var _enumValuesFunction = mutableMapOf<String,EnumValuesFunction>()
+    private var _registeredClasses = mutableMapExportableOf<String, KClass<*>>()
+    private var _registeredClassesReverse = mutableMapExportableOf<KClass<*>,String>()
+    private var _enumValuesFunction = mutableMapExportableOf<String,EnumValuesFunction>()
 
-    val registeredClasses:Map<String, KClass<*>> = _registeredClasses
+    val registeredClasses:MapExportable<String, KClass<*>> = _registeredClasses
 
     fun registerClass(qualifiedName: String, cls: KClass<*>, enumValuesFunction: EnumValuesFunction? = null) {
         _registeredClasses[qualifiedName] = cls

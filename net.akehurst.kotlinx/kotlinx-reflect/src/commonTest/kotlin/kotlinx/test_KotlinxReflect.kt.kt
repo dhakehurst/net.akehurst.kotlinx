@@ -60,7 +60,7 @@ class test_KotlinxReflect {
     }
 
     @Test
-    fun values() {
+    fun enumValues() {
         KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.KR_Colour",KR_Colour::class,KR_Colour::values as EnumValuesFunction)
         val actual = KR_Colour::class.reflect().enumValues()
         val expected = KR_Colour.values().asList()

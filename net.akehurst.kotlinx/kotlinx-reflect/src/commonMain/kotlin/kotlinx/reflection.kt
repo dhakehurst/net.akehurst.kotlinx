@@ -16,6 +16,7 @@
 
 package net.akehurst.kotlinx.reflect
 
+import kotlin.js.JsExport
 import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
@@ -35,7 +36,7 @@ expect class ClassReflection<T : Any>(kclass: KClass<T>) {
 
     val allPropertyNames: List<String>
 
-    val allMemberFunctions: List<KFunction<*>>
+   // val allMemberFunctions: List<KFunction<*>>
 
     fun construct(vararg constructorArgs: Any?): T
 
@@ -43,7 +44,7 @@ expect class ClassReflection<T : Any>(kclass: KClass<T>) {
 
     fun allPropertyNamesFor(self: T): List<String>
 
-    fun allMemberFunctionsFor(self: T): List<KFunction<*>>
+   // fun allMemberFunctionsFor(self: T): List<KFunction<*>>
 
     fun getProperty(self: T, propertyName: String): Any?
 

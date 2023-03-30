@@ -98,9 +98,9 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         (publicProps + methProps).toSet().toList()
     }
 
-    actual val allMemberFunctions: List<KFunction<*>> by lazy {
-        this.kclass.memberFunctions.filter { it.visibility == KVisibility.PUBLIC }
-    }
+  //  actual val allMemberFunctions: List<KFunction<*>> by lazy {
+  //      this.kclass.memberFunctions.filter { it.visibility == KVisibility.PUBLIC }
+ //   }
 
     actual val qualifiedName: String = this.kclass.qualifiedName ?: error("Cannot get qualifiedName of '${this.kclass}'")
 
@@ -131,13 +131,13 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         }
     }
 
-    actual fun allMemberFunctionsFor(self: T): List<KFunction<*>> {
-        if (this.kclass.isInstance(self)) {
-            return this.allMemberFunctions
-        } else {
-            throw RuntimeException("$self is not an instance of ${this.kclass}")
-        }
-    }
+ //   actual fun allMemberFunctionsFor(self: T): List<KFunction<*>> {
+ //       if (this.kclass.isInstance(self)) {
+ //           return this.allMemberFunctions
+ //       } else {
+ //           throw RuntimeException("$self is not an instance of ${this.kclass}")
+ //       }
+ //   }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
         val mprop = this.kclass.memberProperties.firstOrNull { propertyName == it.name }

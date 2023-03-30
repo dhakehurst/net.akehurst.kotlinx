@@ -34,6 +34,8 @@ import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
+import org.jetbrains.kotlin.name.CallableId
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 
@@ -44,9 +46,9 @@ class KotlinxReflectIrGenerationExtension(
 ) : IrGenerationExtension {
 
     companion object {
-        val fq_KotlinxReflect = FqName(KotlinxReflect::class.qualifiedName!!)
-        val fq_registerClass = FqName("${fq_KotlinxReflect}.registerClass")
-        val fq_classForName = FqName("${fq_KotlinxReflect}.classForName")
+        val fq_KotlinxReflect = ClassId.fromString(KotlinxReflect::class.qualifiedName!!)
+        val fq_registerClass = CallableId(fq_KotlinxReflect,Name.identifier("registerClass"))
+        val fq_classForName = CallableId(fq_KotlinxReflect,Name.identifier("classForName"))
         const val classForNameAfterRegistration = "classForNameAfterRegistration"
         const val registerUsedClasses = "registerUsedClasses"
 
@@ -72,7 +74,7 @@ class KotlinxReflectIrGenerationExtension(
             val pkgFqName = FqName(pkgName)
             moduleFragment.descriptor.getPackage(pkgFqName).fragments.forEach { frag ->
                 frag.getMemberScope().getClassifierNames()?.forEach { cls ->
-                    val sym = pluginContext.referenceClass(frag.fqName.child(cls))
+                    val sym = pluginContext.referenceClass(ClassId(frag.fqName,cls))
                     if (null != sym) {
                         messageCollector.report(CompilerMessageSeverity.LOGGING, "include = ${frag.fqName} . ${cls}")
                         classesToRegisterForReflection.add(sym)
@@ -351,7 +353,7 @@ class KotlinxReflectIrGenerationExtension(
                 val qns = fqname //refCls.signature?.packageFqName()?.child(Name.identifier(fqname.asString()))
                 //if (null==qns) error("Cannot find '${fqname}'")
                 val qn = irString(qns.asString())
-                messageCollector.report(CompilerMessageSeverity.INFO, "registered class ${qns.asString()} with ${fq_KotlinxReflect.shortName().asString()}")
+                messageCollector.report(CompilerMessageSeverity.INFO, "registered class ${qns.asString()} with ${fq_KotlinxReflect.shortClassName.asString()}")
                 val cls = classReference(refClsSym, pluginContext.irBuiltIns.kClassClass.typeWith(refClsSym.defaultType))
 
                 call.dispatchReceiver = obj

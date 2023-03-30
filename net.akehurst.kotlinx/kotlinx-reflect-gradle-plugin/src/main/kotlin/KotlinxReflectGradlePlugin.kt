@@ -26,7 +26,7 @@ import org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact
 import org.jetbrains.kotlin.gradle.plugin.SubpluginOption
 import org.jetbrains.kotlin.ir.backend.js.jsResolveLibraries
 import org.jetbrains.kotlin.ir.backend.js.moduleName
-import org.jetbrains.kotlin.ir.backend.js.toResolverLogger
+import org.jetbrains.kotlin.ir.backend.js.resolverLogger
 import org.jetbrains.kotlin.ir.util.IrMessageLogger
 import org.jetbrains.kotlin.js.config.JSConfigurationKeys
 import org.jetbrains.kotlin.js.translate.extensions.JsSyntheticTranslateExtension
@@ -216,7 +216,7 @@ class KotlinxReflectComponentRegistrar(
             val allResolvedDependencies = jsResolveLibraries(
                 dependencies,
                 configuration[JSConfigurationKeys.REPOSITORIES] ?: emptyList(),
-                configuration[IrMessageLogger.IR_MESSAGE_LOGGER].toResolverLogger()
+                configuration.resolverLogger
             )
             allResolvedDependencies.forEach { kotlinLibrary, packageAccessHandler ->
                 messageCollector.report(CompilerMessageSeverity.LOGGING, "moduleName = ${kotlinLibrary.moduleName}")

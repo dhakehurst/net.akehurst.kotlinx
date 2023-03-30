@@ -1,21 +1,17 @@
 plugins {
     `java-gradle-plugin`
     `maven-publish`
-    id("com.gradle.plugin-publish") version "0.14.0"
+    id("com.gradle.plugin-publish") version "1.1.0"
     kotlin("jvm")
     kotlin("kapt") // does not respect buildDir, fixed in kotlin 1.5.20
 }
 import com.github.gmazzo.gradle.plugins.BuildConfigExtension
-
-
 
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(8))
     }
 }
-
-
 
 configure<BuildConfigExtension>  {
     //val project = project(":kotlinx-gradle-plugin")
@@ -33,13 +29,24 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     }
 }
 
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().configureEach {
+    compilerOptions {
+        freeCompilerArgs.add("-opt-in=org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi")
+    }
+}
+
 val testPlugin by sourceSets.creating{}
 
 gradlePlugin {
+    website.set("https://github.com/dhakehurst/net.akehurst.kotlinx")
+    vcsUrl.set("https://github.com/dhakehurst/net.akehurst.kotlinx")
     plugins {
         create("kotlinx-reflect") {
             id = "net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin"
             implementationClass = "net.akehurst.kotlinx.reflect.gradle.plugin.KotlinxReflectGradlePlugin"
+            description = "Kotlin compiler plugin to support net.akehurst.kotlinx reflection on JS-platform"
+            tags.set(listOf("reflection","kotlin", "javascript", "typescript", "kotlin-js", "kotlin-multiplatform"))
+
         }
     }
     testSourceSets(testPlugin)
