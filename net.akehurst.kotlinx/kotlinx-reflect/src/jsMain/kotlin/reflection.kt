@@ -45,14 +45,15 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
              var prt=cls.prototype; //Object.getPrototypeOf(cls);
              var nms=Object.getOwnPropertyNames(prt);
              for(var i=0; i<nms.length; i++ ) if (p.indexOf(nms[i]) == -1) p.push(nms[i])
+             p
             """
         )
         js.toList()
     }
 
-  //  actual val allMemberFunctions: List<KFunction<*>> by lazy {
-  //      TODO()
-  //  }
+    actual val allMemberFunctions: List<KFunction<*>> by lazy {
+        TODO()
+    }
 
     actual val qualifiedName: String get() = KotlinxReflect.qualifiedNameForClass(this.kclass)
 

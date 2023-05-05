@@ -98,9 +98,9 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         (publicProps + methProps).toSet().toList()
     }
 
-  //  actual val allMemberFunctions: List<KFunction<*>> by lazy {
-  //      this.kclass.memberFunctions.filter { it.visibility == KVisibility.PUBLIC }
- //   }
+    actual val allMemberFunctions: List<KFunction<*>> by lazy {
+        this.kclass.memberFunctions.filter { it.visibility == KVisibility.PUBLIC }
+    }
 
     actual val qualifiedName: String = this.kclass.qualifiedName ?: error("Cannot get qualifiedName of '${this.kclass}'")
 

@@ -36,7 +36,7 @@ expect class ClassReflection<T : Any>(kclass: KClass<T>) {
 
     val allPropertyNames: List<String>
 
-   // val allMemberFunctions: List<KFunction<*>>
+    val allMemberFunctions: List<KFunction<*>>
 
     fun construct(vararg constructorArgs: Any?): T
 
