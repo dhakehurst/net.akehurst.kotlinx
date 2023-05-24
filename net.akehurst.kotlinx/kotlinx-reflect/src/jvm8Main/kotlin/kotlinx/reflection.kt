@@ -203,6 +203,8 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     actual val kclass: KClass<T> = self::class as KClass<T>
     actual val isAbstract: Boolean = this.kclass.isAbstract
 
+    actual val isProxy:Boolean get() = Proxy.isProxyClass(kclass.java)
+
     actual val allPropertyNames: List<String> by lazy {
         //find get methods, for java defined classes/properties
         val methProps = this.kclass.memberFunctions.filter { it.name.startsWith("get") && it.valueParameters.size == 0 }.map { it.name.substring(3).decapitalize() }
@@ -286,13 +288,17 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
         try {
             val meth = kclass.memberFunctions.firstOrNull { methodName == it.name }
             if (null != meth) {
-                return meth.call(self, *args)
+               // return if (this.isProxy) {
+               //     Proxy.getInvocationHandler(self).invoke(self, meth.javaMethod, args)
+              //  } else {
+               return      meth.call(self, *args)
+              //  }
             } else {
-                throw RuntimeException("Method ${methodName} not found on object ${self}")
+                throw NoSuchMethodException("Method ${methodName} not found on object ${self}")
             }
-        } catch (t: Throwable) {
-            val e = if (t is InvocationTargetException && null == t.cause) t else t.cause
-            val msg = "call($methodName) failed: ${e}"
+        } catch (t: NoSuchMethodException) {
+            //val e = if (t is InvocationTargetException && null == t.cause) t else t.cause
+            val msg = "call($methodName) failed: ${t}"
             println(msg)
         }
 
@@ -300,42 +306,47 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
         try {
             val meth = kclass.java.methods.firstOrNull { methodName == it.name }
             if (null != meth) {
-                return meth.invoke(self, *args)
+               // return if (this.isProxy) {
+               //     Proxy.getInvocationHandler(self).invoke(self, meth, args)
+                //} else {
+                    return    meth.invoke(self, *args)
+                //}
             } else {
-                throw RuntimeException("Method ${methodName} not found on object ${self}")
+                throw NoSuchMethodException("Method ${methodName} not found on object ${self}")
             }
-        } catch (t: Throwable) {
-            val e = if (t is InvocationTargetException && null == t.cause) t else t.cause
-            val msg = "call($methodName) failed: ${e}"
+        } catch (t: NoSuchMethodException) {
+            //val e = if (t is InvocationTargetException && null == t.cause) t else t.cause
+            val msg = "call($methodName) failed: ${t}"
             println(msg)
         }
 
         // finally try for a mangled name version
         try {
             val meth = kclass.java.methods.firstOrNull { it.name.startsWith(methodName + "-") }
-            val unBoxedArgs = meth!!.parameterTypes.mapIndexed { index, clazz ->
-                val arg = args[index]
-                when {
-                    null == arg -> null
-                    clazz.isInstance(arg) -> arg
-                    else -> arg::class.memberProperties.first().call(arg) //their should only be one property on an inline class
-                }
-            }
             if (null != meth) {
-                return meth.invoke(self, *unBoxedArgs.toTypedArray())
+                val unBoxedArgs = meth.parameterTypes.mapIndexed { index, clazz ->
+                    val arg = args[index]
+                    when {
+                        null == arg -> null
+                        clazz.isInstance(arg) -> arg
+                        else -> arg::class.memberProperties.first().call(arg) //their should only be one property on an inline class
+                    }
+                }
+                //return if (this.isProxy) {
+                //    Proxy.getInvocationHandler(self).invoke(self, meth, unBoxedArgs.toTypedArray())
+                //} else {
+                return    meth.invoke(self, *unBoxedArgs.toTypedArray())
+                //}
             } else {
                 throw RuntimeException("Method ${methodName} not found on object ${self}")
             }
-        } catch (t: Throwable) {
-            if (t is InvocationTargetException && null != t.cause) {
-                throw t
-            } else {
-                val msg = "call($methodName) failed: ${t}"
-                println(msg)
-            }
+        } catch (t: NoSuchMethodException) {
+            //val e = if (t is InvocationTargetException && null == t.cause) t else t.cause
+            val msg = "call($methodName) failed: ${t}"
+            println(msg)
         }
 
-        throw RuntimeException("Method ${methodName} not found on object ${self}")
+        throw NoSuchMethodException("Method ${methodName} not found on object ${self}")
     }
 
     actual suspend fun callSuspend(methodName: String, vararg args: Any?): Any? {
@@ -348,13 +359,22 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
             if (null != meth) {
                 return suspendCoroutineUninterceptedOrReturn { cont ->
                     return@suspendCoroutineUninterceptedOrReturn meth.call(self, *args, cont)
+                    /*
+                    return@suspendCoroutineUninterceptedOrReturn if (this.isProxy) {
+                        val args2 = args.toList()+cont
+                        Proxy.getInvocationHandler(self).invoke(self, meth.javaMethod, args2.toTypedArray())
+                    } else {
+                        meth.call(self, *args, cont)
+                    }
+
+                     */
                 }
             } else {
-                throw RuntimeException("Method ${methodName} not found on object ${self}")
+                throw NoSuchMethodException("Method ${methodName} not found on object ${self}")
             }
-        } catch (t: Throwable) {
-            val e = if (t is InvocationTargetException && null == t.cause) t else t.cause
-            val msg = "callSuspend($methodName) failed: ${e}"
+        } catch (t: NoSuchMethodException) {
+            //val e = if (t is InvocationTargetException && null == t.cause) t else t.cause
+            val msg = "call($methodName) failed: ${t}"
             println(msg)
         }
 
@@ -364,45 +384,58 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
             if (null != meth) {
                 return suspendCoroutineUninterceptedOrReturn { cont ->
                     return@suspendCoroutineUninterceptedOrReturn meth.invoke(self, *args, cont)
+                    /*
+                    return@suspendCoroutineUninterceptedOrReturn if (this.isProxy) {
+                        val args2 = args.toList()+cont
+                        Proxy.getInvocationHandler(self).invoke(self, meth, args2.toTypedArray())
+                    } else {
+                        meth.invoke(self, *args, cont)
+                    }
+                     */
                 }
             } else {
-                throw RuntimeException("Method ${methodName} not found on object ${self}")
+                throw NoSuchMethodException("Method ${methodName} not found on object ${self}")
             }
-        } catch (t: Throwable) {
-            val e = if (t is InvocationTargetException && null == t.cause) t else t.cause
-            val msg = "callSuspend($methodName) failed: ${e}"
+        } catch (t: NoSuchMethodException) {
+            //val e = if (t is InvocationTargetException && null == t.cause) t else t.cause
+            val msg = "call($methodName) failed: ${t}"
             println(msg)
         }
 
         // finally try for a mangled name version
         try {
             val meth = kclass.java.methods.firstOrNull { it.name.startsWith(methodName + "-") }
-            val unBoxedArgs = meth!!.parameterTypes.dropLast(1) //drop the 'Continuation' parameter, no need to check that
-                .mapIndexed { index, clazz ->
-                    val arg = args[index]
-                    when {
-                        null == arg -> null
-                        clazz.isInstance(arg) -> arg
-                        else -> arg::class.memberProperties.first().call(arg) //their should only be one property on an inline class
-                    }
-                }
             if (null != meth) {
+                val unBoxedArgs = meth.parameterTypes.dropLast(1) //drop the 'Continuation' parameter, no need to check that
+                    .mapIndexed { index, clazz ->
+                        val arg = args[index]
+                        when {
+                            null == arg -> null
+                            clazz.isInstance(arg) -> arg
+                            else -> arg::class.memberProperties.first().call(arg) //their should only be one property on an inline class
+                        }
+                    }
                 return suspendCoroutineUninterceptedOrReturn { cont ->
                     return@suspendCoroutineUninterceptedOrReturn meth.invoke(self, *unBoxedArgs.toTypedArray(), cont)
+                    /*
+                    return@suspendCoroutineUninterceptedOrReturn if (this.isProxy) {
+                        val args2 = unBoxedArgs.toList()+cont
+                        Proxy.getInvocationHandler(self).invoke(self, meth, args2.toTypedArray())
+                    } else {
+                        meth.invoke(self, *unBoxedArgs.toTypedArray(), cont)
+                    }
+                     */
                 }
             } else {
-                throw RuntimeException("Method ${methodName} not found on object ${self}")
+                throw NoSuchMethodException("Method ${methodName} not found on object ${self}")
             }
-        } catch (t: Throwable) {
-            if (t is InvocationTargetException && null != t.cause) {
-                throw t
-            } else {
-                val msg = "callSuspend($methodName) failed: ${t}"
-                println(msg)
-            }
+        } catch (t: NoSuchMethodException) {
+            //val e = if (t is InvocationTargetException && null == t.cause) t else t.cause
+            val msg = "call($methodName) failed: ${t}"
+            println(msg)
         }
 
-        throw RuntimeException("Method ${methodName} not found on object ${self}")
+        throw NoSuchMethodException("Method ${methodName} not found on object ${self}")
     }
 
 }

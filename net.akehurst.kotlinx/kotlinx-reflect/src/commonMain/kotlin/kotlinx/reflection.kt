@@ -52,7 +52,7 @@ expect class ClassReflection<T : Any>(kclass: KClass<T>) {
 
     fun isPropertyMutable(propertyName: String): Boolean
 
-    actual val isEnum:Boolean
+    val isEnum:Boolean
 
     fun <E:Enum<E>> enumValues(): List<E>
 
@@ -66,6 +66,8 @@ expect class ObjectReflection<T : Any>(self: T) {
     val kclass: KClass<T>
 
     val isAbstract: Boolean
+
+    val isProxy:Boolean
 
     val allPropertyNames: List<String>
 

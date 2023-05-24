@@ -17,6 +17,7 @@
 package net.akehurst.kotlinx.reflect
 
 import net.akehurst.kotlinx.collections.MapExportable
+import net.akehurst.kotlinx.collections.exportableM
 import net.akehurst.kotlinx.collections.mutableMapExportableOf
 import kotlin.reflect.KClass
 
@@ -25,11 +26,11 @@ typealias EnumValuesFunction = ()->Array<Enum<*>>
 
 object KotlinxReflect {
 
-    private var _registeredClasses = mutableMapExportableOf<String, KClass<*>>()
-    private var _registeredClassesReverse = mutableMapExportableOf<KClass<*>,String>()
-    private var _enumValuesFunction = mutableMapExportableOf<String,EnumValuesFunction>()
+    private var _registeredClasses = mutableMapOf<String, KClass<*>>()
+    private var _registeredClassesReverse = mutableMapOf<KClass<*>,String>()
+    private var _enumValuesFunction = mutableMapOf<String,EnumValuesFunction>()
 
-    val registeredClasses:MapExportable<String, KClass<*>> = _registeredClasses
+    val registeredClasses:MapExportable<String, KClass<*>> = _registeredClasses.exportableM
 
     fun registerClass(qualifiedName: String, cls: KClass<*>, enumValuesFunction: EnumValuesFunction? = null) {
         _registeredClasses[qualifiedName] = cls
@@ -40,13 +41,20 @@ object KotlinxReflect {
     }
 
     fun classForName(qualifiedName: String): KClass<*> {
-        return registeredClasses[qualifiedName] ?:error("Cannot find class $qualifiedName, is the class registered with KotlinxReflect?")
+        return registeredClasses[qualifiedName]
+            ?:error("Cannot find class $qualifiedName, is the class registered with KotlinxReflect and did you remember to call 'KotlinxReflectForModule.registerUsedClasses()'?")
     }
 
     fun qualifiedNameForClass(kclass: KClass<*>): String {
         return _registeredClassesReverse[kclass]
-            ?: error("Cannot get qualifiedName of '${kclass}' is it registered with KotlinxReflect?")
+            ?: error("Cannot get qualifiedName of '${kclass}' is it registered with KotlinxReflect and did you remember to call 'KotlinxReflectForModule.registerUsedClasses()'?")
     }
 
     fun <E:Enum<E>> enumValues(qualifiedName: String): List<E> = _enumValuesFunction[qualifiedName]?.invoke()?.asList() as List<E>? ?: emptyList()
+
+    /**
+     * for debugging
+     */
+    val registeredClassesToString : String get() = _registeredClasses.keys.joinToString(separator = "\n") { it }
+
 }

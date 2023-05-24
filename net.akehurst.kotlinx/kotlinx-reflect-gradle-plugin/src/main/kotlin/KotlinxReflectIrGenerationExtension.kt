@@ -76,10 +76,10 @@ class KotlinxReflectIrGenerationExtension(
                 frag.getMemberScope().getClassifierNames()?.forEach { cls ->
                     val sym = pluginContext.referenceClass(ClassId(frag.fqName,cls))
                     if (null != sym) {
-                        messageCollector.report(CompilerMessageSeverity.LOGGING, "include = ${frag.fqName} . ${cls}")
+                        messageCollector.report(CompilerMessageSeverity.LOGGING, "include = ${frag.fqName}.${cls}")
                         classesToRegisterForReflection.add(sym)
                     } else {
-                        messageCollector.report(CompilerMessageSeverity.LOGGING, "exclude = ${frag.fqName} . ${cls}")
+                        messageCollector.report(CompilerMessageSeverity.LOGGING, "exclude = ${frag.fqName}.${cls}")
                     }
                 }
             }
@@ -181,7 +181,7 @@ class KotlinxReflectIrGenerationExtension(
                 ), null
             )
 
-            messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dump())
+            //messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dump())
             messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dumpKotlinLike())
         }
     }

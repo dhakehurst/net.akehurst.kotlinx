@@ -158,6 +158,8 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
             return this.kclass.simpleName!!.endsWith("Abstract") //TODO !! need something better than this
         }
 
+    actual val isProxy:Boolean get() = TODO()
+
     actual val allPropertyNames: List<String> by lazy {
         val self = this.self
         /*

@@ -48,8 +48,8 @@ class test_ClassReflection {
 
     @Test
     fun A_isSupertypeOf_B() {
-        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.A",CR_A::class)
-        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.B",CR_B::class)
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.CR_A",CR_A::class)
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.CR_B",CR_B::class)
         val actual = CR_A::class.reflect().isSupertypeOf(CR_B::class)
         assertEquals(true, actual)
     }
