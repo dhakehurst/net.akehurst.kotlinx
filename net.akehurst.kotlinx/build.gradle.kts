@@ -19,11 +19,11 @@ import com.github.gmazzo.gradle.plugins.BuildConfigExtension
 import java.io.File
 
 plugins {
-    kotlin("multiplatform") version ("1.9.0-RC") apply false
-    id("org.jetbrains.dokka") version ("1.8.10") apply false
-    id("com.github.gmazzo.buildconfig") version("3.1.0") apply false
+    kotlin("multiplatform") version ("1.9.10") apply false
+    id("org.jetbrains.dokka") version ("1.8.20") apply false
+    id("com.github.gmazzo.buildconfig") version("4.1.2") apply false
     id("nu.studer.credentials") version ("3.0")
-    id("net.akehurst.kotlin.gradle.plugin.exportPublic") version("1.9.0-RC") apply false
+    id("net.akehurst.kotlin.gradle.plugin.exportPublic") version("1.9.10") apply false
 }
 val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9
 val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9
@@ -37,7 +37,7 @@ allprojects {
     group = group_project
     version = version_project
 
-    buildDir = File(rootProject.projectDir, ".gradle-build/${project.name}")
+    project.layout.buildDirectory = File(rootProject.projectDir, ".gradle-build/${project.name}")
 
 }
 
