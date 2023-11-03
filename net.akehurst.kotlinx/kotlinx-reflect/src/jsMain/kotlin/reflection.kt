@@ -32,6 +32,10 @@ actual fun KClass<*>.reflect() = ClassReflection(this)
 
 actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) {
 
+    companion object {
+        const val metadata = "\$metadata\$"
+    }
+
     actual val isAbstract: Boolean
         get() {
             return this.kclass.simpleName!!.endsWith("Abstract")
@@ -57,11 +61,40 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
 
     actual val qualifiedName: String get() = KotlinxReflect.qualifiedNameForClass(this.kclass)
 
+    actual val isEnum: Boolean
+        get() {
+            val n = this.kclass is Enum<*>
+            val jsCls = this.kclass.js.asDynamic()
+            val ep = Enum::class.js.asDynamic().prototype
+            val tp = js("Object.getPrototypeOf(jsCls.prototype)")
+            return ep == tp
+        }
+
+    actual val isObject: Boolean
+        get() {
+            val md = metadata
+            val cls = this.kclass.js
+            return js("('object' == cls[md].kind)") as Boolean
+        }
+
     actual fun construct(vararg constructorArgs: Any?): T {
         val cls = this.kclass.js
-//val obj = js("Reflect.construct(cls, ...constructorArgs)")  // ES6
-        val obj = js("new (Function.prototype.bind.apply(cls, [null].concat(constructorArgs)))")
-        return obj as T
+        return when {
+            isObject -> {
+                val qname = KotlinxReflect.qualifiedNameForClass(this.kclass)
+                val obj = KotlinxReflect.objectInstance<T>(qname)
+                when (obj) {
+                    null -> error("Object instance not found for '$qname', has it been registered?")
+                    else -> obj
+                }
+            }
+
+            else -> {
+               // val obj = js("new (Function.prototype.bind.apply(cls, [null].concat(constructorArgs)));")
+                val obj = js("Reflect.construct(cls, constructorArgs)")
+                obj as T
+            }
+        }
     }
 
     actual fun <S : Any> isSupertypeOf(subtype: KClass<S>): Boolean {
@@ -73,9 +106,9 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         return js.toList()
     }
 
- //   actual fun allMemberFunctionsFor(self: T): List<KFunction<*>> {
- //       TODO()
- //   }
+    //   actual fun allMemberFunctionsFor(self: T): List<KFunction<*>> {
+    //       TODO()
+    //   }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
         val cls = this.kclass.js
@@ -118,15 +151,6 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         //  }
     }
 
-    actual val isEnum: Boolean
-        get() {
-            val n = this.kclass is Enum<*>
-            val jsCls = this.kclass.js.asDynamic()
-            val ep = Enum::class.js.asDynamic().prototype
-            val tp = js("Object.getPrototypeOf(jsCls.prototype)")
-            return ep == tp
-        }
-
     actual fun <E : Enum<E>> enumValues(): List<E> {
         return if (isEnum) {
             //val jsCls = this.kclass.js.asDynamic()
@@ -158,7 +182,7 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
             return this.kclass.simpleName!!.endsWith("Abstract") //TODO !! need something better than this
         }
 
-    actual val isProxy:Boolean get() = TODO()
+    actual val isProxy: Boolean get() = TODO()
 
     actual val allPropertyNames: List<String> by lazy {
         val self = this.self

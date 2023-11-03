@@ -14,9 +14,11 @@ import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.descriptors.effectiveVisibility
 import org.jetbrains.kotlin.descriptors.impl.EmptyPackageFragmentDescriptor
 import org.jetbrains.kotlin.ir.*
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.safeName
+import org.jetbrains.kotlin.ir.backend.js.utils.isJsExport
 import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.builders.declarations.addFunction
 import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
@@ -27,6 +29,7 @@ import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.impl.IrFunctionReferenceImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrRawFunctionReferenceImpl
+import org.jetbrains.kotlin.ir.overrides.isEffectivelyPrivate
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.types.*
@@ -41,18 +44,18 @@ import org.jetbrains.kotlin.name.Name
 
 class KotlinxReflectIrGenerationExtension(
     private val messageCollector: MessageCollector,
-    private val kotlinxReflectRegisterForModuleClassFqName:String,
+    private val kotlinxReflectRegisterForModuleClassFqName: String,
     private val forReflection: List<String>
 ) : IrGenerationExtension {
 
     companion object {
         val fq_KotlinxReflect = ClassId.fromString(KotlinxReflect::class.qualifiedName!!)
-        val fq_registerClass = CallableId(fq_KotlinxReflect,Name.identifier("registerClass"))
-        val fq_classForName = CallableId(fq_KotlinxReflect,Name.identifier("classForName"))
+        val fq_registerClass = CallableId(fq_KotlinxReflect, Name.identifier("registerClass"))
+        val fq_classForName = CallableId(fq_KotlinxReflect, Name.identifier("classForName"))
         const val classForNameAfterRegistration = "classForNameAfterRegistration"
         const val registerUsedClasses = "registerUsedClasses"
 
-        fun IrBuilderWithScope.irFunctionReference(type: IrType, symbol: IrFunctionSymbol, typeArgumentsCount:Int=0, valueArgumentsCount:Int=0) =
+        fun IrBuilderWithScope.irFunctionReference(type: IrType, symbol: IrFunctionSymbol, typeArgumentsCount: Int = 0, valueArgumentsCount: Int = 0) =
             IrFunctionReferenceImpl(startOffset, endOffset, type, symbol, typeArgumentsCount, valueArgumentsCount)
     }
 
@@ -74,8 +77,8 @@ class KotlinxReflectIrGenerationExtension(
             val pkgFqName = FqName(pkgName)
             moduleFragment.descriptor.getPackage(pkgFqName).fragments.forEach { frag ->
                 frag.getMemberScope().getClassifierNames()?.forEach { cls ->
-                    val sym = pluginContext.referenceClass(ClassId(frag.fqName,cls))
-                    if (null != sym) {
+                    val sym = pluginContext.referenceClass(ClassId(frag.fqName, cls))
+                    if (null != sym) {// && true==sym.signature?.isPubliclyVisible) {
                         messageCollector.report(CompilerMessageSeverity.LOGGING, "include = ${frag.fqName}.${cls}")
                         classesToRegisterForReflection.add(sym)
                     } else {
@@ -88,52 +91,52 @@ class KotlinxReflectIrGenerationExtension(
         val plgCtx = pluginContext as IrPluginContextImpl
         val linker = plgCtx.linker as KotlinIrLinker
 
-/*
-        moduleFragment.descriptor.allDependencyModules.forEach { md ->
-            val kotlinLibrary = (md.getCapability(KlibModuleOrigin.CAPABILITY) as? DeserializedKlibModuleOrigin)?.library
+        /*
+                moduleFragment.descriptor.allDependencyModules.forEach { md ->
+                    val kotlinLibrary = (md.getCapability(KlibModuleOrigin.CAPABILITY) as? DeserializedKlibModuleOrigin)?.library
 
-                val irmd = linker.deserializeOnlyHeaderModule(md, kotlinLibrary)
-                ExternalDependenciesGenerator(symbolTable, listOf(linker))
-                    .generateUnboundSymbolsAsDependencies()
-                linker.postProcess()
-                messageCollector.report(CompilerMessageSeverity.WARNING, "dependency = ${irmd.safeName}")
-                messageCollector.report(CompilerMessageSeverity.WARNING, "dependency.files = ${irmd.files.map { it.fqName }}")
-                irmd.acceptVoid(object : IrElementVisitorVoid {
-                    override fun visitElement(element: IrElement) {
-                        element.acceptChildrenVoid(this)
-                    }
+                        val irmd = linker.deserializeOnlyHeaderModule(md, kotlinLibrary)
+                        ExternalDependenciesGenerator(symbolTable, listOf(linker))
+                            .generateUnboundSymbolsAsDependencies()
+                        linker.postProcess()
+                        messageCollector.report(CompilerMessageSeverity.WARNING, "dependency = ${irmd.safeName}")
+                        messageCollector.report(CompilerMessageSeverity.WARNING, "dependency.files = ${irmd.files.map { it.fqName }}")
+                        irmd.acceptVoid(object : IrElementVisitorVoid {
+                            override fun visitElement(element: IrElement) {
+                                element.acceptChildrenVoid(this)
+                            }
 
-                    override fun visitClass(declaration: IrClass) {
-                        super.visitClass(declaration)
-                        if (declaration.kotlinFqName.asString().startsWith("kotlin").not()) {
-                            messageCollector.report(CompilerMessageSeverity.WARNING, "member.name = ${declaration.kotlinFqName}")
-                        }
-                        globRegexes.forEach { regex ->
-                            if (regex.matches(declaration.kotlinFqName.asString())) {
-                                classesToRegisterForReflection.add(declaration.symbol)
+                            override fun visitClass(declaration: IrClass) {
+                                super.visitClass(declaration)
+                                if (declaration.kotlinFqName.asString().startsWith("kotlin").not()) {
+                                    messageCollector.report(CompilerMessageSeverity.WARNING, "member.name = ${declaration.kotlinFqName}")
+                                }
+                                globRegexes.forEach { regex ->
+                                    if (regex.matches(declaration.kotlinFqName.asString())) {
+                                        classesToRegisterForReflection.add(declaration.symbol)
+                                    }
+                                }
+                            }
+                        })
+
+                }
+
+         */
+        /*
+                symbolTable.forEachPublicSymbol { sym ->
+                    val fqname = sym.descriptor.fqNameSafe
+                    if (fqname.asString().startsWith("kotlin").not()) {
+                        messageCollector.report(CompilerMessageSeverity.WARNING, "checking = ${fqname}")
+                        if (sym is IrClassSymbol) {
+                            globRegexes.forEach { regex ->
+                                if (regex.matches(fqname.asString())) {
+                                    classesToRegisterForReflection.add(sym as IrClassSymbol)
+                                }
                             }
                         }
                     }
-                })
-
-        }
-
- */
-/*
-        symbolTable.forEachPublicSymbol { sym ->
-            val fqname = sym.descriptor.fqNameSafe
-            if (fqname.asString().startsWith("kotlin").not()) {
-                messageCollector.report(CompilerMessageSeverity.WARNING, "checking = ${fqname}")
-                if (sym is IrClassSymbol) {
-                    globRegexes.forEach { regex ->
-                        if (regex.matches(fqname.asString())) {
-                            classesToRegisterForReflection.add(sym as IrClassSymbol)
-                        }
-                    }
                 }
-            }
-        }
-*/
+        */
 
         var class_KotlixReflectForModule: IrClass? = null
         moduleFragment.acceptVoid(object : IrElementVisitorVoid {
@@ -143,16 +146,37 @@ class KotlinxReflectIrGenerationExtension(
 
             override fun visitClass(declaration: IrClass) {
                 super.visitClass(declaration)
-                messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: visiting ${declaration.kotlinFqName.asString()}")
+                when {
 
-                if (declaration.kotlinFqName.asString() == kotlinxReflectRegisterForModuleClassFqName) {
-                    class_KotlixReflectForModule = declaration
-                }
+                    declaration.visibility.isPublicAPI -> {
+                        messageCollector.report(
+                            CompilerMessageSeverity.LOGGING,
+                            "KotlinxReflect: visiting ${declaration.kotlinFqName.asString()}"
+                        )
 
+                        if (declaration.kotlinFqName.asString() == kotlinxReflectRegisterForModuleClassFqName) {
+                            class_KotlixReflectForModule = declaration
+                        }
 
-                globRegexes.forEach { regex ->
-                    if (regex.matches(declaration.kotlinFqName.asString())) {
-                        classesToRegisterForReflection.add(declaration.symbol)
+                        globRegexes.forEach { regex ->
+                            if (regex.matches(declaration.kotlinFqName.asString())) {
+                                classesToRegisterForReflection.add(declaration.symbol)
+
+                                if (declaration.isJsExport().not()) {
+                                    messageCollector.report(
+                                        CompilerMessageSeverity.ERROR,
+                                        "KotlinxReflect: declaration ${declaration.kotlinFqName.asString()} is used for reflection but is not 'exported. Add the package to 'exportPublic' configuration or (if you must) use @JsExport"
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    else -> {
+                        messageCollector.report(
+                            CompilerMessageSeverity.LOGGING,
+                            "KotlinxReflect: NOT visiting private ${declaration.kotlinFqName.asString()}"
+                        )
                     }
                 }
             }
@@ -332,6 +356,13 @@ class KotlinxReflectIrGenerationExtension(
 
     @OptIn(ObsoleteDescriptorBasedAPI::class)
     fun buildKotlinxReflectModuleRegistry(pluginContext: IrPluginContext, class_KotlixReflectForModule: IrClass, classes: List<IrClassSymbol>) {
+        // fun registerClass(
+        // [0]   qualifiedName: String,
+        // [1]  cls: KClass<*>,
+        // [2]  valuesFunction: ValuesFunction? = null
+        // [3]  ObjectInstance: Any? = null
+        // )
+
         messageCollector.report(CompilerMessageSeverity.LOGGING, "registering classes $classes")
 
         val class_KotlinxReflect = pluginContext.referenceClass(fq_KotlinxReflect) ?: error("Cannot find ModuleRegistry class")
@@ -343,35 +374,57 @@ class KotlinxReflectIrGenerationExtension(
         fun_classForNameAfterRegistration.body = DeclarationIrBuilder(pluginContext, class_KotlixReflectForModule.symbol).irBlockBody {
             val obj = irGetObject(class_KotlinxReflect)
             for (refCls in classes) {
-                val call = irCall(fun_registerClass, obj.type)
-                messageCollector.report(CompilerMessageSeverity.LOGGING, "sym = $refCls")
-                val refClsSym = refCls//.symbol
-                //val sig = refCls.signature ?: error("signature is 'null' for '${refCls}' '${refCls.starProjectedType.classFqName}'")
-                //val asp = refCls.signature?.asPublic() ?: error("signature.asPublic is 'null' for '${refCls}'")
-                //val fqname = refCls.signature?.asPublic()?.declarationFqName ?: error("declarationFqName is 'null' for '${refCls}' '${refCls.signature?.asPublic()?.firstNameSegment}'")
-                val fqname = refCls.starProjectedType.classFqName ?: error("No classFqName for '${refCls}'")
-                val qns = fqname //refCls.signature?.packageFqName()?.child(Name.identifier(fqname.asString()))
-                //if (null==qns) error("Cannot find '${fqname}'")
-                val qn = irString(qns.asString())
-                messageCollector.report(CompilerMessageSeverity.INFO, "registered class ${qns.asString()} with ${fq_KotlinxReflect.shortClassName.asString()}")
-                val cls = classReference(refClsSym, pluginContext.irBuiltIns.kClassClass.typeWith(refClsSym.defaultType))
+                try {
+                    val call = irCall(fun_registerClass, obj.type)
+                    messageCollector.report(CompilerMessageSeverity.LOGGING, "sym = $refCls")
+                    val refClsSym = refCls//.symbol
+                    //val sig = refCls.signature ?: error("signature is 'null' for '${refCls}' '${refCls.starProjectedType.classFqName}'")
+                    //val asp = refCls.signature?.asPublic() ?: error("signature.asPublic is 'null' for '${refCls}'")
+                    //val fqname = refCls.signature?.asPublic()?.declarationFqName ?: error("declarationFqName is 'null' for '${refCls}' '${refCls.signature?.asPublic()?.firstNameSegment}'")
+                    val fqname = refCls.starProjectedType.classFqName ?: error("No classFqName for '${refCls}'")
+                    val qns = fqname //refCls.signature?.packageFqName()?.child(Name.identifier(fqname.asString()))
+                    //if (null==qns) error("Cannot find '${fqname}'")
+                    val qn = irString(qns.asString())
+                    messageCollector.report(
+                        CompilerMessageSeverity.INFO,
+                        "registered class ${qns.asString()} with ${fq_KotlinxReflect.shortClassName.asString()}"
+                    )
+                    val cls = classReference(refClsSym, pluginContext.irBuiltIns.kClassClass.typeWith(refClsSym.defaultType))
 
-                call.dispatchReceiver = obj
-                call.putValueArgument(0, qn)
-                call.putValueArgument(1, cls)
+                    call.dispatchReceiver = obj
+                    call.putValueArgument(0, qn)
+                    call.putValueArgument(1, cls)
 
-                if ( refCls.descriptor.kind==ClassKind.ENUM_CLASS ) {
-                    val valuesFun = refCls.getSimpleFunction("values") ?: error("No function 'values' defined for '${refCls}'")
-                    //val valuesCall = irCall(valuesFun)
-                    val valuesFunType = pluginContext.irBuiltIns.getKFunctionType(pluginContext.irBuiltIns.listClass.starProjectedType, emptyList())
-                    val funRef = irFunctionReference(valuesFunType,valuesFun)
-                    call.putValueArgument(2, funRef)
-                    //call.putValueArgument(2, irNull())
-                } else {
-                    call.putValueArgument(2, irNull())
+                    when (refCls.descriptor.kind) {
+                        ClassKind.ENUM_CLASS -> {
+                            val valuesFun = refCls.getSimpleFunction("values") ?: error("No function 'values' defined for '${refCls}'")
+                            //val valuesCall = irCall(valuesFun)
+                            val valuesFunType = pluginContext.irBuiltIns.getKFunctionType(
+                                pluginContext.irBuiltIns.listClass.starProjectedType,
+                                emptyList()
+                            )
+                            val funRef = irFunctionReference(valuesFunType, valuesFun)
+                            call.putValueArgument(2, funRef)
+                            call.putValueArgument(3, irNull())
+                        }
+
+                        ClassKind.OBJECT -> {
+                            val instance = irGetObject(refCls)
+                            call.putValueArgument(2, irNull())
+                            call.putValueArgument(3, instance)
+                        }
+                        else -> {
+                            call.putValueArgument(2, irNull())
+                            call.putValueArgument(3, irNull())
+                        }
+                    }
+                    +call
+                } catch (t: Throwable) {
+                    messageCollector.report(
+                        CompilerMessageSeverity.ERROR,
+                        "Error registering class ${refCls}"
+                    )
                 }
-
-                +call
             }
         }
     }

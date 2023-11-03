@@ -29,14 +29,18 @@ object KotlinxReflect {
     private var _registeredClasses = mutableMapOf<String, KClass<*>>()
     private var _registeredClassesReverse = mutableMapOf<KClass<*>,String>()
     private var _enumValuesFunction = mutableMapOf<String,EnumValuesFunction>()
+    private var _objectInstance = mutableMapOf<String,Any>()
 
     val registeredClasses:MapExportable<String, KClass<*>> = _registeredClasses.exportableM
 
-    fun registerClass(qualifiedName: String, cls: KClass<*>, enumValuesFunction: EnumValuesFunction? = null) {
+    fun registerClass(qualifiedName: String, cls: KClass<*>, enumValuesFunction: EnumValuesFunction? = null, objectInstance:Any?=null) {
         _registeredClasses[qualifiedName] = cls
         _registeredClassesReverse[cls]=qualifiedName
         if (null!=enumValuesFunction) {
             _enumValuesFunction[qualifiedName] = enumValuesFunction
+        }
+        if(null!=objectInstance) {
+            _objectInstance[qualifiedName] = objectInstance
         }
     }
 
@@ -51,6 +55,8 @@ object KotlinxReflect {
     }
 
     fun <E:Enum<E>> enumValues(qualifiedName: String): List<E> = _enumValuesFunction[qualifiedName]?.invoke()?.asList() as List<E>? ?: emptyList()
+
+    fun <T: Any> objectInstance(qualifiedName: String) : T?  = _objectInstance[qualifiedName] as T?
 
     /**
      * for debugging

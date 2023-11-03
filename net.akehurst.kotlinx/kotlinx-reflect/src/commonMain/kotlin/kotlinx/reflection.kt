@@ -21,16 +21,16 @@ import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 
-expect fun KFunction<*>.isSuspend() : Boolean
+expect fun KFunction<*>.isSuspend(): Boolean
 
-expect fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler:Any, proxy: Any?, callable: KCallable<*>, methodName:String, args: Array<out Any>) -> Any?): T
+expect fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler: Any, proxy: Any?, callable: KCallable<*>, methodName: String, args: Array<out Any>) -> Any?): T
 
-expect fun Any.reflect() : ObjectReflection<Any>
-expect fun KClass<*>.reflect() : ClassReflection<*>
+expect fun Any.reflect(): ObjectReflection<Any>
+expect fun KClass<*>.reflect(): ClassReflection<*>
 
 expect class ClassReflection<T : Any>(kclass: KClass<T>) {
 
-    val qualifiedName:String
+    val qualifiedName: String
 
     val isAbstract: Boolean
 
@@ -44,7 +44,7 @@ expect class ClassReflection<T : Any>(kclass: KClass<T>) {
 
     fun allPropertyNamesFor(self: T): List<String>
 
-   // fun allMemberFunctionsFor(self: T): List<KFunction<*>>
+    // fun allMemberFunctionsFor(self: T): List<KFunction<*>>
 
     fun getProperty(self: T, propertyName: String): Any?
 
@@ -52,13 +52,14 @@ expect class ClassReflection<T : Any>(kclass: KClass<T>) {
 
     fun isPropertyMutable(propertyName: String): Boolean
 
-    val isEnum:Boolean
+    val isEnum: Boolean
+    val isObject: Boolean
 
-    fun <E:Enum<E>> enumValues(): List<E>
+    fun <E : Enum<E>> enumValues(): List<E>
 
-    fun <E:Enum<E>> enumValueOf(name:String): E?
+    fun <E : Enum<E>> enumValueOf(name: String): E?
 
-    fun call(self: T, methodName: String, vararg args: Any?) : Any?
+    fun call(self: T, methodName: String, vararg args: Any?): Any?
 }
 
 expect class ObjectReflection<T : Any>(self: T) {
@@ -67,7 +68,7 @@ expect class ObjectReflection<T : Any>(self: T) {
 
     val isAbstract: Boolean
 
-    val isProxy:Boolean
+    val isProxy: Boolean
 
     val allPropertyNames: List<String>
 
@@ -81,9 +82,9 @@ expect class ObjectReflection<T : Any>(self: T) {
 
     fun isPropertyMutable(propertyName: String): Boolean
 
-    fun call(methodName: String, vararg args: Any?) : Any?
+    fun call(methodName: String, vararg args: Any?): Any?
 
-    suspend fun callSuspend(methodName: String, vararg args: Any?) : Any?
+    suspend fun callSuspend(methodName: String, vararg args: Any?): Any?
 }
 
 interface KotlinxReflectModuleRegistry {

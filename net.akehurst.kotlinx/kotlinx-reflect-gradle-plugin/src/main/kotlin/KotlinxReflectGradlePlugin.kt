@@ -75,7 +75,7 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
         kotlinSourceSets.forEach { ss ->
             when {
                 (ss.name == KotlinSourceSet.COMMON_MAIN_SOURCE_SET_NAME) -> {
-                    val genDir = File(project.buildDir, "kotlinxReflect/genSrc/${ss.name}")
+                    val genDir = File(project.layout.buildDirectory.get().asFile, "kotlinxReflect/genSrc/${ss.name}")
                     genDir.mkdirs()
                     ss.kotlin.srcDir(genDir)
                     val moduleFile = File(genDir, "${KotlinxReflectRegisterForModuleClassName}.kt")
@@ -88,7 +88,7 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
                 }
 
                 (ss.name == KotlinSourceSet.COMMON_TEST_SOURCE_SET_NAME) -> {
-                    val genDir = File(project.buildDir, "kotlinxReflect/genSrc/${ss.name}")
+                    val genDir = File(project.layout.buildDirectory.get().asFile, "kotlinxReflect/genSrc/${ss.name}")
                     genDir.mkdirs()
                     ss.kotlin.srcDir(genDir)
                     val moduleFile = File(genDir, "${KotlinxReflectRegisterForModuleClassName}.kt")

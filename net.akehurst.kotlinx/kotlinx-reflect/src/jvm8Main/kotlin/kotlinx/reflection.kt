@@ -104,11 +104,27 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
 
     actual val qualifiedName: String = this.kclass.qualifiedName ?: error("Cannot get qualifiedName of '${this.kclass}'")
 
+    actual val isObject: Boolean get() = (null != this.kclass.objectInstance)
+
     actual fun construct(vararg constructorArgs: Any?): T {
-        return this.kclass.constructors.first {
-            //TODO: check types match
-            it.parameters.size == constructorArgs.size
-        }.call(*constructorArgs)
+        return when {
+            this.isObject ->  {
+                //use same KotlinxReflect mechanism as for JS so that tests on JVM and JS are equivalent
+                val qname = KotlinxReflect.qualifiedNameForClass(this.kclass)
+                val obj = KotlinxReflect.objectInstance<T>(qname)
+                when (obj) {
+                    null -> error("Object instance not found for '$qname', has it been registered?")
+                    else -> obj
+                }
+            }
+
+            else -> {
+                this.kclass.constructors.first {
+                    //TODO: check types match
+                    it.parameters.size == constructorArgs.size
+                }.call(*constructorArgs)
+            }
+        }
     }
 
     actual fun <S : Any> isSupertypeOf(subtype: KClass<S>): Boolean {
@@ -131,13 +147,13 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         }
     }
 
- //   actual fun allMemberFunctionsFor(self: T): List<KFunction<*>> {
- //       if (this.kclass.isInstance(self)) {
- //           return this.allMemberFunctions
- //       } else {
- //           throw RuntimeException("$self is not an instance of ${this.kclass}")
- //       }
- //   }
+    //   actual fun allMemberFunctionsFor(self: T): List<KFunction<*>> {
+    //       if (this.kclass.isInstance(self)) {
+    //           return this.allMemberFunctions
+    //       } else {
+    //           throw RuntimeException("$self is not an instance of ${this.kclass}")
+    //       }
+    //   }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
         val mprop = this.kclass.memberProperties.firstOrNull { propertyName == it.name }
@@ -203,7 +219,7 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     actual val kclass: KClass<T> = self::class as KClass<T>
     actual val isAbstract: Boolean = this.kclass.isAbstract
 
-    actual val isProxy:Boolean get() = Proxy.isProxyClass(kclass.java)
+    actual val isProxy: Boolean get() = Proxy.isProxyClass(kclass.java)
 
     actual val allPropertyNames: List<String> by lazy {
         //find get methods, for java defined classes/properties
@@ -288,11 +304,11 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
         try {
             val meth = kclass.memberFunctions.firstOrNull { methodName == it.name }
             if (null != meth) {
-               // return if (this.isProxy) {
-               //     Proxy.getInvocationHandler(self).invoke(self, meth.javaMethod, args)
-              //  } else {
-               return      meth.call(self, *args)
-              //  }
+                // return if (this.isProxy) {
+                //     Proxy.getInvocationHandler(self).invoke(self, meth.javaMethod, args)
+                //  } else {
+                return meth.call(self, *args)
+                //  }
             } else {
                 throw NoSuchMethodException("Method ${methodName} not found on object ${self}")
             }
@@ -306,10 +322,10 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
         try {
             val meth = kclass.java.methods.firstOrNull { methodName == it.name }
             if (null != meth) {
-               // return if (this.isProxy) {
-               //     Proxy.getInvocationHandler(self).invoke(self, meth, args)
+                // return if (this.isProxy) {
+                //     Proxy.getInvocationHandler(self).invoke(self, meth, args)
                 //} else {
-                    return    meth.invoke(self, *args)
+                return meth.invoke(self, *args)
                 //}
             } else {
                 throw NoSuchMethodException("Method ${methodName} not found on object ${self}")
@@ -335,7 +351,7 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
                 //return if (this.isProxy) {
                 //    Proxy.getInvocationHandler(self).invoke(self, meth, unBoxedArgs.toTypedArray())
                 //} else {
-                return    meth.invoke(self, *unBoxedArgs.toTypedArray())
+                return meth.invoke(self, *unBoxedArgs.toTypedArray())
                 //}
             } else {
                 throw RuntimeException("Method ${methodName} not found on object ${self}")

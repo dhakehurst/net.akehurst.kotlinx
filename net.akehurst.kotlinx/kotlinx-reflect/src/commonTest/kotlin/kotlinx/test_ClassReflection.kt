@@ -20,6 +20,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
+object AnObject {
+    const val x="hello"
+}
 
 open class CR_A {
     val prop1 = "hello"
@@ -78,9 +81,17 @@ class test_ClassReflection {
         val actual = CR_A::class.reflect().isPropertyMutable("prop1")
         assertEquals(false, actual)
     }
+
     @Test
     fun isPropertyMutable_true() {
         val actual = CR_A::class.reflect().isPropertyMutable("prop2")
         assertEquals(true, actual)
+    }
+
+    @Test fun accessObject() {
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.AnObject",AnObject::class,null, AnObject)
+        val actual = AnObject::class.reflect().construct()
+        assertEquals(AnObject, actual)
+        assertEquals("hello", (actual as AnObject).x)
     }
 }
