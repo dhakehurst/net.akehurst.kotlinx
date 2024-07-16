@@ -1,6 +1,7 @@
 package net.akehurst.kotlinx.reflect.gradle.plugin
 
 import net.akehurst.kotlinx.reflect.KotlinxReflect
+import org.jetbrains.kotlin.analyzer.moduleInfo
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
@@ -11,10 +12,7 @@ import org.jetbrains.kotlin.backend.common.serialization.KotlinIrLinker
 import org.jetbrains.kotlin.builtins.createFunctionType
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
-import org.jetbrains.kotlin.descriptors.ClassKind
-import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
-import org.jetbrains.kotlin.descriptors.Modality
-import org.jetbrains.kotlin.descriptors.effectiveVisibility
+import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.impl.EmptyPackageFragmentDescriptor
 import org.jetbrains.kotlin.ir.*
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.safeName
@@ -41,6 +39,9 @@ import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.platform.JsPlatform
+import org.jetbrains.kotlin.platform.jvm.JvmPlatform
+import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 
 class KotlinxReflectIrGenerationExtension(
     private val messageCollector: MessageCollector,
@@ -49,7 +50,7 @@ class KotlinxReflectIrGenerationExtension(
 ) : IrGenerationExtension {
 
     companion object {
-        val fq_KotlinxReflect = ClassId.fromString(KotlinxReflect::class.qualifiedName!!)
+        val fq_KotlinxReflect = ClassId.fromString(KotlinxReflect::class.qualifiedName!!.replace(".", "/"))
         val fq_registerClass = CallableId(fq_KotlinxReflect, Name.identifier("registerClass"))
         val fq_classForName = CallableId(fq_KotlinxReflect, Name.identifier("classForName"))
         const val classForNameAfterRegistration = "classForNameAfterRegistration"
@@ -64,32 +65,73 @@ class KotlinxReflectIrGenerationExtension(
             messageCollector.report(CompilerMessageSeverity.WARNING, "InternalError: Got and ignored null or blank class name!")
             null
         } else {
-            it.toRegexFromGlob('.')
+            Pair(it.toRegexFromGlob('.'), it)
         }
-    }
+    }.associate {
+        Pair(it.first, Pair(it.second, false))
+    }.toMutableMap()
 
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
+        val isJvm = pluginContext.platform?.any { it is JvmPlatform } ?: false
+        val isJs = pluginContext.platform?.any { it is JsPlatform } ?: false
+
         messageCollector.report(CompilerMessageSeverity.INFO, "KotlinxReflect: for moduleFragment - '${moduleFragment.name}'")
         messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: forReflection = $forReflection")
 
+        // Classes for Reflection from other modules (using member scope and descriptor)
         val classesToRegisterForReflection = mutableSetOf<IrClassSymbol>()
         forReflection.forEach { pkgName ->
-            val pkgFqName = FqName(pkgName)
-            moduleFragment.descriptor.getPackage(pkgFqName).fragments.forEach { frag ->
-                frag.getMemberScope().getClassifierNames()?.forEach { cls ->
-                    val sym = pluginContext.referenceClass(ClassId(frag.fqName, cls))
-                    if (null != sym) {// && true==sym.signature?.isPubliclyVisible) {
-                        messageCollector.report(CompilerMessageSeverity.LOGGING, "include = ${frag.fqName}.${cls}")
-                        classesToRegisterForReflection.add(sym)
-                    } else {
-                        messageCollector.report(CompilerMessageSeverity.LOGGING, "exclude = ${frag.fqName}.${cls}")
+            when {
+                pkgName.contains("*").not() -> {
+                    val pkgFqName = FqName(pkgName)
+                    messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: Checking content of package (1) '$pkgName'")
+
+                    // This works in JS but not JVM ?
+                    val pkgContent = moduleFragment.descriptor.allDependencyModules.flatMap { dep ->
+                        messageCollector.report(CompilerMessageSeverity.INFO, "KotlinxReflect: Checking dependency '${dep.name}'")
+                        val pkg = dep.getPackage(pkgFqName)
+                        pkg.memberScope.getClassifierNames()?.map { cls -> Pair(cls,pluginContext.referenceClass(ClassId(pkgFqName, cls))) } ?: emptyList()
                     }
+                    if(pkgContent.isEmpty()) {
+                        messageCollector.report(CompilerMessageSeverity.WARNING, "KotlinxReflect: No content found for package '$pkgName'")
+                    }
+                    pkgContent.forEach { p ->
+                        val cls = p.first
+                        val sym = p.second
+                        if (null != sym) {// && true==sym.signature?.isPubliclyVisible) {
+                            messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: include = ${pkgFqName}.${cls}")
+                            classesToRegisterForReflection.add(sym)
+                            globRegexes[pkgName.toRegexFromGlob('.')] = Pair(pkgName, true)
+                        } else {
+                            messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: exclude = ${pkgFqName}.${cls}")
+                        }
+                    }
+
+                    // This used to work kotlin 1.9
+                    moduleFragment.descriptor.getPackage(pkgFqName).fragments.forEach { frag ->
+                        messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: Checking content of package (2) '$pkgName'")
+                        frag.getMemberScope().getClassifierNames()?.forEach { cls ->
+                            val sym = pluginContext.referenceClass(ClassId(frag.fqName, cls))
+                            if (null != sym) {// && true==sym.signature?.isPubliclyVisible) {
+                                messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: include = ${frag.fqName}.${cls}")
+                                classesToRegisterForReflection.add(sym)
+                                globRegexes[pkgName.toRegexFromGlob('.')] = Pair(pkgName, true)
+                            } else {
+                                messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: exclude = ${frag.fqName}.${cls}")
+                            }
+                        }
+                    }
+
+
+
                 }
+
+                else -> Unit // TODO
             }
         }
 
-        val plgCtx = pluginContext as IrPluginContextImpl
-        val linker = plgCtx.linker as KotlinIrLinker
+        //val plgCtx = pluginContext as IrPluginContextImpl
+        // val linker = plgCtx.linker as KotlinIrLinker
 
         /*
                 moduleFragment.descriptor.allDependencyModules.forEach { md ->
@@ -138,6 +180,7 @@ class KotlinxReflectIrGenerationExtension(
                 }
         */
 
+        // Classes for Reflection from this module (using module  fragment visitor)
         var class_KotlixReflectForModule: IrClass? = null
         moduleFragment.acceptVoid(object : IrElementVisitorVoid {
             override fun visitElement(element: IrElement) {
@@ -158,16 +201,26 @@ class KotlinxReflectIrGenerationExtension(
                             class_KotlixReflectForModule = declaration
                         }
 
-                        globRegexes.forEach { regex ->
+                        globRegexes.forEach { entry ->
+                            val regex = entry.key
                             if (regex.matches(declaration.kotlinFqName.asString())) {
                                 classesToRegisterForReflection.add(declaration.symbol)
 
-                                if (declaration.isJsExport().not()) {
+                                if (isJs && declaration.isJsExport().not()) {
                                     messageCollector.report(
                                         CompilerMessageSeverity.ERROR,
-                                        "KotlinxReflect: declaration ${declaration.kotlinFqName.asString()} is used for reflection but is not 'exported. Add the package to 'exportPublic' configuration or (if you must) use @JsExport"
+                                        "KotlinxReflect: declaration ${declaration.kotlinFqName.asString()} is used for reflection but is not exported. Make it public and add the package to 'exportPublic' configuration or (if you must) use @JsExport"
                                     )
                                 }
+
+                                if (isJvm && declaration.visibility.isPublicAPI.not()) {
+                                    messageCollector.report(
+                                        CompilerMessageSeverity.ERROR,
+                                        "KotlinxReflect: declaration ${declaration.kotlinFqName.asString()} is used for reflection but is not public. Make it public"
+                                    )
+                                }
+
+                                globRegexes[regex] = Pair(entry.value.first, true)
                             }
                         }
                     }
@@ -181,6 +234,15 @@ class KotlinxReflectIrGenerationExtension(
                 }
             }
         })
+
+        globRegexes.forEach { entry ->
+            if (entry.value.second) {
+                //used
+            } else {
+                messageCollector.report(CompilerMessageSeverity.STRONG_WARNING, "KotlinxReflect: No matches for '${entry.value.first}' (Regex '${entry.key}')")
+            }
+        }
+
         val krfm = class_KotlixReflectForModule
         if (null == krfm) {
             //can't validly report ERROR ot WARNING here as module is in multiple fragments
@@ -278,6 +340,8 @@ class KotlinxReflectIrGenerationExtension(
 
             override fun getLineNumber(offset: Int) = UNDEFINED_OFFSET
             override fun getColumnNumber(offset: Int) = UNDEFINED_OFFSET
+            override fun getLineAndColumnNumbers(offset: Int) = LineAndColumn(getLineNumber(offset), getColumnNumber(offset))
+
         }, internalPackageFragmentDescriptor, moduleFragment).also {
             moduleFragment.files += it
         }
@@ -365,7 +429,7 @@ class KotlinxReflectIrGenerationExtension(
 
         messageCollector.report(CompilerMessageSeverity.LOGGING, "registering classes $classes")
 
-        val class_KotlinxReflect = pluginContext.referenceClass(fq_KotlinxReflect) ?: error("Cannot find ModuleRegistry class")
+        val class_KotlinxReflect = pluginContext.referenceClass(fq_KotlinxReflect) ?: error("Cannot find ModuleRegistry class '${fq_KotlinxReflect.asFqNameString()}'")
         val fun_registerClass = pluginContext.referenceFunctions(fq_registerClass).single() // should be only one
 
         val fun_classForNameAfterRegistration = class_KotlixReflectForModule.getSimpleFunction(registerUsedClasses)?.owner
@@ -413,6 +477,7 @@ class KotlinxReflectIrGenerationExtension(
                             call.putValueArgument(2, irNull())
                             call.putValueArgument(3, instance)
                         }
+
                         else -> {
                             call.putValueArgument(2, irNull())
                             call.putValueArgument(3, irNull())
@@ -442,7 +507,7 @@ class KotlinxReflectRegisterTransformer(
     private val functionClassForName = pluginContext.referenceFunctions(KotlinxReflectIrGenerationExtension.fq_classForName).single() // should be only one
 
     override fun visitCall(expression: IrCall): IrExpression {
-        //convert all ModuleRegistry.classForName calls EXCEPT the one in generated class KotlixReflect
+        //convert all ModuleRegistry.classForName calls EXCEPT the one in generated class KotlinxReflect
         val curClass_sym = (this.currentClass?.irElement as IrClass?)?.symbol
         if (expression.symbol == functionClassForName && curClass_sym != class_KotlixReflect_sym) {
             messageCollector.report(CompilerMessageSeverity.LOGGING, "called: ${expression.dumpKotlinLike()} on ${curClass_sym}")

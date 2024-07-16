@@ -28,6 +28,10 @@ expect fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler: A
 expect fun Any.reflect(): ObjectReflection<Any>
 expect fun KClass<*>.reflect(): ClassReflection<*>
 
+interface KotlinxReflectModuleRegistry {
+    fun registerClasses()
+}
+
 expect class ClassReflection<T : Any>(kclass: KClass<T>) {
 
     val qualifiedName: String
@@ -87,6 +91,4 @@ expect class ObjectReflection<T : Any>(self: T) {
     suspend fun callSuspend(methodName: String, vararg args: Any?): Any?
 }
 
-interface KotlinxReflectModuleRegistry {
-    fun registerClasses()
-}
+

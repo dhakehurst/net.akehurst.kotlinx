@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2019 Dr. David H. Akehurst (http://dr.david.h.akehurst.net)
+ * Copyright (C) 2024 Dr. David H. Akehurst (http://dr.david.h.akehurst.net)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package net.akehurst.kotlinx.reflect
 import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
-import kotlin.reflect.createInstance
 
 actual fun KFunction<*>.isSuspend(): Boolean = TODO() //this.isSuspend
 
@@ -29,6 +28,7 @@ actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler: A
 
 actual fun Any.reflect() = ObjectReflection(this)
 actual fun KClass<*>.reflect() = ClassReflection(this)
+
 
 actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) {
 
@@ -42,17 +42,7 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         }
 
     actual val allPropertyNames: List<String> by lazy {
-        val cls = this.kclass.js
-        val js: Array<String> = js(
-            """
-             var p=[];
-             var prt=cls.prototype; //Object.getPrototypeOf(cls);
-             var nms=Object.getOwnPropertyNames(prt);
-             for(var i=0; i<nms.length; i++ ) if (p.indexOf(nms[i]) == -1) p.push(nms[i])
-             p
-            """
-        )
-        js.toList()
+        TODO()
     }
 
     actual val allMemberFunctions: List<KFunction<*>> by lazy {
@@ -63,40 +53,16 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
 
     actual val isEnum: Boolean
         get() {
-            val n = this.kclass is Enum<*>
-            val jsCls = this.kclass.js.asDynamic()
-            val ep = Enum::class.js.asDynamic().prototype
-            val tp = js("Object.getPrototypeOf(jsCls.prototype)")
-            return ep == tp
+            TODO()
         }
 
     actual val isObject: Boolean
         get() {
-            val md = metadata
-            val cls = this.kclass.js
-            return js("('object' == cls[md].kind)") as Boolean
+            TODO()
         }
 
-    @OptIn(ExperimentalJsReflectionCreateInstance::class)
     actual fun construct(vararg constructorArgs: Any?): T {
-        val cls = this.kclass.js
-        return when {
-            constructorArgs.isEmpty() -> this.kclass.createInstance()
-            isObject -> {
-                val qname = KotlinxReflect.qualifiedNameForClass(this.kclass)
-                val obj = KotlinxReflect.objectInstance<T>(qname)
-                when (obj) {
-                    null -> error("Object instance not found for '$qname', has it been registered?")
-                    else -> obj
-                }
-            }
-
-            else -> {
-               // val obj = js("new (Function.prototype.bind.apply(cls, [null].concat(constructorArgs)));")
-                val obj = js("Reflect.construct(cls, constructorArgs)")
-                obj as T
-            }
-        }
+        TODO()
     }
 
     actual fun <S : Any> isSupertypeOf(subtype: KClass<S>): Boolean {
@@ -104,8 +70,9 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual fun allPropertyNamesFor(self: T): List<String> {
-        val js: Array<String> = js("Object.getOwnPropertyNames(self)")
-        return js.toList()
+        TODO()
+//        val js: Array<String> = js("Object.getOwnPropertyNames(self)")
+//        return js.toList()
     }
 
     //   actual fun allMemberFunctionsFor(self: T): List<KFunction<*>> {
@@ -113,44 +80,15 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     //   }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
-        val cls = this.kclass.js
-        //return js("!!Object.getOwnPropertyDescriptor(cls.prototype, propertyName).set")
-        return js(
-            """
-                var proto = cls.prototype;
-                var propDescriptor = null;
-                while(proto) {
-                    propDescriptor = Object.getOwnPropertyDescriptor(proto, propertyName);
-                    if (propDescriptor) {
-                        break;
-                    } else {
-                        proto = Object.getPrototypeOf(proto);
-                    }
-                }
-                //var result = false
-                var result = true // try default to true !
-                if (propDescriptor) {
-                    result = typeof propDescriptor.set === 'function';
-                }
-                result
-            """
-        ) as Boolean
+        TODO()
     }
 
     actual fun getProperty(self: T, propertyName: String): Any? {
-        // return if(IR) {
-        //     js("self['_'+propertyName]")
-        // } else {
         return js("self[propertyName]")
-        //  }
     }
 
     actual fun setProperty(self: T, propertyName: String, value: Any?) {
-        //  if(IR) {
-        //      js("self['_'+propertyName] = value")
-        //  } else {
         js("self[propertyName] = value")
-        //  }
     }
 
     actual fun <E : Enum<E>> enumValues(): List<E> {
@@ -168,11 +106,7 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual fun call(self: T, methodName: String, vararg args: Any?): Any? {
-        //       return if (IR) {
         return js("self[methodName](args)")
-        //       } else {
-//            js("self[methodName](args)")
-//        }
     }
 }
 
@@ -225,10 +159,7 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     }
 
     actual fun construct(vararg constructorArgs: Any?): T {
-        val cls = this.kclass.js
-//val obj = js("Reflect.construct(cls, ...constructorArgs)")  // ES6
-        val obj = js("new (Function.prototype.bind.apply(cls, [null].concat(constructorArgs)))")
-        return obj as T
+       TODO()
     }
 
     actual fun <S : Any> isSupertypeOf(subtype: KClass<S>): Boolean {

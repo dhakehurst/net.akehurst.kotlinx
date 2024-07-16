@@ -14,18 +14,18 @@ import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.starProjectedType
 import org.jetbrains.kotlin.ir.util.defaultType
 
-inline fun IrClass.addAnonymousInitializer(builder: IrFunctionBuilder.() -> Unit = {}): IrAnonymousInitializer =
-    IrFunctionBuilder().run {
-        builder()
-        returnType = defaultType
-        IrAnonymousInitializerImpl(
-            startOffset, endOffset, origin,
-            IrAnonymousInitializerSymbolImpl()
-        )
-    }.also { anonymousInitializer ->
-        declarations.add(anonymousInitializer)
-        anonymousInitializer.parent = this@addAnonymousInitializer
-    }
+//inline fun IrClass.addAnonymousInitializer(builder: IrFunctionBuilder.() -> Unit = {}): IrAnonymousInitializer =
+//    IrFunctionBuilder().run {
+//        builder()
+//        returnType = defaultType
+//        IrAnonymousInitializerImpl(
+//            startOffset, endOffset, origin,
+//            IrAnonymousInitializerSymbolImpl()
+//        )
+//    }.also { anonymousInitializer ->
+//        declarations.add(anonymousInitializer)
+//        anonymousInitializer.parent = this@addAnonymousInitializer
+//    }
 
 //fun IrBuilderWithScope.kClassReference(classType: IrType) =
 //    IrClassReferenceImpl(

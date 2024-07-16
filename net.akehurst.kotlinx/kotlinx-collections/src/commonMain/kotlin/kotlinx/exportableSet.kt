@@ -15,7 +15,7 @@
  */
 
 package net.akehurst.kotlinx.collections
-
+/*
 val <E> Set<E>.exportable: SetExportable<E> get() = SetExportableDefault(this)
 val <E> SetExportable<E>.nonExportable: Set<E> get() = (this as SetExportableDefault).delegate
 val <E> MutableSet<E>.exportableM: MutableSetExportable<E> get() = MutableSetExportableDefault(this)
@@ -63,5 +63,5 @@ class MutableSetExportableDefault<E>(val delegate: MutableSet<E>) : MutableSetEx
     override fun containsAll(elements: CollectionExportable<E>): Boolean = delegate.containsAll(elements.nonExportable)
     override fun contains(element: E): Boolean = delegate.contains(element)
 }
-
+*/
 

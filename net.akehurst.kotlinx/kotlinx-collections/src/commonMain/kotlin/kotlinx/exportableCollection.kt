@@ -15,7 +15,7 @@
  */
 
 package net.akehurst.kotlinx.collections
-
+/*
 val <E> Iterator<E>.exportable: IteratorExportable<E> get() = IteratorExportableDefault(this)
 val <E> IteratorExportable<E>.nonExportable: Iterator<E> get() = (this as IteratorExportableDefault<E>).delegate
 
@@ -99,3 +99,4 @@ class MutableCollectionExportableDefault<E>(val delegate: MutableCollection<E>) 
     override fun contains(element: E): Boolean = delegate.contains(element)
 
 }
+ */

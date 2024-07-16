@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.cli.jvm.config.jvmModularRoots
 import org.jetbrains.kotlin.compiler.plugin.*
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.CompilerConfigurationKey
+import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.js.config.JSConfigurationKeys
@@ -215,12 +216,12 @@ class KotlinxReflectComponentRegistrar(
         defaultReflectionLibs = ""
     )
 
-    override val supportsK2: Boolean get() = TODO("not implemented")
+    override val supportsK2: Boolean get() = true
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
         val messageCollector = configuration.get(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
 
-        messageCollector.report(CompilerMessageSeverity.LOGGING, "modularRoot = ${configuration.jvmModularRoots}")
+        messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: modularRoot = ${configuration.jvmModularRoots}")
 
         val forReflection = configuration.get(KotlinxReflectCommandLineProcessor.ARG_forReflection, defaultReflectionLibs)
             .split(java.io.File.pathSeparator).toList().filterNot { it.isNullOrBlank() }
@@ -228,29 +229,32 @@ class KotlinxReflectComponentRegistrar(
         val kotlinxReflectRegisterForModuleClassFqName =
             configuration.get(KotlinxReflectCommandLineProcessor.ARG_kotlinxReflectRegisterForModuleClassFqName, defaultReflectionLibs)
 
-        messageCollector.report(CompilerMessageSeverity.LOGGING, "configuration = ${configuration}")
+        messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: configuration = ${configuration}")
         val dependencies = configuration.get(JSConfigurationKeys.LIBRARIES)
         if (null != dependencies) {
-/*
-            val allResolvedDependencies =  jsResolveLibraries(
-                dependencies,
-                configuration[JSConfigurationKeys.REPOSITORIES] ?: emptyList(),
-                configuration.resolverLogger
-            )
-            allResolvedDependencies.forEach { kotlinLibrary, packageAccessHandler ->
-                messageCollector.report(CompilerMessageSeverity.LOGGING, "moduleName = ${kotlinLibrary.moduleName}")
-                if ("kotlin" != kotlinLibrary.moduleName) {
-                    packageAccessHandler.loadModuleHeader(kotlinLibrary).packageFragmentNameList.forEach {
-                        messageCollector.report(CompilerMessageSeverity.LOGGING, "packageFragmentName = ${it}")
-                    }
-                }
-            }
- */
+            /*
+                        val allResolvedDependencies =  jsResolveLibraries(
+                            dependencies,
+                            configuration[JSConfigurationKeys.REPOSITORIES] ?: emptyList(),
+                            configuration.resolverLogger
+                        )
+                        allResolvedDependencies.forEach { kotlinLibrary, packageAccessHandler ->
+                            messageCollector.report(CompilerMessageSeverity.LOGGING, "moduleName = ${kotlinLibrary.moduleName}")
+                            if ("kotlin" != kotlinLibrary.moduleName) {
+                                packageAccessHandler.loadModuleHeader(kotlinLibrary).packageFragmentNameList.forEach {
+                                    messageCollector.report(CompilerMessageSeverity.LOGGING, "packageFragmentName = ${it}")
+                                }
+                            }
+                        }
+             */
         }
         //JsSyntheticTranslateExtension.registerExtension(project, KotlinxReflectJsSyntheticTranslateExtension(messageCollector, forReflection))
         //AnalysisHandlerExtension.registerExtension(project, KotlinxReflectAnalysisHandlerExtension(messageCollector, forReflection))
         ExtraImportsProviderExtension.registerExtension(KotlinxReflectExtraImportsProviderExtension(messageCollector, forReflection))
         IrGenerationExtension.registerExtension(KotlinxReflectIrGenerationExtension(messageCollector, kotlinxReflectRegisterForModuleClassFqName, forReflection))
+
+        messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect-FIR: FirExtensionRegistrarAdapter.registerExtension")
+        FirExtensionRegistrarAdapter.registerExtension(KotlinxReflectFirExtensionRegistrar(messageCollector, kotlinxReflectRegisterForModuleClassFqName, forReflection))
 
     }
 

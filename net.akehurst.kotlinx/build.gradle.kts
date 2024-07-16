@@ -19,17 +19,26 @@ import com.github.gmazzo.gradle.plugins.BuildConfigExtension
 import java.io.File
 
 plugins {
-    kotlin("multiplatform") version ("1.9.22") apply false
+    kotlin("multiplatform") version ("2.0.20-Beta1") apply false
     id("org.jetbrains.dokka") version ("1.9.10") apply false
-    id("com.github.gmazzo.buildconfig") version("4.1.2") apply false
+    id("com.github.gmazzo.buildconfig") version("4.2.0") apply false
     id("nu.studer.credentials") version ("3.0")
-    id("net.akehurst.kotlin.gradle.plugin.exportPublic") version("1.9.22") apply false
+    id("net.akehurst.kotlin.gradle.plugin.exportPublic") version("2.0.20-Beta1") apply false
 }
-val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9
-val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9
+val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0
+val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0
 val jvmTargetVersion = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8
 
 allprojects {
+
+    repositories {
+        mavenLocal {
+            content{
+                includeGroupByRegex("net\\.akehurst.+")
+            }
+        }
+        mavenCentral()
+    }
 
     val version_project: String by project
     val group_project = rootProject.name
@@ -51,15 +60,6 @@ subprojects {
     apply(plugin = "org.jetbrains.dokka")
     apply(plugin = "com.github.gmazzo.buildconfig")
 
-    repositories {
-        mavenLocal {
-            content{
-                includeGroupByRegex("net\\.akehurst.+")
-            }
-        }
-        mavenCentral()
-    }
-
     if (name!="kotlinx-reflect-gradle-plugin") {
         apply(plugin = "org.jetbrains.kotlin.multiplatform")
         apply(plugin = "net.akehurst.kotlin.gradle.plugin.exportPublic")
@@ -79,17 +79,21 @@ subprojects {
         configure<KotlinMultiplatformExtension> {
             jvm("jvm8") {
                 val main by compilations.getting {
-                    compilerOptions.configure {
-                        languageVersion.set(kotlin_languageVersion)
-                        apiVersion.set(kotlin_apiVersion)
-                        jvmTarget.set(jvmTargetVersion)
+                    compileTaskProvider.configure {
+                        compilerOptions {
+                            languageVersion.set(kotlin_languageVersion)
+                            apiVersion.set(kotlin_apiVersion)
+                            jvmTarget.set(jvmTargetVersion)
+                        }
                     }
                 }
                 val test by compilations.getting {
-                    compilerOptions.configure {
-                        languageVersion.set(kotlin_languageVersion)
-                        apiVersion.set(kotlin_apiVersion)
-                        jvmTarget.set(jvmTargetVersion)
+                    compileTaskProvider.configure {
+                        compilerOptions {
+                            languageVersion.set(kotlin_languageVersion)
+                            apiVersion.set(kotlin_apiVersion)
+                            jvmTarget.set(jvmTargetVersion)
+                        }
                     }
                 }
             }
@@ -98,6 +102,15 @@ subprojects {
                 nodejs()
                 browser()
             }
+
+            macosArm64()
+
+//            @OptIn(org.jetbrains.kotlin.gradle.targets.js.dsl.ExperimentalWasmDsl::class)
+//            wasmJs() {
+//                browser()
+//            }
+
+            applyDefaultHierarchyTemplate()
         }
 
         dependencies {

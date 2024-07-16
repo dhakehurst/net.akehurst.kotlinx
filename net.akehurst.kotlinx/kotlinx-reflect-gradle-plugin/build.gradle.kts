@@ -1,11 +1,12 @@
+import com.github.gmazzo.gradle.plugins.BuildConfigExtension
+
 plugins {
     `java-gradle-plugin`
     `maven-publish`
-    id("com.gradle.plugin-publish") version "1.1.0"
+    id("com.gradle.plugin-publish") version "1.2.1"
     kotlin("jvm")
     kotlin("kapt") // does not respect buildDir, fixed in kotlin 1.5.20
 }
-import com.github.gmazzo.gradle.plugins.BuildConfigExtension
 
 java {
     toolchain {
@@ -56,8 +57,8 @@ val version_junit:String by project
 dependencies {
     compileOnly("org.jetbrains.kotlin:kotlin-compiler-embeddable")
     compileOnly(kotlin("gradle-plugin"))
-    compileOnly("com.google.auto.service:auto-service:1.0.1")
-    kapt("com.google.auto.service:auto-service:1.0.1")
+    compileOnly("com.google.auto.service:auto-service:1.1.1")
+    kapt("com.google.auto.service:auto-service:1.1.1")
 
     implementation(kotlin("gradle-plugin-api"))
     implementation(project(":kotlinx-reflect"))
@@ -71,6 +72,7 @@ dependencies {
     "testPluginImplementation"("org.junit.jupiter:junit-jupiter:$version_junit")
     "testPluginImplementation"(kotlin("gradle-plugin"))
     "testPluginImplementation"("org.jetbrains.kotlin:kotlin-compiler-embeddable")
+
 }
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
@@ -82,3 +84,4 @@ val testPluginTask = tasks.register<Test>("testPlugin") {
     classpath = testPlugin.runtimeClasspath
     mustRunAfter(tasks.test)
 }
+

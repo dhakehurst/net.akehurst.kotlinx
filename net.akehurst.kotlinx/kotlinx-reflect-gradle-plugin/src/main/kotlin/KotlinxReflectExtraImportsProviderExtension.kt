@@ -19,18 +19,19 @@ class KotlinxReflectExtraImportsProviderExtension(
 ): ExtraImportsProviderExtension {
 
     override fun getExtraImports(ktFile: KtFile): Collection<KtImportInfo> {
-        messageCollector.report(CompilerMessageSeverity.LOGGING,"getExtraImports for $ktFile")
+        messageCollector.report(CompilerMessageSeverity.INFO,"getExtraImports for $ktFile")
         val imports = forReflection
         val infos = imports.map {
+            val fqname = FqName(it)
             object : KtImportInfo{
                 override val aliasName: String? = null
-                override val importedFqName: FqName = FqName(it)
-                override val importContent: KtImportInfo.ImportContent = KtImportInfo.ImportContent.FqNameBased(importedFqName)
+                override val importedFqName: FqName = fqname
+                override val importContent: KtImportInfo.ImportContent = KtImportInfo.ImportContent.FqNameBased(fqname)
                 override val isAllUnder: Boolean = true
 
             }
         }
-        messageCollector.report(CompilerMessageSeverity.LOGGING,"importedNames ${infos.map{it.importedFqName}}")
+        messageCollector.report(CompilerMessageSeverity.INFO,"importedNames ${infos.map{it.importedFqName}}")
         return infos
     }
 

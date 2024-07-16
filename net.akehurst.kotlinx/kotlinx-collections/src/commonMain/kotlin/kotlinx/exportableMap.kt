@@ -15,7 +15,7 @@
  */
 
 package net.akehurst.kotlinx.collections
-
+/*
 val <K, V> Map<K, V>.exportable: MapExportable<K, V> get() = MapExportableDefault(this)
 val <K, V> MapExportable<K,V>.nonExportable: Map<K,V> get() = (this as MapExportableDefault).delegate
 val <K, V> MutableMap<K, V>.exportableM: MutableMapExportable<K, V> get() = MutableMapExportableDefault(this)
@@ -116,5 +116,5 @@ class MutableMapExportableDefault<K, V>(val delegate: MutableMap<K, V>) : Mutabl
     override fun containsValue(value: V): Boolean = delegate.containsValue(value)
     override fun getOrDefault(key: K, defaultValue: V): V = delegate.get(key) ?: defaultValue
 }
-
+*/
 
