@@ -56,7 +56,9 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual val allMemberFunctions: List<KFunction<*>> by lazy {
+
         TODO()
+
     }
 
     actual val qualifiedName: String get() = KotlinxReflect.qualifiedNameForClass(this.kclass)

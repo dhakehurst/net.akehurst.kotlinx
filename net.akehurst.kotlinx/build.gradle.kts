@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
+import com.github.gmazzo.buildconfig.BuildConfigExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
-import com.github.gmazzo.gradle.plugins.BuildConfigExtension
 import java.io.File
 
 plugins {
-    kotlin("multiplatform") version ("2.0.20-Beta1") apply false
-    id("org.jetbrains.dokka") version ("1.9.10") apply false
-    id("com.github.gmazzo.buildconfig") version("4.2.0") apply false
-    id("nu.studer.credentials") version ("3.0")
-    id("net.akehurst.kotlin.gradle.plugin.exportPublic") version("2.0.20-Beta1") apply false
+    alias(libs.plugins.kotlin) apply false
+    alias(libs.plugins.dokka) apply false
+    alias(libs.plugins.buildconfig) apply false
+    alias(libs.plugins.credentials) apply true
+    alias(libs.plugins.exportPublic) apply false
 }
 val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0
 val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0
@@ -40,11 +40,8 @@ allprojects {
         mavenCentral()
     }
 
-    val version_project: String by project
-    val group_project = rootProject.name
-
-    group = group_project
-    version = version_project
+    group = rootProject.name
+    version = rootProject.libs.versions.project.get()
 
     project.layout.buildDirectory = File(rootProject.projectDir, ".gradle-build/${project.name}")
 
@@ -101,6 +98,9 @@ subprojects {
                 binaries.library()
                 nodejs()
                 browser()
+                compilerOptions {
+                    target.set("es2015")
+                }
             }
 
             macosArm64()

@@ -1,4 +1,4 @@
-import com.github.gmazzo.gradle.plugins.BuildConfigExtension
+import com.github.gmazzo.buildconfig.BuildConfigExtension
 
 plugins {
     `java-gradle-plugin`
@@ -62,6 +62,7 @@ dependencies {
 
     implementation(kotlin("gradle-plugin-api"))
     implementation(project(":kotlinx-reflect"))
+    implementation(kotlin("util-klib"))
 
     // seem to need these to be able to run the pluginTest
     //implementation(kotlin("gradle-plugin"))

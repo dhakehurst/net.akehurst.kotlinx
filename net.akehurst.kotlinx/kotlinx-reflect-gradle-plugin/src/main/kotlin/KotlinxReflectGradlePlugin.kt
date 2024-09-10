@@ -6,11 +6,14 @@ import org.gradle.api.logging.Logger
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
-import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.jvm.config.jvmModularRoots
-import org.jetbrains.kotlin.compiler.plugin.*
+import org.jetbrains.kotlin.compiler.plugin.AbstractCliOption
+import org.jetbrains.kotlin.compiler.plugin.CliOption
+import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
+import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
+import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.CompilerConfigurationKey
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
@@ -30,7 +33,7 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
             import net.akehurst.kotlinx.reflect.KotlinxReflect
             import net.akehurst.kotlinx.reflect.EnumValuesFunction
             object $KotlinxReflectRegisterForModuleClassName {
-              internal fun registerUsedClasses() { /* populated by IR generation */
+              fun registerUsedClasses() { /* populated by IR generation */
               }
               internal fun classForNameAfterRegistration(qualifiedName: String): kotlin.reflect.KClass<*> {
                 this.registerUsedClasses()
@@ -83,7 +86,6 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
                     moduleFile.createNewFile()
                     val packageName = "${moduleSafeName}_${ss.name}"
                     this.kotlinxReflectRegisterForModuleClassFqNameMain = "$packageName.${KotlinxReflectRegisterForModuleClassName}"
-
                     moduleFile.printWriter().use { pw -> pw.println(KotlinxReflectRegisterForModuleTemplate(ss.name, packageName)) }
 
                 }
@@ -103,7 +105,6 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
             }
         }
     }
-
 
     override fun applyToCompilation(kotlinCompilation: KotlinCompilation<*>): Provider<List<SubpluginOption>> {
         val project = kotlinCompilation.target.project
@@ -219,7 +220,7 @@ class KotlinxReflectComponentRegistrar(
     override val supportsK2: Boolean get() = true
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
-        val messageCollector = configuration.get(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
+        val messageCollector = configuration.get(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
 
         messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: modularRoot = ${configuration.jvmModularRoots}")
 
@@ -257,6 +258,8 @@ class KotlinxReflectComponentRegistrar(
         FirExtensionRegistrarAdapter.registerExtension(KotlinxReflectFirExtensionRegistrar(messageCollector, kotlinxReflectRegisterForModuleClassFqName, forReflection))
 
     }
+
+
 
 }
 
