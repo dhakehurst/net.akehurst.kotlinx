@@ -6,8 +6,10 @@ import org.gradle.api.logging.Logger
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
+import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
+import org.jetbrains.kotlin.cli.jvm.config.jvmClasspathRoots
 import org.jetbrains.kotlin.cli.jvm.config.jvmModularRoots
 import org.jetbrains.kotlin.compiler.plugin.AbstractCliOption
 import org.jetbrains.kotlin.compiler.plugin.CliOption
@@ -231,8 +233,12 @@ class KotlinxReflectComponentRegistrar(
             configuration.get(KotlinxReflectCommandLineProcessor.ARG_kotlinxReflectRegisterForModuleClassFqName, defaultReflectionLibs)
 
         messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: configuration = ${configuration}")
-        val dependencies = configuration.get(JSConfigurationKeys.LIBRARIES)
+        messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: dependencies")
+        val dependencies = configuration.getList(JSConfigurationKeys.TRANSITIVE_LIBRARIES)
         if (null != dependencies) {
+            dependencies.forEach { dep ->
+                messageCollector.report(CompilerMessageSeverity.LOGGING,"KotlinxReflect: dep ${dep::class.simpleName} - $dep")
+            }
             /*
                         val allResolvedDependencies =  jsResolveLibraries(
                             dependencies,
@@ -248,6 +254,9 @@ class KotlinxReflectComponentRegistrar(
                             }
                         }
              */
+        }
+        configuration.jvmClasspathRoots.forEach { dep ->
+            messageCollector.report(CompilerMessageSeverity.LOGGING,"KotlinxReflect: jvm-dep - '$dep'")
         }
         //JsSyntheticTranslateExtension.registerExtension(project, KotlinxReflectJsSyntheticTranslateExtension(messageCollector, forReflection))
         //AnalysisHandlerExtension.registerExtension(project, KotlinxReflectAnalysisHandlerExtension(messageCollector, forReflection))

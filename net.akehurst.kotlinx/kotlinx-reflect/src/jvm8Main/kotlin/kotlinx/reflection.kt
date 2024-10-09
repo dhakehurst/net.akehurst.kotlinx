@@ -261,6 +261,7 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
         val mprop = kclass.memberProperties.firstOrNull { propertyName == it.name }
         if (null != mprop) {
             //first do null check because of bug with properties with type inline class
+            mprop.javaGetter?.isAccessible = true
             if (null == mprop.javaGetter?.invoke(self)) {
                 return null;
             }

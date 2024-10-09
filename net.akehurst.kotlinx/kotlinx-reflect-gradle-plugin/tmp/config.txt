@@ -1,0 +1,164 @@
+original message collector = org.jetbrains.kotlin.compilerRunner.MessageCollectorToOutputItemsCollectorAdapter@4cf002b6,
+message collector = org.jetbrains.kotlin.cli.common.messages.GroupingMessageCollector@6b4b61d3,
+performance manager=org.jetbrains.kotlin.cli.js.K2JSCompiler$K2JSCompilerPerformanceManager@24744141,
+disable inline=false,
+fir extended checkers=false,
+Produce metadata klib=false,
+report output files=true,
+Enable incremental compilation=true,
+Allow to compile any scripts along with regular Kotlin sources=false,
+Ignore errors from IrConstTransformer=false,
+IR verification mode=NONE,
+language version settings=Language = 2.0,
+API = 2.0 +MultiPlatformProjects +JsAllowValueClassesInExternals allowFullyQualifiedNameInKClass:false allowKotlinPackage:false dontWarnOnErrorSuppression:false explicitApiMode:DISABLED explicitApiVersion:false explicitReturnTypes:DISABLED extendedCompilerChecks:false multiPlatformDoNotCheckActual:false muteExpectActualClassesWarning:false optIn:[kotlin.ExperimentalStdlibApi] skipExpectedActualDeclarationChecker:false skipMetadataVersionCheck:false skipPrereleaseCheck:false stdlibCompilation:false,
+front-end IR=true,
+light tree=true,
+HMPP module structure=org.jetbrains.kotlin.config.HmppCliModuleStructure@76e5f7b,
+generate source map=true,
+TypedArrays enabled=true,
+disable support for friend paths=false,
+enable strict implicitly exported entities types inside d.ts files=false,
+incremental results consumer=org.jetbrains.kotlin.incremental.js.IncrementalResultsConsumerImpl@4bc70892,
+lookup tracker=org.jetbrains.kotlin.incremental.LookupTrackerImpl@7b32bdc0,
+expect actual tracker=org.jetbrains.kotlin.incremental.ExpectActualTrackerImpl@7dca95ae,
+embed source files into source map=NEVER,
+insert source mappings from libraries even if their sources are unavailable on the end-user machine=false,
+a policy to generate a mapping from generated identifiers to their corresponding original names=SIMPLE_NAMES,
+print declarations' reachability info during performing DCE=false,
+IR fake override validator=false,
+partial linkage configuration=PartialLinkageConfig(mode=DISABLE, logLevel=INFO),
+ECMA version target=es5,
+plugin component registrars=[org.jetbrains.kotlin.scripting.compiler.plugin.ScriptingCompilerConfigurationComponentRegistrar@82a88eb],
+Compiler plugin registrars=[org.jetbrains.kotlin.scripting.compiler.plugin.ScriptingK2CompilerPluginRegistrar@7bda92e4,
+net.akehurst.kotlin.gradle.plugin.exportPublic.ExportPublicComponentRegistrar@1568fce2,
+net.akehurst.kotlinx.reflect.gradle.plugin.KotlinxReflectComponentRegistrar@3c267c04],
+exportPatterns=[net.akehurst.language.editor.api.**],
+forReflection=net.akehurst.language.editor.api.*,
+kotlinxReflectRegisterForModuleClassFqName=agl_editor_api_commonMain.KotlinxReflectForModule,
+library file paths=[
+  /Users/akehurst/.m2/repository/net/akehurst/language/agl-processor-js/4.2.0.20/agl-processor-js-4.2.0.20.klib,
+  /Users/akehurst/.m2/repository/net/akehurst/kotlinx/kotlinx-reflect-js/2.0.20/kotlinx-reflect-js-2.0.20.klib,
+  /Users/akehurst/.m2/repository/net/akehurst/language/agl-parser-js/4.2.0.20/agl-parser-js-4.2.0.20.klib,
+  /Users/akehurst/.m2/repository/net/akehurst/language/agl-regex-js/4.2.0.20/agl-regex-js-4.2.0.20.klib,
+  /Users/akehurst/.m2/repository/net/akehurst/language/collections-js/4.2.0.20/collections-js-4.2.0.20.klib,
+  /Users/akehurst/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-dom-api-compat/2.0.20/537dbda0c5c5ee06c81b2c0d1f466df60d810e3f/kotlin-dom-api-compat-2.0.20.klib,
+  /Users/akehurst/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-test-js/2.0.20/8c94547a7259b3c1bad318bfc7872df24da21e11/kotlin-test-js-2.0.20.klib,
+  /Users/akehurst/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib-js/2.0.20/f2fd1ead34110de298c135734770cf87dc136dd9/kotlin-stdlib-js-2.0.20.klib
+],
+library files for transitive dependencies=[
+   /Users/akehurst/.m2/repository/net/akehurst/language/agl-processor-js/4.2.0.20/agl-processor-js-4.2.0.20.klib,
+   /Users/akehurst/.m2/repository/net/akehurst/kotlinx/kotlinx-reflect-js/2.0.20/kotlinx-reflect-js-2.0.20.klib,
+   /Users/akehurst/.m2/repository/net/akehurst/language/agl-parser-js/4.2.0.20/agl-parser-js-4.2.0.20.klib,
+   /Users/akehurst/.m2/repository/net/akehurst/language/agl-regex-js/4.2.0.20/agl-regex-js-4.2.0.20.klib,
+   /Users/akehurst/.m2/repository/net/akehurst/language/collections-js/4.2.0.20/collections-js-4.2.0.20.klib,
+   /Users/akehurst/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-dom-api-compat/2.0.20/537dbda0c5c5ee06c81b2c0d1f466df60d810e3f/kotlin-dom-api-compat-2.0.20.klib,
+   /Users/akehurst/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-test-js/2.0.20/8c94547a7259b3c1bad318bfc7872df24da21e11/kotlin-test-js-2.0.20.klib,
+   /Users/akehurst/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib-js/2.0.20/f2fd1ead34110de298c135734770cf87dc136dd9/kotlin-stdlib-js-2.0.20.klib
+ ],
+ enable array range checks=false,
+ enable asserts=false,
+ generate wat file=false,
+ use wasm traps instead of throwing exceptions=false,
+ use wasm new exception proposal=false,
+ perform additional optimizations on the generated JS code=true,
+ content roots=[
+   KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/agl-editor-api/src/commonMain/kotlin/EditorOptionsBuilder.kt, isCommon=false, hmppModuleName=commonMain),
+   KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/agl-editor-api/src/commonMain/kotlin/api.kt, isCommon=false, hmppModuleName=commonMain),
+   KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/agl-editor-api/src/commonMain/kotlin/LanguageInterface.kt, isCommon=false, hmppModuleName=commonMain),
+   KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/agl-editor-api/src/commonMain/kotlin/AglEditorLogger.kt, isCommon=false, hmppModuleName=commonMain),
+   KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/.gradle-build/agl-editor-api/generated/sources/buildConfig/main/net/akehurst/language/editor/agl/editor/api/BuildConfig.kt, isCommon=false, hmppModuleName=commonMain),
+   KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/.gradle-build/agl-editor-api/kotlinxReflect/genSrc/commonMain/KotlinxReflectForModule.kt, isCommon=false, hmppModuleName=commonMain)
+ ],
+Normalize absolute paths in klib (replace file separator with '/')=false, Turn on the checks on uniqueness of signatures=true, Turns on experimental double-inlining mode=false
+
+
+
+
+
+------
+original message collector=org.jetbrains.kotlin.compilerRunner.MessageCollectorToOutputItemsCollectorAdapter@695a5248
+ message collector=org.jetbrains.kotlin.cli.common.messages.GroupingMessageCollector@6649906a
+ performance manager=org.jetbrains.kotlin.cli.js.K2JSCompiler$K2JSCompilerPerformanceManager@6d679a7e
+ disable inline=false
+ fir extended checkers=false
+ Produce metadata klib=false
+ report output files=true
+ Enable incremental compilation=true
+ Allow to compile any scripts along with regular Kotlin sources=false
+ Ignore errors from IrConstTransformer=false
+ IR verification mode=NONE
+ language version settings=Language = 2.0
+ API = 2.0 +MultiPlatformProjects +JsAllowValueClassesInExternals allowFullyQualifiedNameInKClass:false allowKotlinPackage:false dontWarnOnErrorSuppression:false explicitApiMode:DISABLED explicitApiVersion:false explicitReturnTypes:DISABLED extendedCompilerChecks:false multiPlatformDoNotCheckActual:false muteExpectActualClassesWarning:false optIn:[kotlin.ExperimentalStdlibApi] skipExpectedActualDeclarationChecker:false skipMetadataVersionCheck:false skipPrereleaseCheck:false stdlibCompilation:false
+ front-end IR=true
+ light tree=true
+ HMPP module structure=org.jetbrains.kotlin.config.HmppCliModuleStructure@1b3884ba
+ generate source map=true
+ TypedArrays enabled=true
+ disable support for friend paths=false
+ enable strict implicitly exported entities types inside d.ts files=false
+ incremental results consumer=org.jetbrains.kotlin.incremental.js.IncrementalResultsConsumerImpl@204b5d87
+ lookup tracker=org.jetbrains.kotlin.incremental.LookupTrackerImpl@aab4324
+ expect actual tracker=org.jetbrains.kotlin.incremental.ExpectActualTrackerImpl@5bce8c65
+ embed source files into source map=NEVER
+ insert source mappings from libraries even if their sources are unavailable on the end-user machine=false
+ a policy to generate a mapping from generated identifiers to their corresponding original names=SIMPLE_NAMES
+ print declarations' reachability info during performing DCE=false
+ IR fake override validator=false
+ partial linkage configuration=PartialLinkageConfig(mode=DISABLE
+ logLevel=INFO)
+ ECMA version target=es5
+ plugin component registrars=[org.jetbrains.kotlin.scripting.compiler.plugin.ScriptingCompilerConfigurationComponentRegistrar@40ccef2]
+ Compiler plugin registrars=[org.jetbrains.kotlin.scripting.compiler.plugin.ScriptingK2CompilerPluginRegistrar@7e511c91
+ net.akehurst.kotlin.gradle.plugin.exportPublic.ExportPublicComponentRegistrar@2e33c21c
+ net.akehurst.kotlinx.reflect.gradle.plugin.KotlinxReflectComponentRegistrar@1b1de1b]
+ exportPatterns=[]
+ forReflection=net.akehurst.language.editor.api.*:net.akehurst.language.editor.common.*:net.akehurst.language.editor.language.service.messages.*
+ kotlinxReflectRegisterForModuleClassFqName=agl_language_service_commonMain.KotlinxReflectForModule
+ library file paths=[/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/.gradle-build/agl-editor-common/libs/agl-editor-common-js-2.0.20.klib
+ /Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/.gradle-build/agl-editor-api/libs/agl-editor-api-js-2.0.20.klib
+ /Users/akehurst/.m2/repository/net/akehurst/language/kotlinx-komposite-js/4.2.0.20/kotlinx-komposite-js-4.2.0.20.klib
+ /Users/akehurst/.m2/repository/net/akehurst/kotlinx/kotlinx-collections-js/2.0.20/kotlinx-collections-js-2.0.20.klib
+ /Users/akehurst/.m2/repository/net/akehurst/kotlinx/kotlinx-reflect-js/2.0.20/kotlinx-reflect-js-2.0.20.klib
+ /Users/akehurst/.m2/repository/net/akehurst/kotlin/kserialisation/kserialisation-json-js/2.0.20/kserialisation-json-js-2.0.20.klib
+ /Users/akehurst/.m2/repository/net/akehurst/language/agl-processor-js/4.2.0.20/agl-processor-js-4.2.0.20.klib
+ /Users/akehurst/.m2/repository/net/akehurst/kotlin/json/json-js/2.0.20/json-js-2.0.20.klib
+ /Users/akehurst/.m2/repository/net/akehurst/language/agl-parser-js/4.2.0.20/agl-parser-js-4.2.0.20.klib
+ /Users/akehurst/.m2/repository/net/akehurst/language/agl-regex-js/4.2.0.20/agl-regex-js-4.2.0.20.klib
+ /Users/akehurst/.m2/repository/net/akehurst/language/collections-js/4.2.0.20/collections-js-4.2.0.20.klib
+ /Users/akehurst/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-dom-api-compat/2.0.20/537dbda0c5c5ee06c81b2c0d1f466df60d810e3f/kotlin-dom-api-compat-2.0.20.klib
+ /Users/akehurst/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-test-js/2.0.20/8c94547a7259b3c1bad318bfc7872df24da21e11/kotlin-test-js-2.0.20.klib
+ /Users/akehurst/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib-js/2.0.20/f2fd1ead34110de298c135734770cf87dc136dd9/kotlin-stdlib-js-2.0.20.klib]
+ library files for transitive dependencies=[
+     /Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/.gradle-build/agl-editor-common/libs/agl-editor-common-js-2.0.20.klib
+     /Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/.gradle-build/agl-editor-api/libs/agl-editor-api-js-2.0.20.klib
+     /Users/akehurst/.m2/repository/net/akehurst/language/kotlinx-komposite-js/4.2.0.20/kotlinx-komposite-js-4.2.0.20.klib
+     /Users/akehurst/.m2/repository/net/akehurst/kotlinx/kotlinx-collections-js/2.0.20/kotlinx-collections-js-2.0.20.klib
+     /Users/akehurst/.m2/repository/net/akehurst/kotlinx/kotlinx-reflect-js/2.0.20/kotlinx-reflect-js-2.0.20.klib
+     /Users/akehurst/.m2/repository/net/akehurst/kotlin/kserialisation/kserialisation-json-js/2.0.20/kserialisation-json-js-2.0.20.klib
+     /Users/akehurst/.m2/repository/net/akehurst/language/agl-processor-js/4.2.0.20/agl-processor-js-4.2.0.20.klib
+     /Users/akehurst/.m2/repository/net/akehurst/kotlin/json/json-js/2.0.20/json-js-2.0.20.klib
+     /Users/akehurst/.m2/repository/net/akehurst/language/agl-parser-js/4.2.0.20/agl-parser-js-4.2.0.20.klib
+     /Users/akehurst/.m2/repository/net/akehurst/language/agl-regex-js/4.2.0.20/agl-regex-js-4.2.0.20.klib
+     /Users/akehurst/.m2/repository/net/akehurst/language/collections-js/4.2.0.20/collections-js-4.2.0.20.klib
+     /Users/akehurst/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-dom-api-compat/2.0.20/537dbda0c5c5ee06c81b2c0d1f466df60d810e3f/kotlin-dom-api-compat-2.0.20.klib
+     /Users/akehurst/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-test-js/2.0.20/8c94547a7259b3c1bad318bfc7872df24da21e11/kotlin-test-js-2.0.20.klib
+     /Users/akehurst/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib-js/2.0.20/f2fd1ead34110de298c135734770cf87dc136dd9/kotlin-stdlib-js-2.0.20.klib
+ ]
+ enable array range checks=false
+ enable asserts=false
+ generate wat file=false
+ use wasm traps instead of throwing exceptions=false
+ use wasm new exception proposal=false
+ perform additional optimizations on the generated JS code=true
+ content roots=[KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/agl-language-service/src/jsMain/kotlin/AglLanguageServiceByWorker.kt, isCommon=false, hmppModuleName=jsMain)
+   KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/agl-language-service/src/jsMain/kotlin/external/WebComponent.kt, isCommon=false, hmppModuleName=jsMain)
+   KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/agl-language-service/src/jsMain/kotlin/AglWorkerClient.kt, isCommon=false, hmppModuleName=jsMain)
+   KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/agl-language-service/src/commonMain/kotlin/messages.kt, isCommon=false, hmppModuleName=commonMain)
+   KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/agl-language-service/src/commonMain/kotlin/AglWorkerSerialisation.kt, isCommon=false, hmppModuleName=commonMain)
+   KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/agl-language-service/src/commonMain/kotlin/LanguageServiceDirectExecution.kt, isCommon=false, hmppModuleName=commonMain)
+   KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/.gradle-build/agl-language-service/generated/sources/buildConfig/main/net/akehurst/language/editor/agl/language/service/BuildConfig.kt, isCommon=false, hmppModuleName=commonMain)
+   KotlinSourceRoot(path=/Users/akehurst/git/agl/net.akehurst.language.editor/net.akehurst.language.editor/.gradle-build/agl-language-service/kotlinxReflect/genSrc/commonMain/KotlinxReflectForModule.kt, isCommon=false, hmppModuleName=commonMain)
+ ]
+ Normalize absolute paths in klib (replace file separator with '/')=false
+ Turn on the checks on uniqueness of signatures=true
+ Turns on experimental double-inlining mode=false

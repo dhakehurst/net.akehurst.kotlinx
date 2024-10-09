@@ -57,7 +57,7 @@ class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
         class GradleToKotlin(val logger: Logger) : org.jetbrains.kotlin.util.Logger {
             override fun fatal(message: String): Nothing {
                 error(message)
-                throw CompilationErrorException()
+                throw Exception()
             }
 
             override fun error(message: String) = logger.error(message)
