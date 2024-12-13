@@ -9,10 +9,7 @@ import org.jetbrains.kotlin.backend.common.CommonKLibResolver
 import org.jetbrains.kotlin.backend.common.serialization.metadata.DynamicTypeDeserializer
 import org.jetbrains.kotlin.backend.common.toLogger
 import org.jetbrains.kotlin.builtins.konan.KonanBuiltIns
-import org.jetbrains.kotlin.config.ApiVersion
-import org.jetbrains.kotlin.config.LanguageVersion
-import org.jetbrains.kotlin.config.LanguageVersionSettingsImpl
-import org.jetbrains.kotlin.config.messageCollector
+import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinMetadataCompilation
@@ -154,7 +151,8 @@ class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
                 val res = CommonKLibResolver.resolveWithoutDependencies(
                     dependencies,
                     GradleToKotlin(logger),
-                    ZipFileSystemInPlaceAccessor
+                    ZipFileSystemInPlaceAccessor,
+                    duplicatedUniqueNameStrategy = DuplicatedUniqueNameStrategy.DENY
                 )
                 val storageManager = LockBasedStorageManager("klib")
                 project.logger.info("Modules: ${res.libraries.size}")

@@ -1,11 +1,11 @@
 [versions]
-project = "2.0.20"
+project = "2.1.0"
 
-kotlin = "2.0.20"
+kotlin = "2.1.0"
 dokka = "1.9.20"
-exportPublic = "2.0.20"
+exportPublic = "2.1.0"
 
-buildconfig = "5.4.0"
+buildconfig = "5.5.0"
 credentials = "3.0"
 
 korlibs = "6.0.1"

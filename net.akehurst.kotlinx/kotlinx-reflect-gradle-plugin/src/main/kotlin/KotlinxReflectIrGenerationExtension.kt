@@ -56,8 +56,8 @@ class KotlinxReflectIrGenerationExtension(
         const val classForNameAfterRegistration = "classForNameAfterRegistration"
         const val registerUsedClasses = "registerUsedClasses"
 
-        fun IrBuilderWithScope.irFunctionReference(type: IrType, symbol: IrFunctionSymbol, typeArgumentsCount: Int = 0, valueArgumentsCount: Int = 0) =
-            IrFunctionReferenceImpl(startOffset, endOffset, type, symbol, typeArgumentsCount, valueArgumentsCount)
+        // fun IrBuilderWithScope.irFunctionReference(type: IrType, symbol: IrFunctionSymbol, typeArgumentsCount: Int = 0, valueArgumentsCount: Int = 0) =
+        //    IrFunctionReferenceImpl(startOffset, endOffset, type, symbol, typeArgumentsCount, valueArgumentsCount)
     }
 
     private val globRegexes = forReflection.mapNotNull {
@@ -90,9 +90,9 @@ class KotlinxReflectIrGenerationExtension(
                     val pkgContent = moduleFragment.descriptor.allDependencyModules.flatMap { dep ->
                         messageCollector.report(CompilerMessageSeverity.INFO, "KotlinxReflect: Checking dependency '${dep.name}'")
                         val pkg = dep.getPackage(pkgFqName)
-                        pkg.memberScope.getClassifierNames()?.map { cls -> Pair(cls,pluginContext.referenceClass(ClassId(pkgFqName, cls))) } ?: emptyList()
+                        pkg.memberScope.getClassifierNames()?.map { cls -> Pair(cls, pluginContext.referenceClass(ClassId(pkgFqName, cls))) } ?: emptyList()
                     }
-                    if(pkgContent.isEmpty()) {
+                    if (pkgContent.isEmpty()) {
                         messageCollector.report(CompilerMessageSeverity.WARNING, "KotlinxReflect: No content found for package '$pkgName'")
                     }
                     pkgContent.forEach { p ->
@@ -121,7 +121,6 @@ class KotlinxReflectIrGenerationExtension(
 //                            }
 //                        }
 //                    }
-
 
 
                 }
