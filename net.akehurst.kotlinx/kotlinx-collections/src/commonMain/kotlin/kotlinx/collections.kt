@@ -31,7 +31,6 @@ class MutableMapNonNullDefault<K, V>(private val map: MutableMap<K, V>) : Mutabl
     override fun get(key: K): V = this.map[key]!!
 }
 
-
 class Stack<T> {
 
     private val _elements = mutableListOf<T>()

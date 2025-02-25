@@ -83,7 +83,6 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     actual fun construct(vararg constructorArgs: Any?): T {
         val cls = this.kclass.js
         return when {
-            constructorArgs.isEmpty() -> this.kclass.createInstance()
             isObject -> {
                 val qname = KotlinxReflect.qualifiedNameForClass(this.kclass)
                 val obj = KotlinxReflect.objectInstance<T>(qname)
@@ -92,6 +91,7 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
                     else -> obj
                 }
             }
+            constructorArgs.isEmpty() -> this.kclass.createInstance()
 
             else -> {
                // val obj = js("new (Function.prototype.bind.apply(cls, [null].concat(constructorArgs)));")

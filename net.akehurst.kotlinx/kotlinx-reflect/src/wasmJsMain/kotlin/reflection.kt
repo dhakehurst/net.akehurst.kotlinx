@@ -33,7 +33,6 @@ actual fun KClass<*>.reflect() = ClassReflection(this)
 actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) {
 
     companion object {
-        const val metadata = "\$metadata\$"
     }
 
     actual val isAbstract: Boolean
@@ -71,24 +70,18 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
 
     actual fun allPropertyNamesFor(self: T): List<String> {
         TODO()
-//        val js: Array<String> = js("Object.getOwnPropertyNames(self)")
-//        return js.toList()
     }
-
-    //   actual fun allMemberFunctionsFor(self: T): List<KFunction<*>> {
-    //       TODO()
-    //   }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
         TODO()
     }
 
     actual fun getProperty(self: T, propertyName: String): Any? {
-        return js("self[propertyName]")
+        TODO()
     }
 
     actual fun setProperty(self: T, propertyName: String, value: Any?) {
-        js("self[propertyName] = value")
+        TODO()
     }
 
     actual fun <E : Enum<E>> enumValues(): List<E> {
@@ -106,7 +99,7 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual fun call(self: T, methodName: String, vararg args: Any?): Any? {
-        return js("self[methodName](args)")
+        TODO()// return js("self[methodName](args)")
     }
 }
 
@@ -121,41 +114,7 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     actual val isProxy: Boolean get() = TODO()
 
     actual val allPropertyNames: List<String> by lazy {
-        val self = this.self
-        /*
-        val js: Array<String> = js("""(function(){
-            var props = [];
-            var proto = Object.getPrototypeOf(self);
-            Object.getOwnPropertyNames(proto).forEach(function(name) {
-                if (typeof self[name] === 'function') {
-                    // ignore it
-                } else if (self.hasOwnProperty(name) && props.indexOf(name) === -1) {
-                    props.push(name);
-                }
-                var descriptor = Object.getOwnPropertyDescriptor(proto, name);
-                if (typeof descriptor.get === 'function' && props.indexOf(name) === -1) {
-                    props.push(name);
-                }
-            });
-            Object.getOwnPropertyNames(self).forEach(function(name) {
-                if (typeof self[name] === 'function') {
-                    // ignore it
-                } else if (self.hasOwnProperty(name) && props.indexOf(name) === -1) {
-                    props.push(name);
-                }
-                var descriptor = Object.getOwnPropertyDescriptor(self, name);
-                if (typeof descriptor.get === 'function' && props.indexOf(name) === -1) {
-                    props.push(name);
-                }
-            });
-            props
-        })();""")
-        */
-        //FIXME: this does not seem to get all properties from a Kotlin object!!
-        // tried above code but it made no difference/
-        // problem seems to be getting properties that are defined using Object.defineProperty in Kotlin generated code
-        val js: Array<String> = js("Object.getOwnPropertyNames(self)")
-        js.toList()
+        TODO()
     }
 
     actual fun construct(vararg constructorArgs: Any?): T {
@@ -167,43 +126,19 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
     }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
-        //val cls = this.self::class.js
-        val self = this.self //ensures self is available in the js script below
-        return js(
-            """
-                var proto = Object.getPrototypeOf(self);
-                var propDescriptor = null;
-                while(proto) {
-                    propDescriptor = Object.getOwnPropertyDescriptor(proto, propertyName);
-                    if (propDescriptor) {
-                        break;
-                    } else {
-                        proto = Object.getPrototypeOf(proto);
-                    }
-                }
-                //var result = false
-                var result = true // try default to true !
-                if (propDescriptor) {
-                    result = typeof propDescriptor.set === 'function';
-                }
-                result
-            """
-        ) as Boolean
+        TODO()
     }
 
     actual fun getProperty(propertyName: String): Any? {
-        val self = this.self //ensures self is available in the js script below
-        return js("self[propertyName]")
+        TODO()
     }
 
     actual fun setProperty(propertyName: String, value: Any?) {
-        val self = this.self //ensures self is available in the js script below
-        js("self[propertyName] = value")
+        TODO()
     }
 
     actual fun call(methodName: String, vararg args: Any?): Any? {
-        val self = this.self //ensures self is available in the js script below
-        return js("self[methodName](args)")
+        TODO()
     }
 
     actual suspend fun callSuspend(methodName: String, vararg args: Any?): Any? {

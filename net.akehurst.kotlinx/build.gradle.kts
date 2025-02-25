@@ -105,10 +105,11 @@ subprojects {
 
             macosArm64()
 
-//            @OptIn(org.jetbrains.kotlin.gradle.targets.js.dsl.ExperimentalWasmDsl::class)
-//            wasmJs() {
-//                browser()
-//            }
+            @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+            wasmJs() {
+                binaries.library()
+                browser()
+            }
 
             applyDefaultHierarchyTemplate()
         }
