@@ -1,9 +1,9 @@
 [versions]
-project = "2.1.0"
+project = "2.1.20-RC3"
 
-kotlin = "2.1.0"
+kotlin = "2.1.20-RC3"
 dokka = "2.0.0"
-exportPublic = "2.1.0"
+exportPublic = "2.1.20-RC3"
 
 buildconfig = "5.5.1"
 credentials = "3.0"
