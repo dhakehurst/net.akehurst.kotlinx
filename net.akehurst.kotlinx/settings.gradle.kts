@@ -31,7 +31,13 @@ pluginManagement {
 }
 rootProject.name = file(".").name
 
-include("kotlinx-collections")
-include("kotlinx-reflect")
-include("kotlinx-reflect-gradle-plugin")
 
+fileTree(".") {
+    include ("**/build.gradle.kts")
+    exclude ("build.gradle.kts") // Exclude the root _build file.
+}.forEach {
+    val prj = it.parentFile.name
+    println( "including $prj at "+relativePath(it.parent))
+    include(prj)
+    project(":$prj").projectDir = File(relativePath(it.parent))
+}

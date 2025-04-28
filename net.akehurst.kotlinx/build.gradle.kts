@@ -20,10 +20,12 @@ import java.io.File
 
 plugins {
     alias(libs.plugins.kotlin) apply false
+    alias(libs.plugins.jsPlainObjects) apply false
     alias(libs.plugins.dokka) apply false
     alias(libs.plugins.buildconfig) apply false
     alias(libs.plugins.credentials) apply true
     alias(libs.plugins.exportPublic) apply false
+
 }
 val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1
 val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1
@@ -59,6 +61,7 @@ subprojects {
 
     if (name!="kotlinx-reflect-gradle-plugin") {
         apply(plugin = "org.jetbrains.kotlin.multiplatform")
+        apply(plugin = "org.jetbrains.kotlin.plugin.js-plain-objects")
         apply(plugin = "net.akehurst.kotlin.gradle.plugin.exportPublic")
 
         configure<BuildConfigExtension> {
@@ -140,6 +143,5 @@ subprojects {
                 }
             }
         }
-
     }
 }
