@@ -8,8 +8,8 @@ dependencies {
 }
 
 
-exportPublic {
-    exportPatterns.set(listOf(
-        "net.akehurst.kotlinx.reflect.ClassReflection",
-    ))
-}
+//exportPublic {
+//    exportPatterns.set(listOf(
+//        "net.akehurst.kotlinx.reflect.ClassReflection",
+//    ))
+//}

@@ -3,7 +3,7 @@ project = "2.1.21-RC"
 
 kotlin = "2.1.21-RC"
 dokka = "2.0.0"
-exportPublic = "2.1.21-RC"
+#exportPublic = "2.1.21-RC"
 
 buildconfig = "5.5.1"
 credentials = "3.0"
@@ -18,7 +18,7 @@ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-c
 [plugins]
 kotlin = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
-exportPublic = { id = "net.akehurst.kotlin.gradle.plugin.exportPublic", version.ref = "exportPublic" }
+#exportPublic = { id = "net.akehurst.kotlin.gradle.plugin.exportPublic", version.ref = "exportPublic" }
 buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
 credentials = { id = "nu.studer.credentials", version.ref = "credentials" }
 jsPlainObjects = { id = "org.jetbrains.kotlin.plugin.js-plain-objects", version.ref = "kotlin" }
