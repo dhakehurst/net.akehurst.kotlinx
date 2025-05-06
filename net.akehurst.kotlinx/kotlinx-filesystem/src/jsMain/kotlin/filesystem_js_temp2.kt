@@ -90,9 +90,9 @@ data class DirectoryHandleJS(
 data class FileHandleJS(
     val fileSystem: UserFileSystem,
     val handle: FileSystemFileHandle
-) : FileHandle {
+) : FileHandleAbstract() {
+
     override val name: String get() = handle.name
-    override val extension: String get() = name.substringAfterLast('.')
 
     override suspend fun readContent(): String? =
         fileSystem.readFileContent(this)
@@ -101,7 +101,7 @@ data class FileHandleJS(
         fileSystem.writeFileContent(this, content)
 }
 
-actual object UserFileSystem {
+actual object UserFileSystem : FileSystem {
 
     actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
         return when (parentDirectory) {
@@ -128,10 +128,16 @@ actual object UserFileSystem {
 
     actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?, mode: FileAccessMode): DirectoryHandle? {
         val w: dynamic = window
-        val p: Promise<dynamic> = when (mode) {
+        val rw = when (mode) {
             FileAccessMode.READ_ONLY -> w.showDirectoryPicker(js("{mode:'read'}"))
             FileAccessMode.READ_WRITE -> w.showDirectoryPicker(js("{mode:'readwrite'}"))
         }
+        val cur = current?.let { (it as DirectoryHandleJS).handle }
+        val options = when(current) {
+            null -> js("{mode:rw}")
+            else -> js("{mode:rw, startIn:cur}")
+        }
+        val p: Promise<dynamic> =w.showDirectoryPicker(options)
         return try {
             val handle: FileSystemDirectoryHandle = p.await()
             DirectoryHandleJS(this, handle)

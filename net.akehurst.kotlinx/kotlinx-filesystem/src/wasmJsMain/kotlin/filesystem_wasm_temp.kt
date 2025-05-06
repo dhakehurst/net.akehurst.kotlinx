@@ -82,9 +82,9 @@ data class DirectoryHandleJS(
 data class FileHandleJS(
     val fileSystem: UserFileSystem,
     val handle: FileSystemFileHandle
-) : FileHandle {
+) : FileHandleAbstract() {
+
     override val name: String get() = handle.name
-    override val extension: String get() = name.substringAfterLast('.')
 
     override suspend fun readContent(): String? =
         fileSystem.readFileContent(this)
@@ -106,7 +106,7 @@ external interface WasmWindow {
     fun prompt(message: String, defaultText: String): String?
 }
 
-actual object UserFileSystem {
+actual object UserFileSystem : FileSystem {
 
     actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
         return when (parentDirectory) {

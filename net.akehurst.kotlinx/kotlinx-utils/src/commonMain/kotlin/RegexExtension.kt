@@ -1,4 +1,4 @@
-package net.akehurst.kotlinx.reflect.gradle.plugin
+package net.akehurst.kotlinx.text
 
 //TODO: hopefully this will be in the kotlin-stdlib at some point
 /*
@@ -22,7 +22,7 @@ package net.akehurst.kotlinx.reflect.gradle.plugin
  * i.e. '.' (for kotlin qualified names) or '/' (for file paths)
  *
  */
-internal fun String.toRegexFromGlob(separator: Char, options: Set<RegexOption> = emptySet()): Regex {
+fun String.toRegexFromGlob(separator: Char, options: Set<RegexOption> = emptySet()): Regex {
     val globStr = this
     var regex = ""
     var inGroup = 0

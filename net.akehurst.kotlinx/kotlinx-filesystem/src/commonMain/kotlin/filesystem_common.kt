@@ -5,32 +5,7 @@ enum class FileAccessMode {
     READ_WRITE
 }
 
-expect object UserFileSystem {
-  //  var useDispatcher: Boolean
-
-    suspend fun getEntry(parentDirectory: DirectoryHandle, name:String):FileSystemObjectHandle?
-
-    suspend fun selectDirectoryFromDialog(current: DirectoryHandle? = null, mode: FileAccessMode = FileAccessMode.READ_WRITE): DirectoryHandle?
-    suspend fun selectExistingFileFromDialog(mode: FileAccessMode = FileAccessMode.READ_WRITE): FileHandle?
-    suspend fun selectNewFileFromDialog(parentDirectory: DirectoryHandle): FileHandle?
-
-    suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle>
-
-    suspend fun createNewFile(parentPath: DirectoryHandle): FileHandle?
-    suspend fun createNewDirectory(parentPath: DirectoryHandle): DirectoryHandle?
-
-    suspend fun readFileContent(file: FileHandle): String?
-
-    suspend fun writeFileContent(file: FileHandle, content: String)
-
-}
-
-interface AppFilesystem {
-    val root: DirectoryHandle
-
-    suspend fun getDirectory(resourcePath: String): DirectoryHandle?
-    suspend fun getFile(resourcePath: String): FileHandle?
-    suspend fun read(resourcePath: String): String
+interface FileSystem {
 }
 
 interface FileSystemObjectHandle {
@@ -54,7 +29,6 @@ interface DirectoryHandle : FileSystemObjectHandle {
     suspend fun createDirectory(name: String): DirectoryHandle?
 }
 
-
 abstract class DirectoryHandleAbstract : DirectoryHandle {
     override suspend fun directory(name: String): DirectoryHandle? {
         val entry = entry(name)
@@ -71,4 +45,8 @@ abstract class DirectoryHandleAbstract : DirectoryHandle {
             else -> null
         }
     }
+}
+
+abstract class FileHandleAbstract : FileHandle {
+    override val extension: String get() = name.substringAfterLast('.')
 }

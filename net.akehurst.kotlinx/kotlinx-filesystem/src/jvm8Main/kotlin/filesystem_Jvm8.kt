@@ -15,7 +15,7 @@ import kotlin.io.writeText
 import kotlin.let
 import kotlin.text.substringAfterLast
 
-actual object UserFileSystem {
+actual object UserFileSystem : FileSystem {
 
     actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
         return when (parentDirectory) {
@@ -178,10 +178,9 @@ data class DirectoryHandleJVM(
 data class FileHandleJVM(
     val fileSystem: UserFileSystem,
     val handle: File
-) : FileHandle {
+) : FileHandleAbstract() {
 
     override val name: String get() = handle.name
-    override val extension: String get() = name.substringAfterLast('.')
 
     override suspend fun readContent(): String? =
         fileSystem.readFileContent(this)

@@ -1,6 +1,6 @@
 package net.akehurst.kotlinx.filesystem
 
-actual object UserFileSystem {
+actual object UserFileSystem : FileSystem {
     //actual var useDispatcher: Boolean = false
     actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
         TODO()
