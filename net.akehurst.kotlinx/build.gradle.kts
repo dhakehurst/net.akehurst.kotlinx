@@ -35,11 +35,12 @@ allprojects {
 
     repositories {
         mavenLocal {
-            content{
+            content {
                 includeGroupByRegex("net\\.akehurst.+")
             }
         }
         mavenCentral()
+        gradlePluginPortal()
     }
 
     group = rootProject.name
@@ -59,7 +60,7 @@ subprojects {
     apply(plugin = "org.jetbrains.dokka")
     apply(plugin = "com.github.gmazzo.buildconfig")
 
-    if (name!="kotlinx-reflect-gradle-plugin") {
+    if (name != "kotlinx-reflect-gradle-plugin") {
         apply(plugin = "org.jetbrains.kotlin.multiplatform")
         apply(plugin = "org.jetbrains.kotlin.plugin.js-plain-objects")
         apply(plugin = "net.akehurst.kotlin.gradle.plugin.exportPublic")
@@ -68,7 +69,7 @@ subprojects {
             val now = java.time.Instant.now()
             fun fBbuildStamp(): String = java.time.format.DateTimeFormatter.ISO_DATE_TIME.withZone(java.time.ZoneId.of("UTC")).format(now)
             fun fBuildDate(): String = java.time.format.DateTimeFormatter.ofPattern("yyyy-MMM-dd").withZone(java.time.ZoneId.of("UTC")).format(now)
-            fun fBuildTime(): String= java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss z").withZone(java.time.ZoneId.of("UTC")).format(now)
+            fun fBuildTime(): String = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss z").withZone(java.time.ZoneId.of("UTC")).format(now)
 
             buildConfigField("String", "version", "\"${project.version}\"")
             buildConfigField("String", "buildStamp", "\"${fBbuildStamp()}\"")
@@ -117,10 +118,73 @@ subprojects {
             applyDefaultHierarchyTemplate()
         }
 
+        val javadocJar: TaskProvider<Jar> by tasks.registering(Jar::class) {
+            //dependsOn(dokkaHtml)
+            archiveClassifier.set("javadoc")
+            //from(dokkaHtml.outputDirectory)
+        }
+        tasks.named("publish").get().dependsOn("javadocJar")
+
         dependencies {
             "commonTestImplementation"(kotlin("test"))
             "commonTestImplementation"(kotlin("test-annotations-common"))
         }
+
+
+        val creds = project.properties["credentials"] as nu.studer.gradle.credentials.domain.CredentialsContainer
+        val sonatype_pwd = creds.forKey("SONATYPE_PASSWORD")
+            ?: getProjectProperty("SONATYPE_PASSWORD")
+            ?: error("Must set project property with Sonatype Password (-P SONATYPE_PASSWORD=<...> or set in ~/.gradle/gradle.properties)")
+        project.ext.set("signing.password", sonatype_pwd)
+
+        configure<PublishingExtension> {
+            repositories {
+                maven {
+                    name = "sonatype"
+                    setUrl("https://oss.sonatype.org/service/local/staging/deploy/maven2/")
+                    credentials {
+                        username = getProjectProperty("SONATYPE_USERNAME")
+                            ?: error("Must set project property with Sonatype Username (-P SONATYPE_USERNAME=<...> or set in ~/.gradle/gradle.properties)")
+                        password = sonatype_pwd
+                    }
+                }
+                maven {
+                    name = "Other"
+                    setUrl(getProjectProperty("PUB_URL") ?: "<use -P PUB_URL=<...> to set>")
+                    credentials {
+                        username = getProjectProperty("PUB_USERNAME")
+                            ?: error("Must set project property with Username (-P PUB_USERNAME=<...> or set in ~/.gradle/gradle.properties)")
+                        password = getProjectProperty("PUB_PASSWORD") ?: creds.forKey(getProjectProperty("PUB_USERNAME"))
+                    }
+                }
+                publications.withType<MavenPublication> {
+                    artifact(javadocJar.get())
+
+                    pom {
+                        name.set("akehurst-kotlinx")
+                        description.set("Useful Kotlin stuff that is missing from the stdlib, e.g. reflection, logging, native-filesystem-dialogs, etc")
+                        url.set("https://github.com/dhakehurst/net.akehurst.kotlinx")
+
+                        licenses {
+                            license {
+                                name.set("The Apache License, Version 2.0")
+                                url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                            }
+                        }
+                        developers {
+                            developer {
+                                name.set("Dr. David H. Akehurst")
+                                email.set("dr.david.h@akehurst.net")
+                            }
+                        }
+                        scm {
+                            url.set("https://github.com/dhakehurst/net.akehurst.kotlinx")
+                        }
+                    }
+                }
+            }
+        }
+
 
     }
 
@@ -129,18 +193,12 @@ subprojects {
         val publishing = project.properties["publishing"] as PublishingExtension
         sign(publishing.publications)
     }
-
-    val creds = project.properties["credentials"] as nu.studer.gradle.credentials.domain.CredentialsContainer
-    configure<PublishingExtension> {
-        repositories {
-            maven {
-                name = "Other"
-                setUrl(getProjectProperty("PUB_URL")?: "<use -P PUB_URL=<...> to set>")
-                credentials {
-                    username = getProjectProperty("PUB_USERNAME")
-                        ?: error("Must set project property with Username (-P PUB_USERNAME=<...> or set in ~/.gradle/gradle.properties)")
-                    password = getProjectProperty("PUB_PASSWORD")?: creds.forKey(getProjectProperty("PUB_USERNAME"))
-                }
+    val signTasks = tasks.matching { it.name.matches(Regex("sign(.)+")) }.toTypedArray()
+    tasks.forEach {
+        when {
+            it.name.matches(Regex("publish(.)+")) -> {
+                println("${it.name}.mustRunAfter(${signTasks.toList()})")
+                it.mustRunAfter(*signTasks)
             }
         }
     }

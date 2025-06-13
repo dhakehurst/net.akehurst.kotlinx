@@ -1,6 +1,7 @@
 package net.akehurst.kotlinx.reflect.gradle.plugin
 
 import net.akehurst.kotlinx.reflect.KotlinxReflect
+import net.akehurst.kotlinx.text.toRegexFromGlob
 import org.jetbrains.kotlin.analyzer.moduleInfo
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension

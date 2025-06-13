@@ -1,5 +1,7 @@
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 
+group = "net.akehurst.kotlin"
+
 plugins {
     `java-gradle-plugin`
     `maven-publish`
@@ -45,9 +47,9 @@ gradlePlugin {
         create("kotlinx-reflect") {
             id = "net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin"
             implementationClass = "net.akehurst.kotlinx.reflect.gradle.plugin.KotlinxReflectGradlePlugin"
-            description = "Kotlin compiler plugin to support net.akehurst.kotlinx reflection on JS-platform"
+            displayName = project.name
+            description = "Kotlin compiler plugin to support net.akehurst.kotlinx reflection on multi-platform"
             tags.set(listOf("reflection","kotlin", "javascript", "typescript", "kotlin-js", "kotlin-multiplatform"))
-
         }
     }
     testSourceSets(testPlugin)
@@ -64,6 +66,7 @@ dependencies {
     implementation(project(":kotlinx-reflect"))
     implementation(kotlin("util-klib"))
 
+    implementation(project(":kotlinx-utils"))
     // seem to need these to be able to run the pluginTest
     //implementation(kotlin("gradle-plugin"))
     //implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable")

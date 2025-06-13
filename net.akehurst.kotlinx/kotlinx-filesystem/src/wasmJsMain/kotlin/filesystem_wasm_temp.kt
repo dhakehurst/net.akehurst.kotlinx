@@ -130,7 +130,9 @@ actual object UserFileSystem : FileSystem {
             else -> null
         }
     }
-
+    actual suspend fun getDirectory(fullPath:String, mode: FileAccessMode):DirectoryHandle? {
+        return selectDirectoryFromDialog(null, mode)
+    }
     actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?,mode: FileAccessMode): DirectoryHandle? {
         val opts = when(mode) {
             FileAccessMode.READ_ONLY -> FilePickerOptions("read")

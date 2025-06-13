@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2024 Dr. David H. Akehurst (http://dr.david.h.akehurst.net)
+ * Copyright (C) 2025 Dr. David H. Akehurst (http://dr.david.h.akehurst.net)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package net.akehurst.kotlinx.logging.common
 
 import net.akehurst.kotlinx.logging.api.LogLevel
 import net.akehurst.kotlinx.logging.api.Logger
 import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
+import web.console.console
 
-class LoggerJsConsole(
-
+class LoggerWasmJsConsole(
 ) : Logger {
 
     override var outputLevel: LogLevel = LogLevel.All
@@ -52,12 +51,12 @@ class LoggerJsConsole(
         }
     }
 
-    private fun consoleFatal(msg: String?) = console.error(duration("Fatal", "$msg"))
-    private fun consoleError(msg: String?) = console.error(duration("Error", "$msg"))
-    private fun consoleWarn(msg: String?) = console.warn(duration("Warn", "$msg"))
-    private fun consoleInfo(msg: String?) = console.info(duration("Info", "$msg"))
-    private fun consoleDebug(msg: String?) = console.asDynamic().debug(duration("Debug", "$msg"))
-    private fun consoleTrace(msg: String?) = console.asDynamic().debug(duration("Trace", "$msg"))
+    private fun consoleFatal(msg: String?) = console.error(duration("Fatal","$msg"))
+    private fun consoleError(msg: String?) = console.error(duration("Error","$msg"))
+    private fun consoleWarn(msg: String?) = console.warn(duration("Warn","$msg"))
+    private fun consoleInfo(msg: String?) = console.info(duration("Info","$msg"))
+    private fun consoleDebug(msg: String?) = console.debug(duration("Debug","$msg"))
+    private fun consoleTrace(msg: String?) = console.debug(duration("Trace","$msg"))
 
     private var lastTimeMark: TimeSource.Monotonic.ValueTimeMark? = null
     private fun duration(lev: String, msg: String): String {

@@ -1,19 +1,24 @@
 [versions]
-project = "2.1.21-RC"
+project = "2.1.21"
 
-kotlin = "2.1.21-RC"
+kotlin = "2.1.21"
 dokka = "2.0.0"
-exportPublic = "2.1.21-RC"
+exportPublic = "2.1.21"
 
 buildconfig = "5.5.1"
 credentials = "3.0"
 
 korlibs = "6.0.1"
 kotlinx-coroutines = "1.10.1"
+kotlinx-html = "0.12.0"
+kotlinx-wrappers = "2025.5.8"
 
 [libraries]
 korlibs-korio = { module = "com.soywiz:korlibs-io", version.ref = "korlibs" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-html = { module = "org.jetbrains.kotlinx:kotlinx-html", version.ref = "kotlinx-coroutines" }
+kotlinx-wrappers-js = { module = "org.jetbrains.kotlin-wrappers:kotlin-js", version.ref = "kotlinx-html" }
+kotlinx-wrappers-browser = { module = "org.jetbrains.kotlin-wrappers:kotlin-browser", version.ref = "kotlinx-wrappers" }
 
 [plugins]
 kotlin = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

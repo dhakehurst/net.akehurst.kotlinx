@@ -28,6 +28,15 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
+    actual suspend fun getDirectory(fullPath:String, mode: FileAccessMode):DirectoryHandle? {
+        val file = File(fullPath)
+        return if(file.exists() && file.isDirectory) {
+            DirectoryHandleJVM(this,file)
+        } else {
+            null
+        }
+    }
+
     actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?,mode: FileAccessMode): DirectoryHandle? {
         return if (EventQueue.isDispatchThread()) {
             chooseDirectory2(current as DirectoryHandleJVM?)

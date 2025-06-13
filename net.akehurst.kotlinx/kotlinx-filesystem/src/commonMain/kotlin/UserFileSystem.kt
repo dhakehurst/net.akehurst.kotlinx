@@ -5,6 +5,11 @@ expect object UserFileSystem : FileSystem{
 
     suspend fun getEntry(parentDirectory: DirectoryHandle, name:String):FileSystemObjectHandle?
 
+    /**
+     * for JS/Wasm, this just calls the selectDirectoryFromDialog method
+     */
+    suspend fun getDirectory(fullPath:String, mode: FileAccessMode = FileAccessMode.READ_WRITE):DirectoryHandle?
+
     suspend fun selectDirectoryFromDialog(current: DirectoryHandle? = null, mode: FileAccessMode = FileAccessMode.READ_WRITE): DirectoryHandle?
     suspend fun selectExistingFileFromDialog(mode: FileAccessMode = FileAccessMode.READ_WRITE): FileHandle?
     suspend fun selectNewFileFromDialog(parentDirectory: DirectoryHandle): FileHandle?

@@ -10,14 +10,14 @@ kotlin {
         }
         jsMain {
             dependencies {
-                implementation("org.jetbrains.kotlin-wrappers:kotlin-js:2025.4.6")
-                implementation("org.jetbrains.kotlin-wrappers:kotlin-browser:2025.4.6")
+                implementation(libs.kotlinx.wrappers.js)
+                implementation(libs.kotlinx.wrappers.browser)
             }
         }
         wasmJsMain {
             dependencies {
-                implementation("org.jetbrains.kotlin-wrappers:kotlin-js:2025.4.6")
-                implementation("org.jetbrains.kotlin-wrappers:kotlin-browser:2025.4.6")
+                implementation(libs.kotlinx.wrappers.js)
+                implementation(libs.kotlinx.wrappers.browser)
             }
         }
     }

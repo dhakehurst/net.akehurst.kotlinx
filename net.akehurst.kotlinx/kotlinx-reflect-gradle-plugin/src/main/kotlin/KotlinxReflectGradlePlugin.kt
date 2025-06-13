@@ -1,6 +1,7 @@
 package net.akehurst.kotlinx.reflect.gradle.plugin
 
 import com.google.auto.service.AutoService
+import net.akehurst.kotlin.reflect.gradle.plugin.KotlinPluginInfo
 import org.gradle.api.Project
 import org.gradle.api.logging.Logger
 import org.gradle.api.model.ObjectFactory

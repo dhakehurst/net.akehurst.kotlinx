@@ -5,7 +5,9 @@ actual object UserFileSystem : FileSystem {
     actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
         TODO()
     }
-
+    actual suspend fun getDirectory(fullPath:String, mode: FileAccessMode):DirectoryHandle? {
+        return selectDirectoryFromDialog(null, mode)
+    }
     actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?,mode: FileAccessMode): DirectoryHandle? {
         TODO()
     }
