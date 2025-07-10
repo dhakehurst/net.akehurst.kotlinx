@@ -56,7 +56,7 @@ class test_KotlinxReflectGradlePlugin {
                 
                 kotlinxReflect {
                     forReflectionMain.set(listOf(
-                        "test",
+                        "test.*",
                     ))
                 }
                 repositories {
