@@ -33,7 +33,7 @@ import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.util.*
-import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
+import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
 import org.jetbrains.kotlin.name.CallableId
@@ -182,7 +182,7 @@ class KotlinxReflectIrGenerationExtension(
 
         // Classes for Reflection from this module (using module  fragment visitor)
         var class_KotlixReflectForModule: IrClass? = null
-        moduleFragment.acceptVoid(object : IrElementVisitorVoid {
+        moduleFragment.acceptVoid(object : IrVisitorVoid() {
             override fun visitElement(element: IrElement) {
                 element.acceptChildrenVoid(this)
             }
@@ -457,8 +457,8 @@ class KotlinxReflectIrGenerationExtension(
                     val cls = classReference(refClsSym, pluginContext.irBuiltIns.kClassClass.typeWith(refClsSym.defaultType))
 
                     call.dispatchReceiver = obj
-                    call.putValueArgument(0, qn)
-                    call.putValueArgument(1, cls)
+                    call.arguments[1] = qn
+                    call.arguments[2] = cls
 
                     when (refCls.descriptor.kind) {
                         ClassKind.ENUM_CLASS -> {
@@ -469,19 +469,19 @@ class KotlinxReflectIrGenerationExtension(
                                 emptyList()
                             )
                             val funRef = irFunctionReference(valuesFunType, valuesFun)
-                            call.putValueArgument(2, funRef)
-                            call.putValueArgument(3, irNull())
+                            call.arguments[3] = funRef
+                            call.arguments[4] = irNull()
                         }
 
                         ClassKind.OBJECT -> {
                             val instance = irGetObject(refCls)
-                            call.putValueArgument(2, irNull())
-                            call.putValueArgument(3, instance)
+                            call.arguments[3] = irNull()
+                            call.arguments[4] = instance
                         }
 
                         else -> {
-                            call.putValueArgument(2, irNull())
-                            call.putValueArgument(3, irNull())
+                            call.arguments[3] = irNull()
+                            call.arguments[4] = irNull()
                         }
                     }
                     +call
@@ -517,7 +517,7 @@ class KotlinxReflectRegisterTransformer(
                 val b = DeclarationIrBuilder(pluginContext, curFun.symbol)
                 val call = b.irCall(fun_classForNameAfterRegistration)
                 call.dispatchReceiver = b.irGetObject(class_KotlixReflect_sym)
-                call.putValueArgument(0, expression.getValueArgument(0))
+                call.arguments[1] = expression.arguments[1]
                 return call
             } else {
                 TODO()

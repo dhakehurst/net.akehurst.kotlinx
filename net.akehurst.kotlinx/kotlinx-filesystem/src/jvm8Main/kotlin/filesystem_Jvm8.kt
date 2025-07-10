@@ -117,20 +117,24 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun createNewFile(parentPath: DirectoryHandle): FileHandle? {
+    actual suspend fun createNewFile(parentPath: DirectoryHandle, name:String): FileHandle? {
         return when (parentPath) {
             is DirectoryHandleJVM -> {
-                TODO()
+                val newFile = parentPath.handle.resolve(name)
+                newFile.createNewFile()
+                FileHandleJVM(this, newFile)
             }
 
             else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
         }
     }
 
-    actual suspend fun createNewDirectory(parentPath: DirectoryHandle): DirectoryHandle? {
+    actual suspend fun createNewDirectory(parentPath: DirectoryHandle, name:String): DirectoryHandle? {
         return when (parentPath) {
             is DirectoryHandleJVM -> {
-                TODO()
+                val newDir = parentPath.handle.resolve(name)
+                newDir.mkdirs()
+                DirectoryHandleJVM(this, newDir)
             }
 
             else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
@@ -176,11 +180,11 @@ data class DirectoryHandleJVM(
         fileSystem.listDirectoryContent(this)
 
     override suspend fun createDirectory(name: String): DirectoryHandle? {
-        TODO("not implemented")
+       return fileSystem.createNewDirectory(this,name)
     }
 
     override suspend fun createFile(name: String): FileHandle? {
-        TODO("not implemented")
+        return fileSystem.createNewFile(this,name)
     }
 }
 

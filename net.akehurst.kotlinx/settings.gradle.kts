@@ -27,6 +27,7 @@ pluginManagement {
             }
         }
         gradlePluginPortal()
+        mavenCentral()
     }
 }
 rootProject.name = file(".").name

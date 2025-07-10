@@ -16,45 +16,6 @@
 
 package net.akehurst.kotlinx.collections
 
-
-inline fun <K, V> mutableMapNonNullOf() = MutableMapNonNullDefault(mutableMapOf<K, V>())
-
-interface MapNonNull<K, out V> : Map<K, V> {
-    override operator fun get(key: K): V
-}
-
-interface MutableMapNonNull<K, V> : MapNonNull<K, V>, MutableMap<K, V> {
-    override operator fun get(key: K): V
-}
-
-class MutableMapNonNullDefault<K, V>(private val map: MutableMap<K, V>) : MutableMapNonNull<K, V>, MutableMap<K, V> by map {
-    override fun get(key: K): V = this.map[key]!!
-}
-
-class Stack<T> {
-
-    private val _elements = mutableListOf<T>()
-
-    val elements: List<T> = this._elements
-
-    fun clear() {
-        this._elements.clear()
-    }
-
-    fun push(element: T) {
-        _elements.add(element)
-    }
-
-    fun pop(): T {
-        val v = _elements.last()
-        _elements.removeAt(_elements.size - 1)
-        return v
-    }
-
-    fun peek(): T = _elements.last()
-
-}
-
 fun <T> Set<T>.transitveClosure(function: (T) -> Set<T>): Set<T> {
     var result: MutableSet<T> = this.toMutableSet()
     var newThings: MutableSet<T> = this.toMutableSet()

@@ -16,8 +16,8 @@ expect object UserFileSystem : FileSystem{
 
     suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle>
 
-    suspend fun createNewFile(parentPath: DirectoryHandle): FileHandle?
-    suspend fun createNewDirectory(parentPath: DirectoryHandle): DirectoryHandle?
+    suspend fun createNewFile(parentPath: DirectoryHandle, name:String): FileHandle?
+    suspend fun createNewDirectory(parentPath: DirectoryHandle, name:String): DirectoryHandle?
 
     suspend fun readFileContent(file: FileHandle): String?
 

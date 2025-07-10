@@ -27,8 +27,8 @@ plugins {
     alias(libs.plugins.exportPublic) apply false
 
 }
-val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1
-val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1
+val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
+val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
 val jvmTargetVersion = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8
 
 allprojects {
@@ -60,7 +60,7 @@ subprojects {
     apply(plugin = "org.jetbrains.dokka")
     apply(plugin = "com.github.gmazzo.buildconfig")
 
-    if (name != "kotlinx-reflect-gradle-plugin") {
+    if (name != "kotlinx-reflect-gradle-plugin" && name != "krgp2") {
         apply(plugin = "org.jetbrains.kotlin.multiplatform")
         apply(plugin = "org.jetbrains.kotlin.plugin.js-plain-objects")
         apply(plugin = "net.akehurst.kotlin.gradle.plugin.exportPublic")
@@ -130,7 +130,6 @@ subprojects {
             "commonTestImplementation"(kotlin("test-annotations-common"))
         }
 
-
         val creds = project.properties["credentials"] as nu.studer.gradle.credentials.domain.CredentialsContainer
         val sonatype_pwd = creds.forKey("SONATYPE_PASSWORD")
             ?: getProjectProperty("SONATYPE_PASSWORD")
@@ -184,8 +183,6 @@ subprojects {
                 }
             }
         }
-
-
     }
 
     configure<SigningExtension> {
@@ -197,7 +194,7 @@ subprojects {
     tasks.forEach {
         when {
             it.name.matches(Regex("publish(.)+")) -> {
-                println("${it.name}.mustRunAfter(${signTasks.toList()})")
+ //               println("${it.name}.mustRunAfter(${signTasks.toList()})")
                 it.mustRunAfter(*signTasks)
             }
         }

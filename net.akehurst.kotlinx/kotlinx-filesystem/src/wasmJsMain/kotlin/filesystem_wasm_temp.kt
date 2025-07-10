@@ -3,11 +3,13 @@ package net.akehurst.kotlinx.filesystem
 import js.buffer.ArrayBuffer
 import js.core.Void
 import js.iterable.AsyncIterable
+import js.iterable.iterator
 import js.objects.JsPlainObject
 import kotlinx.coroutines.await
-import web.window.window
+//import web.window.window
 import kotlin.js.Promise
 
+external val window: JsAny
 external interface Blob : JsAny {
     //val size:Number
     val type:String
@@ -52,7 +54,6 @@ external interface FileSystemFileHandle : FileSystemHandle {
     fun getFile(): Promise<File>
     fun createWritable():Promise<FileSystemWritableFileStream>
 }
-
 
 data class DirectoryHandleJS(
     val fileSystem: UserFileSystem,
@@ -111,12 +112,14 @@ actual object UserFileSystem : FileSystem {
     actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
         return when (parentDirectory) {
             is DirectoryHandleJS -> {
-                for (v in parentDirectory.handle.values()) {
+                val iter = parentDirectory.handle.values().iterator()
+                while (iter.hasNext()) {
+                    val v = iter.next()
                     when (v.name) {
                         name -> {
                             return when (v.kind) {
-                                "file" -> FileHandleJS(this, parentDirectory.handle.getFileHandle(v.name).await())
-                                "directory" -> DirectoryHandleJS(this, parentDirectory.handle.getDirectoryHandle(v.name))
+//                                "file"  -> FileHandleJS(this, parentDirectory.handle.getFileHandle(v.name).await())
+//                                "directory" -> DirectoryHandleJS(this, parentDirectory.handle.getDirectoryHandle(v.name))
                                 else -> error("Should not happen")
                             }
                         }
@@ -189,20 +192,23 @@ actual object UserFileSystem : FileSystem {
             else -> error("DirectoryHandle is not a DirectoryHandleJS: ${dir::class.simpleName}")
         }
 
-    actual suspend fun createNewFile(parentPath: DirectoryHandle): FileHandle? {
+    actual suspend fun createNewFile(parentPath: DirectoryHandle, name:String): FileHandle? {
         return when (parentPath) {
             is DirectoryHandleJS -> {
-                TODO()
+                val newFile = parentPath.handle.getFileHandle(name).await<FileSystemFileHandle>()
+                newFile.createWritable().await<FileSystemWritableFileStream>()
+                FileHandleJS(this,newFile)
             }
 
             else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
         }
     }
 
-    actual suspend fun createNewDirectory(parentPath: DirectoryHandle): DirectoryHandle? {
+    actual suspend fun createNewDirectory(parentPath: DirectoryHandle, name:String): DirectoryHandle? {
         return when (parentPath) {
             is DirectoryHandleJS -> {
-                TODO()
+                val newDir = parentPath.handle.getDirectoryHandle(name)
+                DirectoryHandleJS(this, newDir)
             }
 
             else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")

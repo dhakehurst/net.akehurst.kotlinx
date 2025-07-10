@@ -2,8 +2,9 @@ package net.akehurst.kotlinx.filesystem
 
 //The underlying web.fs lib does not seem to work
 // here does not compile due to ReadableStream
-
 /*
+
+import js.iterable.iterator
 import js.objects.JsPlainObject
 import kotlinx.coroutines.await
 import web.fs.FileSystemDirectoryHandle
@@ -71,13 +72,14 @@ external class FilePickerOptions(
 //    js("this.showOpenFilePicker(options)")
 //}
 
-actual object UserFileSystem {
-    actual var useDispatcher: Boolean = false
+actual object UserFileSystem : FileSystem {
 
     actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
         return when (parentDirectory) {
             is DirectoryHandleJS -> {
-                for (v in parentDirectory.handle.values()) {
+                val iter =  parentDirectory.handle.values().iterator()
+                while(iter.hasNext()){
+                    val v = iter.next()
                     when (v.name) {
                         name -> {
                             return when (v.kind) {
@@ -89,16 +91,20 @@ actual object UserFileSystem {
                         else -> null
                     }
                 }
-                null
+                null //if not found in loop
             }
 
             else -> null
         }
     }
 
-    actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?): DirectoryHandle? {
+    actual suspend fun getDirectory(fullPath:String, mode: FileAccessMode):DirectoryHandle? {
+        return selectDirectoryFromDialog(null, mode)
+    }
+
+    actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?,mode: FileAccessMode): DirectoryHandle? {
         val p = (window as WasmWindow).showDirectoryPicker(
-            FilePickerOptions(mode = "readwrite")
+            FilePickerOptions(mode = mode.name)
         )
         return try {
             val handle: FileSystemDirectoryHandle = p.await()
@@ -108,9 +114,9 @@ actual object UserFileSystem {
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(): FileHandle? {
+    actual suspend fun selectExistingFileFromDialog(mode: FileAccessMode): FileHandle? {
         val p = (window as WasmWindow).showOpenFilePicker(
-           FilePickerOptions(mode = "readwrite")
+           FilePickerOptions(mode = mode.name)
         )
         return try {
             val handle: FileSystemFileHandle = p.await()
@@ -134,10 +140,13 @@ actual object UserFileSystem {
         when (dir) {
             is DirectoryHandleJS -> {
                 val list = mutableListOf<FileSystemObjectHandle>()
-                for (v in dir.handle.values()) {
+                val iter =  dir.handle.values().iterator()
+                while(iter.hasNext()){
+                    val v = iter.next()
                     val o = when (v.kind) {
                         FileSystemHandleKind.file -> FileHandleJS(this, dir.handle.getFileHandle(v.name))
                         FileSystemHandleKind.directory -> DirectoryHandleJS(this, dir.handle.getDirectoryHandle(v.name))
+                        else -> error("Should not happen")
                     }
                     list.add(o)
                 }
@@ -189,4 +198,6 @@ actual object UserFileSystem {
     }
 
 }
-*/
+
+
+ */

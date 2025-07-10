@@ -1,14 +1,13 @@
 package net.akehurst.kotlinx.reflect.gradle.plugin
 
 import org.gradle.testkit.runner.GradleRunner
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Test
 import java.io.File
 import java.nio.file.Files
-import java.nio.file.Path
 import java.nio.file.Paths
-import kotlin.streams.asSequence
-
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class test_KotlinxReflectGradlePlugin {
 
@@ -20,7 +19,7 @@ class test_KotlinxReflectGradlePlugin {
     private val codeFile_AAA = File(testProjectDir, "src/commonMain/kotlin/test/AAA.kt")
 
 
-    @AfterEach
+    @AfterTest
     fun after() {
 /*        Files.walk(testProjectDir?.toPath()).use { dirStream ->
             dirStream.asSequence()
@@ -48,11 +47,11 @@ class test_KotlinxReflectGradlePlugin {
         buildFile.writeText(
             """
                 plugins {
-                    kotlin("multiplatform") version ("2.0.0")
-                    id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") //version("2.0.0") 
+                    kotlin("multiplatform") version ("2.2.0-RC3")
+                    id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") //version("2.2.0-RC3") 
                 }
-                val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0
-                val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0
+                val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
+                val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
                 val jvmTargetVersion = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8
                 
                 kotlinxReflect {
@@ -70,21 +69,26 @@ class test_KotlinxReflectGradlePlugin {
                 }
                
                 kotlin {
-                    val main by compilations.getting {
-                        compileTaskProvider.configure {
-                            compilerOptions {
-                                languageVersion.set(kotlin_languageVersion)
-                                apiVersion.set(kotlin_apiVersion)
-                                jvmTarget.set(jvmTargetVersion)
+                    applyDefaultHierarchyTemplate()
+                    jvm {
+                        compilations {
+                            val main by compilations.getting {
+                                compileTaskProvider.configure {
+                                    compilerOptions {
+                                        languageVersion.set(kotlin_languageVersion)
+                                        apiVersion.set(kotlin_apiVersion)
+                                        jvmTarget.set(jvmTargetVersion)
+                                    }
+                                }
                             }
-                        }
-                    }
-                    val test by compilations.getting {
-                        compileTaskProvider.configure {
-                            compilerOptions {
-                                languageVersion.set(kotlin_languageVersion)
-                                apiVersion.set(kotlin_apiVersion)
-                                jvmTarget.set(jvmTargetVersion)
+                            val test by compilations.getting {
+                                compileTaskProvider.configure {
+                                    compilerOptions {
+                                        languageVersion.set(kotlin_languageVersion)
+                                        apiVersion.set(kotlin_apiVersion)
+                                        jvmTarget.set(jvmTargetVersion)
+                                    }
+                                }
                             }
                         }
                     }

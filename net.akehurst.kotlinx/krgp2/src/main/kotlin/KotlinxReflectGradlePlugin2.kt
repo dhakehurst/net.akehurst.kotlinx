@@ -1,35 +1,39 @@
 package net.akehurst.kotlinx.reflect.gradle.plugin
 
-import net.akehurst.kotlin.reflect.gradle.plugin.KotlinPluginInfo
+//import net.akehurst.kotlinx.text.toRegexFromGlob
+import com.google.auto.service.AutoService
+import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.logging.LogLevel
 import org.gradle.api.logging.Logger
 import org.gradle.api.provider.Provider
-import org.jetbrains.kotlin.analyzer.CompilationErrorException
 import org.jetbrains.kotlin.backend.common.CommonKLibResolver
 import org.jetbrains.kotlin.backend.common.serialization.metadata.DynamicTypeDeserializer
-import org.jetbrains.kotlin.backend.common.toLogger
 import org.jetbrains.kotlin.builtins.konan.KonanBuiltIns
-import org.jetbrains.kotlin.config.*
+import org.jetbrains.kotlin.compiler.plugin.AbstractCliOption
+import org.jetbrains.kotlin.compiler.plugin.CliOption
+import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
+import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
+import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
+import org.jetbrains.kotlin.config.ApiVersion
+import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.config.DuplicatedUniqueNameStrategy
+import org.jetbrains.kotlin.config.LanguageVersion
+import org.jetbrains.kotlin.config.LanguageVersionSettingsImpl
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.*
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinMetadataCompilation
-import org.jetbrains.kotlin.js.config.JSConfigurationKeys
 import org.jetbrains.kotlin.konan.file.ZipFileSystemInPlaceAccessor
 import org.jetbrains.kotlin.library.metadata.KlibMetadataFactories
-import org.jetbrains.kotlin.library.nativeTargets
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import java.io.File
 import java.nio.file.FileSystem
 import java.nio.file.FileSystems
 import java.nio.file.Files
-import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.Path
 import kotlin.io.path.name
 import kotlin.reflect.KClass
 
-class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
+open class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
 
     companion object {
         const val KotlinxReflectRegisterForModuleClassName = "KotlinxReflectForModule"
@@ -71,26 +75,36 @@ class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
     private var forReflectionMainStr = ""
     private var forReflectionTestStr = ""
 
-    override fun getCompilerPluginId(): String = KotlinPluginInfo.KOTLIN_PLUGIN_ID
+    override fun getCompilerPluginId(): String = KotlinxReflectPluginInfo.KOTLIN_PLUGIN_ID
 
-    override fun getPluginArtifact(): SubpluginArtifact = SubpluginArtifact(
-        groupId = KotlinPluginInfo.PROJECT_GROUP,
-        artifactId = KotlinPluginInfo.PROJECT_NAME,
-        version = KotlinPluginInfo.PROJECT_VERSION
-    )
+    override fun getPluginArtifact(): SubpluginArtifact =  SubpluginArtifact(
+            groupId = KotlinxReflectPluginInfo.PROJECT_GROUP,
+            artifactId = KotlinxReflectPluginInfo.PROJECT_NAME,
+            version = KotlinxReflectPluginInfo.PROJECT_VERSION
+        )
 
     override fun getPluginArtifactForNative(): SubpluginArtifact = SubpluginArtifact(
-        groupId = KotlinPluginInfo.PROJECT_GROUP,
-        artifactId = KotlinPluginInfo.PROJECT_NAME + "-native",
-        version = KotlinPluginInfo.PROJECT_VERSION
+        groupId = KotlinxReflectPluginInfo.PROJECT_GROUP,
+        artifactId = KotlinxReflectPluginInfo.PROJECT_NAME + "-native",
+        version = KotlinxReflectPluginInfo.PROJECT_VERSION
     )
 
     override fun isApplicable(kotlinCompilation: KotlinCompilation<*>): Boolean = true
 
     override fun apply(project: Project) {
+        project.logger.info("KotlinxReflect: Applying KotlinxReflectGradlePlugin")
         //Note: the values assigned to the extension are not available here, only available in 'applyToCompilation'
         project.extensions.create(KotlinxReflectGradlePluginExtension.NAME, KotlinxReflectGradlePluginExtension::class.java)
         this.logger = project.logger
+
+        project.afterEvaluate {
+            val kotlinExtension = project.extensions.getByName("kotlin") as KotlinMultiplatformExtension
+            val kotlinSourceSets = kotlinExtension.sourceSets
+
+            kotlinSourceSets.getByName(KotlinSourceSet.COMMON_MAIN_SOURCE_SET_NAME).dependencies {
+                implementation("net.akehurst.kotlinx:kotlinx-reflect:${KotlinxReflectPluginInfo.PROJECT_VERSION}")
+            }
+        }
     }
 
     override fun applyToCompilation(kotlinCompilation: KotlinCompilation<*>): Provider<List<SubpluginOption>> {
@@ -137,12 +151,18 @@ class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
     }
 
     private fun generateStatements(project: Project, configurationName: String): String {
-        project.logger.info("KotlinxReflect: $configurationName")
+        project.logger.info("KotlinxReflect: generating for $configurationName")
+        project.logger.info("KotlinxReflect: configuration ${project.configurations.findByName(configurationName)}")
+
         val sb = StringBuilder()
         project.configurations.findByName(configurationName)?.let { cfg1 ->
+            project.logger.info("KotlinxReflect: doing ${cfg1.name}")
             val c2 = cfg1.copy()
             project.afterEvaluate {
-
+                project.logger.info("KotlinxReflect: afterEvaluate ${cfg1.name}")
+                c2.allArtifacts.forEach {
+                    project.logger.info("KotlinxReflect:   artifact ${it.name} ${it.file} ${it.classifier}")
+                }
                 val dependencies = cfg1.dependencies.map {
                     project.logger.info("dep '${it.name}'")
                     it.name
@@ -154,7 +174,7 @@ class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
                     duplicatedUniqueNameStrategy = DuplicatedUniqueNameStrategy.DENY
                 )
                 val storageManager = LockBasedStorageManager("klib")
-                project.logger.info("Modules: ${res.libraries.size}")
+                project.logger.info("KotlinxReflect: Modules: ${res.libraries.size}")
                 res.resolveWithDependencies().forEach { lib, pa ->
                     project.logger.info("module '${lib.libraryName}'")
                     val module = KlibFactories.DefaultDeserializedDescriptorFactory.createDescriptorAndNewBuiltIns(lib, languageVersionSettings, storageManager, null)
@@ -189,3 +209,25 @@ class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
     }
 }
 
+// without the following 2 classes, the KotlinCompilerPluginSupportPlugin methods are not called
+// even though they are not used.
+
+@OptIn(ExperimentalCompilerApi::class)
+@AutoService(CommandLineProcessor::class)
+class KotlinxReflectCommandLineProcessor : CommandLineProcessor {
+    override val pluginId: String = KotlinxReflectPluginInfo.KOTLIN_PLUGIN_ID
+
+    override val pluginOptions: Collection<CliOption> = listOf(
+    )
+}
+
+@OptIn(ExperimentalCompilerApi::class)
+@AutoService(CompilerPluginRegistrar::class)
+class KotlinxReflectComponentRegistrar(
+    private val defaultReflectionLibs: String
+) : CompilerPluginRegistrar() {
+    override val supportsK2 = true
+    override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
+
+    }
+}

@@ -21,7 +21,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
-@JsExport
+//@JsExport
 open class OR_A {
     val prop1 = "hello"
     var prop2 = "world"

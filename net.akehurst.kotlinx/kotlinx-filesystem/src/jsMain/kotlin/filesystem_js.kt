@@ -3,16 +3,19 @@ package net.akehurst.kotlinx.filesystem
 //The underlying web.fs lib does not seem to work
 // here issues with getFile().text()
 
+
 /*
+
+import js.iterable.iterator
 import js.objects.JsPlainObject
-import js.objects.jso
-import kotlinx.browser.document
+import js.objects.unsafeJso
 import kotlinx.browser.window
 import kotlinx.coroutines.await
-import web.fs.*
-
+import web.fs.FileSystemDirectoryHandle
+import web.fs.FileSystemFileHandle
+import web.fs.FileSystemHandleKind
 import kotlin.js.Promise
-import kotlin.text.substringAfterLast
+import kotlin.js.iterator
 
 data class DirectoryHandleJS(
     val fileSystem: UserFileSystem,
@@ -58,35 +61,49 @@ external interface FilePickerOptions {
     var mode:String
 }
 
-actual object UserFileSystem {
+actual object UserFileSystem: FileSystem {
     //actual var useDispatcher: Boolean = false
     actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
         return when (parentDirectory) {
             is DirectoryHandleJS -> {
-                for (v in parentDirectory.handle.values()) {
+                val iter =  parentDirectory.handle.values().iterator()
+                while(iter.hasNext()){
+                    val v = iter.next()
                     when (v.name) {
                         name -> {
                             return when (v.kind) {
                                 FileSystemHandleKind.file -> FileHandleJS(this, parentDirectory.handle.getFileHandle(v.name))
                                 FileSystemHandleKind.directory -> DirectoryHandleJS(this, parentDirectory.handle.getDirectoryHandle(v.name))
+                                else -> error("Should not happen")
                             }
                         }
 
                         else -> null
                     }
                 }
-                null
+                null //if not found in loop
             }
 
             else -> null
         }
     }
 
-    actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?): DirectoryHandle? {
+    actual suspend fun getDirectory(fullPath:String, mode: FileAccessMode):DirectoryHandle? {
+        return selectDirectoryFromDialog(null, mode)
+    }
+
+    actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?, mode: FileAccessMode): DirectoryHandle? {
         val w: dynamic = window
-        val p: Promise<dynamic> = w.showDirectoryPicker(
-            FilePickerOptions(mode = "readwrite")
-        )
+        val rw = when (mode) {
+            FileAccessMode.READ_ONLY -> w.showDirectoryPicker(js("{mode:'read'}"))
+            FileAccessMode.READ_WRITE -> w.showDirectoryPicker(js("{mode:'readwrite'}"))
+        }
+        val cur = current?.let { (it as DirectoryHandleJS).handle }
+        val options = when(current) {
+            null -> js("{mode:rw}")
+            else -> js("{mode:rw, startIn:cur}")
+        }
+        val p: Promise<dynamic> =w.showDirectoryPicker(options)
         return try {
             val handle: FileSystemDirectoryHandle = p.await()
             DirectoryHandleJS(this, handle)
@@ -95,13 +112,12 @@ actual object UserFileSystem {
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(): FileHandle? {
+    actual suspend fun selectExistingFileFromDialog(mode: FileAccessMode): FileHandle? {
         val w: dynamic = window
-        val p: Promise<dynamic> = w.showOpenFilePicker(
-            jso {
-                mode = "readwrite"
-            }
-        )
+        val p: Promise<dynamic> = when (mode) {
+            FileAccessMode.READ_ONLY -> w.showOpenFilePicker(js("{mode:'read'}"))
+            FileAccessMode.READ_WRITE -> w.showOpenFilePicker(js("{mode:'readwrite'}"))
+        }
         return try {
             val handle: FileSystemFileHandle = p.await()
             FileHandleJS(this, handle)
@@ -113,7 +129,7 @@ actual object UserFileSystem {
     actual suspend fun selectNewFileFromDialog(parentDirectory: DirectoryHandle): FileHandle? {
         val w: dynamic = window
         val p: Promise<dynamic> = w.showSaveFilePicker(
-            jso {
+            unsafeJso {
 //                types = arrayOf(
 //                    objectJS {
 //                        description = "SysML v2 file"
@@ -134,10 +150,13 @@ actual object UserFileSystem {
         when (dir) {
             is DirectoryHandleJS -> {
                 val list = mutableListOf<FileSystemObjectHandle>()
-                for (v in dir.handle.values()) {
+                val iter =  dir.handle.values().iterator()
+                while(iter.hasNext()){
+                    val v = iter.next()
                     val o = when (v.kind) {
                         FileSystemHandleKind.file -> FileHandleJS(this, dir.handle.getFileHandle(v.name))
                         FileSystemHandleKind.directory -> DirectoryHandleJS(this, dir.handle.getDirectoryHandle(v.name))
+                        else -> error("Should not happen")
                     }
                     list.add(o)
                 }
@@ -188,4 +207,6 @@ actual object UserFileSystem {
         }
     }
 
-}*/
+}
+
+ */

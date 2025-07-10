@@ -1,12 +1,11 @@
 package net.akehurst.kotlinx.filesystem
 
-
 import js.buffer.ArrayBuffer
 import js.core.Void
 import js.iterable.AsyncIterable
+import js.iterable.iterator
 import kotlinx.browser.window
 import kotlinx.coroutines.await
-
 import kotlin.js.Promise
 
 external interface Blob {
@@ -106,7 +105,9 @@ actual object UserFileSystem : FileSystem {
     actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
         return when (parentDirectory) {
             is DirectoryHandleJS -> {
-                for (v in parentDirectory.handle.values()) {
+                val iter = parentDirectory.handle.values().iterator()
+                while (iter.hasNext()) {
+                    val v = iter.next()
                     when (v.name) {
                         name -> {
                             return when (v.kind) {
@@ -193,20 +194,23 @@ actual object UserFileSystem : FileSystem {
             else -> error("DirectoryHandle is not a DirectoryHandleJS: ${dir::class.simpleName}")
         }
 
-    actual suspend fun createNewFile(parentPath: DirectoryHandle): FileHandle? {
+    actual suspend fun createNewFile(parentPath: DirectoryHandle, name:String): FileHandle? {
         return when (parentPath) {
             is DirectoryHandleJS -> {
-                TODO()
+                val newFile = parentPath.handle.getFileHandle(name).await()
+                newFile.createWritable().await()
+                FileHandleJS(this,newFile)
             }
 
             else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
         }
     }
 
-    actual suspend fun createNewDirectory(parentPath: DirectoryHandle): DirectoryHandle? {
+    actual suspend fun createNewDirectory(parentPath: DirectoryHandle, name:String): DirectoryHandle? {
         return when (parentPath) {
             is DirectoryHandleJS -> {
-                TODO()
+                val newDir = parentPath.handle.getDirectoryHandle(name).await()
+                DirectoryHandleJS(this, newDir)
             }
 
             else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")

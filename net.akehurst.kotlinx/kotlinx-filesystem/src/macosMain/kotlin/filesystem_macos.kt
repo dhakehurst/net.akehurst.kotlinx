@@ -5,10 +5,12 @@ actual object UserFileSystem : FileSystem {
     actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
         TODO()
     }
-    actual suspend fun getDirectory(fullPath:String, mode: FileAccessMode):DirectoryHandle? {
+
+    actual suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
         return selectDirectoryFromDialog(null, mode)
     }
-    actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?,mode: FileAccessMode): DirectoryHandle? {
+
+    actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?, mode: FileAccessMode): DirectoryHandle? {
         TODO()
     }
 
@@ -24,11 +26,11 @@ actual object UserFileSystem : FileSystem {
         TODO()
     }
 
-    actual suspend fun createNewFile(parentPath: DirectoryHandle): FileHandle? {
+    actual suspend fun createNewFile(parentPath: DirectoryHandle, name: String): FileHandle? {
         TODO()
     }
 
-    actual suspend fun createNewDirectory(parentPath: DirectoryHandle): DirectoryHandle? {
+    actual suspend fun createNewDirectory(parentPath: DirectoryHandle, name: String): DirectoryHandle? {
         TODO()
     }
 
