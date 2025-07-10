@@ -79,6 +79,8 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
         val kotlinExtension = project.extensions.getByName("kotlin") as KotlinMultiplatformExtension
         val kotlinSourceSets = kotlinExtension.sourceSets
 
+        project.dependencies.add("commonMainImplementation", "net.akehurst.kotlinx:kotlinx-reflect:${KotlinPluginInfo.PROJECT_VERSION}")
+
         kotlinSourceSets.forEach { ss ->
             when {
                 (ss.name == KotlinSourceSet.COMMON_MAIN_SOURCE_SET_NAME) -> {

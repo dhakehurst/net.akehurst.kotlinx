@@ -239,7 +239,7 @@ class KotlinxReflectIrGenerationExtension(
             if (entry.value.second) {
                 //used
             } else {
-                messageCollector.report(CompilerMessageSeverity.STRONG_WARNING, "KotlinxReflect: No matches for '${entry.value.first}' (Regex '${entry.key}')")
+                messageCollector.report(CompilerMessageSeverity.STRONG_WARNING, "KotlinxReflect: No matches for '${entry.value.first}' (Regex '${entry.key}') in module fragment '${moduleFragment.name}'")
             }
         }
 
