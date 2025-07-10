@@ -11,8 +11,8 @@ import kotlin.test.assertTrue
 
 class test_KotlinxReflectGradlePlugin {
 
-    //@TempDir
-    var testProjectDir: File? = Files.createDirectories(Paths.get("/Users/akehurst/temp/kotlinTest")).toFile()// Files.createTempDirectory("testTemp").toFile()
+    var testProjectDir: File? = Files.createTempDirectory("testTemp").toFile()
+//    var testProjectDir: File? = Files.createDirectories(Paths.get("/Users/akehurst/temp/kotlinTest")).toFile()
     private var settingsFile = File(testProjectDir, "settings.gradle.kts")
     private var gradlePropertiesFile = File(testProjectDir, "gradle.properties")
     private var buildFile = File(testProjectDir, "build.gradle.kts")
@@ -31,7 +31,7 @@ class test_KotlinxReflectGradlePlugin {
 
     @Test
     fun testCompilerPlugin() {
-        println("$testProjectDir ${testProjectDir?.exists()}")
+        println("Test dir: $testProjectDir ${testProjectDir?.exists()}")
 
         //Given
         settingsFile.writeText(
@@ -47,15 +47,15 @@ class test_KotlinxReflectGradlePlugin {
         buildFile.writeText(
             """
                 plugins {
-                    kotlin("multiplatform") version ("2.2.0-RC3")
-                    id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") //version("2.2.0-RC3") 
+                    kotlin("multiplatform") version ("2.2.0")
+                    id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") //version("2.2.0-SNAPSHOT") 
                 }
                 val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
                 val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
                 val jvmTargetVersion = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8
                 
                 kotlinxReflect {
-                    forReflection.set(listOf(
+                    forReflectionMain.set(listOf(
                         "test",
                     ))
                 }

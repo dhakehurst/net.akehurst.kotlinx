@@ -67,9 +67,6 @@ dependencies {
     implementation(kotlin("util-klib"))
 
     testImplementation(project)
-    //testImplementation(gradleTestKit())
-    //testImplementation(kotlin("gradle-plugin"))
-    //testImplementation("org.jetbrains.kotlin:kotlin-compiler-embeddable")
     testImplementation(project(":kotlinx-reflect"))
     testImplementation(project(":kotlinx-utils"))
 
