@@ -56,7 +56,7 @@ configure<BuildConfigExtension>  {
 }
 
 dependencies {
-    compileOnly(kotlin("gradle-plugin"))
+    implementation(kotlin("gradle-plugin"))
     compileOnly("com.google.auto.service:auto-service:1.1.1")
     kapt("com.google.auto.service:auto-service:1.1.1")
 

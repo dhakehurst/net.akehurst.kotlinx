@@ -251,7 +251,7 @@ class KotlinxReflectIrGenerationExtension(
         } else {
             // val modulePackage = syntheticFile(moduleFragment, pluginContext)
 
-            buildKotlinxReflectModuleRegistry(
+            val generatedFor = buildKotlinxReflectModuleRegistry(
                 pluginContext,
                 krfm,
                 classesToRegisterForReflection.toList()
@@ -270,6 +270,9 @@ class KotlinxReflectIrGenerationExtension(
 
             //messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dump())
             messageCollector.report(CompilerMessageSeverity.LOGGING, moduleFragment.dumpKotlinLike())
+
+            val outputMsg = generatedFor.groupBy { it.parent() }.entries.joinToString(separator = "\n") { "  ${it.key.asString()} - ${it.value.size}" }
+            messageCollector.report(CompilerMessageSeverity.INFO, "Generated:\n${outputMsg}")
         }
     }
 
@@ -419,15 +422,18 @@ class KotlinxReflectIrGenerationExtension(
     }
     */
 
+    /**
+     * returns list of qualified names of classes generated for
+     */
     @OptIn(ObsoleteDescriptorBasedAPI::class)
-    fun buildKotlinxReflectModuleRegistry(pluginContext: IrPluginContext, class_KotlixReflectForModule: IrClass, classes: List<IrClassSymbol>) {
+    fun buildKotlinxReflectModuleRegistry(pluginContext: IrPluginContext, class_KotlixReflectForModule: IrClass, classes: List<IrClassSymbol>): List<FqName> {
         // fun registerClass(
         // [0]   qualifiedName: String,
         // [1]  cls: KClass<*>,
         // [2]  valuesFunction: ValuesFunction? = null
         // [3]  ObjectInstance: Any? = null
         // )
-
+        val results = mutableListOf<FqName>()
         messageCollector.report(CompilerMessageSeverity.LOGGING, "registering classes $classes")
 
         val class_KotlinxReflect = pluginContext.referenceClass(fq_KotlinxReflect) ?: error("Cannot find ModuleRegistry class '${fq_KotlinxReflect.asFqNameString()}'")
@@ -450,10 +456,7 @@ class KotlinxReflectIrGenerationExtension(
                     val qns = fqname //refCls.signature?.packageFqName()?.child(Name.identifier(fqname.asString()))
                     //if (null==qns) error("Cannot find '${fqname}'")
                     val qn = irString(qns.asString())
-                    messageCollector.report(
-                        CompilerMessageSeverity.INFO,
-                        "registered class ${qns.asString()} with ${fq_KotlinxReflect.shortClassName.asString()}"
-                    )
+                    messageCollector.report(CompilerMessageSeverity.INFO, "registered class ${qns.asString()} with ${fq_KotlinxReflect.shortClassName.asString()}")
                     val cls = classReference(refClsSym, pluginContext.irBuiltIns.kClassClass.typeWith(refClsSym.defaultType))
 
                     call.dispatchReceiver = obj
@@ -485,14 +488,13 @@ class KotlinxReflectIrGenerationExtension(
                         }
                     }
                     +call
+                    results.add(fqname)
                 } catch (t: Throwable) {
-                    messageCollector.report(
-                        CompilerMessageSeverity.ERROR,
-                        "Error registering class ${refCls}"
-                    )
+                    messageCollector.report(CompilerMessageSeverity.ERROR, "Error registering class ${refCls}")
                 }
             }
         }
+        return results
     }
 
 }

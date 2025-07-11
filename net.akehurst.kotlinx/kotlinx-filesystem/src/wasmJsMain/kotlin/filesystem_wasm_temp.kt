@@ -1,5 +1,5 @@
 package net.akehurst.kotlinx.filesystem
-
+/*
 import js.buffer.ArrayBuffer
 import js.core.Void
 import js.iterable.AsyncIterable
@@ -237,3 +237,4 @@ actual object UserFileSystem : FileSystem {
     }
 
 }
+*/

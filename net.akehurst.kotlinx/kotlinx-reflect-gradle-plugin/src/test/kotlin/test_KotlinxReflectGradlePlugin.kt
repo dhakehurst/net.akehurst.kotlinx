@@ -3,7 +3,9 @@ package net.akehurst.kotlinx.reflect.gradle.plugin
 import org.gradle.testkit.runner.GradleRunner
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
+import kotlin.streams.asSequence
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,12 +23,12 @@ class test_KotlinxReflectGradlePlugin {
 
     @AfterTest
     fun after() {
-/*        Files.walk(testProjectDir?.toPath()).use { dirStream ->
+        Files.walk(testProjectDir?.toPath()).use { dirStream ->
             dirStream.asSequence()
                 .map(Path::toFile)
                 .sortedWith(Comparator.reverseOrder())
                 .forEach { obj -> obj.delete() }
-        }*/
+        }
     }
 
     @Test
@@ -48,6 +50,7 @@ class test_KotlinxReflectGradlePlugin {
             """
                 plugins {
                     kotlin("multiplatform") version ("2.2.0")
+                    id("net.akehurst.kotlin.gradle.plugin.exportPublic") version("2.2.0")
                     id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") //version("2.2.0-SNAPSHOT") 
                 }
                 val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
@@ -92,6 +95,13 @@ class test_KotlinxReflectGradlePlugin {
                             }
                         }
                     }
+                    js {
+                        compilerOptions {
+                            target.set("es2015")
+                        }
+                        browser()
+                        nodejs()
+                    }
                 }
             """.trimIndent()
         )
@@ -110,7 +120,7 @@ class test_KotlinxReflectGradlePlugin {
         //When
         val result = GradleRunner.create()
             .withProjectDir(testProjectDir)
-            .withArguments("compileKotlin","--stacktrace")
+            .withArguments("assemble", "--debug")
             .withPluginClasspath()
             .withDebug(true)
             .forwardStdError(System.err.writer())
@@ -118,7 +128,7 @@ class test_KotlinxReflectGradlePlugin {
             .build()
 
         //Then
-        //println(result.output)
+        println(result.output)
     }
 
 }
