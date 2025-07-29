@@ -1,5 +1,10 @@
 package net.akehurst.kotlinx.filesystem
 
+import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
+import net.akehurst.kotlinx.filesystem.api.FileHandle
+import net.akehurst.kotlinx.filesystem.api.FileSystem
+import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
+
 actual object UserFileSystem : FileSystem {
     //actual var useDispatcher: Boolean = false
     actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {

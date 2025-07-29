@@ -3,6 +3,7 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
+                api(project(":kotlinx-filesystem-api"))
                implementation(libs.kotlinx.coroutines.core)
                 // for VFS/resources filesystem
                 implementation(libs.korlibs.korio)

@@ -6,6 +6,10 @@ import js.iterable.AsyncIterable
 import js.iterable.iterator
 import kotlinx.browser.window
 import kotlinx.coroutines.await
+import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
+import net.akehurst.kotlinx.filesystem.api.FileHandle
+import net.akehurst.kotlinx.filesystem.api.FileSystem
+import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
 import kotlin.js.Promise
 
 external interface Blob {

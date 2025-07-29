@@ -1,19 +1,17 @@
 package net.akehurst.kotlinx.filesystem
 
+import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
+import net.akehurst.kotlinx.filesystem.api.FileHandle
+import net.akehurst.kotlinx.filesystem.api.FileSystem
+import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
 import java.awt.EventQueue
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 import javax.swing.JFileChooser
-import kotlin.collections.map
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.listDirectoryEntries
-import kotlin.io.readText
-import kotlin.io.resolve
-import kotlin.io.writeText
-import kotlin.let
-import kotlin.text.substringAfterLast
 
 actual object UserFileSystem : FileSystem {
 

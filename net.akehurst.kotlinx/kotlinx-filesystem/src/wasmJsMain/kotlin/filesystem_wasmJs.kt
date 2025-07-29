@@ -7,6 +7,11 @@ package net.akehurst.kotlinx.filesystem
 import js.iterable.iterator
 import js.objects.JsPlainObject
 import kotlinx.coroutines.await
+import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
+import net.akehurst.kotlinx.filesystem.api.FileHandle
+import net.akehurst.kotlinx.filesystem.api.FileSystem
+import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
+
 import web.blob.text
 import web.fs.*
 import web.streams.close
