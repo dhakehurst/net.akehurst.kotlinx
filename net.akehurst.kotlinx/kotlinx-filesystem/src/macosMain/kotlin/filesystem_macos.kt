@@ -19,7 +19,7 @@ actual object UserFileSystem : FileSystem {
         TODO()
     }
 
-    actual suspend fun selectExistingFileFromDialog(mode: FileAccessMode): FileHandle? {
+    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?, mode: FileAccessMode, useNativeDialog:Boolean): FileHandle? {
         TODO()
     }
 

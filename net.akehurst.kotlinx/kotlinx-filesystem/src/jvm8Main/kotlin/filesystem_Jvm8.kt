@@ -9,6 +9,7 @@ import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 import javax.swing.JFileChooser
+import javax.swing.UIManager
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.listDirectoryEntries
@@ -47,52 +48,80 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    private fun chooseDirectory(current: DirectoryHandleJVM?): DirectoryHandle? {
-        val fc = JFileChooser()
-        current?.let { fc.selectedFile = current.handle }
-        fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
-        fc.setAcceptAllFileFilterUsed(false)
-        fc.isFileHidingEnabled = false
-        return if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-            DirectoryHandleJVM(this, fc.selectedFile)
-        } else {
-            null
-        }
-    }
-
     private fun chooseDirectory2(current: DirectoryHandleJVM?): DirectoryHandle? {
         val parentFrame = Frame("Choose Directory")
         System.setProperty("apple.awt.fileDialogForDirectories", "true")
-        val fd = FileDialog(parentFrame, "Choose directory")
+        val fd = FileDialog(parentFrame, "Choose Directory")
+        fd.mode = FileDialog.LOAD
+        fd.isMultipleMode = false
         fd.directory = current?.handle?.name
         fd.isVisible = true
         val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
         return selectedFile?.let { DirectoryHandleJVM(this, it) }
     }
 
-    actual suspend fun selectExistingFileFromDialog(mode: FileAccessMode): FileHandle? {
-        val fc = JFileChooser()
-        fc.setFileSelectionMode(JFileChooser.FILES_ONLY)
-        fc.setAcceptAllFileFilterUsed(false)
-        return if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-            FileHandleJVM(this, fc.selectedFile)
+    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?,mode: FileAccessMode, useNativeDialog:Boolean): FileHandle? {
+        return if (EventQueue.isDispatchThread()) {
+            if(useNativeDialog) {
+                chooseFileNative(current as DirectoryHandleJVM?, FileDialog.LOAD)
+            } else {
+                chooseFile(current as DirectoryHandleJVM?)
+            }
+        } else {
+            var handle: FileHandle? = null
+            EventQueue.invokeAndWait() {
+                handle = if(useNativeDialog) {
+                    chooseFileNative(current as DirectoryHandleJVM?, FileDialog.LOAD)
+                } else {
+                    chooseFile(current as DirectoryHandleJVM?)
+                }
+            }
+            handle
+        }
+    }
+
+    private fun chooseFile(current: DirectoryHandleJVM?): FileHandle? {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        val fileChooser = JFileChooser()
+        fileChooser.currentDirectory = current?.handle
+        fileChooser.isMultiSelectionEnabled = false
+        fileChooser.fileSelectionMode =  JFileChooser.FILES_ONLY
+        fileChooser.dialogTitle =  "Choose File"
+        val result = fileChooser.showOpenDialog(null) // 'null' for parent component
+        return if (result == JFileChooser.APPROVE_OPTION) {
+            val selectedFile = fileChooser.selectedFile
+            selectedFile?.let { FileHandleJVM(this, selectedFile) }
         } else {
             null
         }
     }
 
+    private fun chooseFileNative(current: DirectoryHandleJVM?, mode:Int): FileHandle? {
+        val parentFrame = Frame("Choose File")
+        System.clearProperty("apple.awt.fileDialogForDirectories")
+        val fd = FileDialog(parentFrame, "Choose File")
+        fd.mode = mode
+        fd.isMultipleMode = false
+        fd.directory = current?.handle?.name
+        fd.isVisible = true
+        val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
+        return selectedFile?.let { FileHandleJVM(this, it) }
+    }
+
     actual suspend fun selectNewFileFromDialog(parentDirectory: DirectoryHandle): FileHandle? {
-        val fc = JFileChooser()
-        fc.currentDirectory = (parentDirectory as DirectoryHandleJVM).handle
-        fc.setFileSelectionMode(JFileChooser.FILES_ONLY)
-        fc.setAcceptAllFileFilterUsed(false)
-        return if (fc.showSaveDialog(null) == JFileChooser.APPROVE_OPTION) {
-            val file = fc.selectedFile
+        val file = chooseFile(parentDirectory as DirectoryHandleJVM)
+        return if (null != file) {
+            val jFile = (file as FileHandleJVM).handle
             when {
-                file.exists() -> Unit
-                else -> file.createNewFile()
+                jFile.exists() -> Unit
+                else -> jFile.createNewFile()
             }
-            FileHandleJVM(this, file)
+            file
         } else {
             null
         }

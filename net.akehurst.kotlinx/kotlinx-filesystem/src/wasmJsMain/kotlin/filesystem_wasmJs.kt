@@ -119,7 +119,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(mode: FileAccessMode): FileHandle? {
+    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?, mode: FileAccessMode, useNativeDialog:Boolean): FileHandle? {
         val p = (window as WasmWindow).showOpenFilePicker(
             FilePickerOptions(mode = mode.name)
         )

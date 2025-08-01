@@ -155,7 +155,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(mode: FileAccessMode): FileHandle? {
+    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?, mode: FileAccessMode, useNativeDialog:Boolean): FileHandle? {
         val w: dynamic = window
         val p: Promise<dynamic> = when (mode) {
             FileAccessMode.READ_ONLY -> w.showOpenFilePicker(js("{mode:'read'}"))
