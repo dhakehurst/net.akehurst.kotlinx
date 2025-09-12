@@ -4,6 +4,9 @@ import js.buffer.ArrayBuffer
 import js.core.Void
 import js.iterable.AsyncIterable
 import js.iterable.iterator
+import js.typedarrays.Uint8Array
+import korlibs.io.file.std.ZipVfs
+import korlibs.io.stream.openAsync
 import kotlinx.browser.window
 import kotlinx.coroutines.await
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
@@ -96,12 +99,9 @@ data class FileHandleJS(
 ) : FileHandleAbstract() {
 
     override val name: String get() = handle.name
-
-    override suspend fun readContent(): String? =
-        fileSystem.readFileContent(this)
-
-    override suspend fun writeContent(content: String) =
-        fileSystem.writeFileContent(this, content)
+    override suspend fun readContent(): String? = fileSystem.readFileContent(this)
+    override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
+    override suspend fun openAsZipDirectory(): DirectoryHandle = fileSystem.openFileAsZipDirectory(this)
 }
 
 actual object UserFileSystem : FileSystem {
@@ -242,4 +242,12 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
+    actual suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle {
+        val handle = (file as FileHandleJS).handle
+        val arrBuf = handle.getFile().await().arrayBuffer().await()
+        val bytes = Uint8Array(arrBuf)
+        val byteArray = ByteArray(bytes.byteLength) { bytes[it].toByte() }
+        val zipFs = ZipVfs(byteArray.openAsync())
+        return DirectoryHandleKorio(FileSystemKorio, zipFs)
+    }
 }

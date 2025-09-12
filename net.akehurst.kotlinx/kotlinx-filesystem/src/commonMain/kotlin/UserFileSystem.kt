@@ -43,4 +43,5 @@ expect object UserFileSystem : FileSystem{
 
     suspend fun writeFileContent(file: FileHandle, content: String)
 
+    suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle
 }

@@ -23,12 +23,6 @@ interface FileSystemObjectHandle {
     val name: String
 }
 
-interface FileHandle : FileSystemObjectHandle {
-    val extension: String
-    suspend fun readContent(): String?
-    suspend fun writeContent(content: String)
-}
-
 interface DirectoryHandle : FileSystemObjectHandle {
     val path: String
 
@@ -38,4 +32,11 @@ interface DirectoryHandle : FileSystemObjectHandle {
     suspend fun directory(name: String): DirectoryHandle?
     suspend fun createFile(name: String): FileHandle?
     suspend fun createDirectory(name: String): DirectoryHandle?
+}
+
+interface FileHandle : FileSystemObjectHandle {
+    val extension: String
+    suspend fun readContent(): String?
+    suspend fun writeContent(content: String)
+    suspend fun openAsZipDirectory(): DirectoryHandle
 }

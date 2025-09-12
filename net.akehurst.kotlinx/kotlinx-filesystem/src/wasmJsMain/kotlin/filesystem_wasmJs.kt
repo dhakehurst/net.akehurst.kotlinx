@@ -4,13 +4,17 @@ package net.akehurst.kotlinx.filesystem
 // here does not compile due to ReadableStream
 
 
+import js.core.JsPrimitives.toByte
 import js.iterable.iterator
 import js.objects.JsPlainObject
+import korlibs.io.file.std.ZipVfs
+import korlibs.io.stream.openAsync
 import kotlinx.coroutines.await
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
 import net.akehurst.kotlinx.filesystem.api.FileSystem
 import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
+import web.blob.bytes
 
 import web.blob.text
 import web.fs.*
@@ -50,11 +54,9 @@ data class FileHandleWasmJS(
     override val name: String get() = handle.name
     override val extension: String get() = name.substringAfterLast('.')
 
-    override suspend fun readContent(): String? =
-        fileSystem.readFileContent(this)
-
-    override suspend fun writeContent(content: String) =
-        fileSystem.writeFileContent(this, content)
+    override suspend fun readContent(): String? = fileSystem.readFileContent(this)
+    override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
+    override suspend fun openAsZipDirectory() : DirectoryHandle = fileSystem.openFileAsZipDirectory(this)
 }
 
 external interface WasmWindow {
@@ -203,6 +205,14 @@ actual object UserFileSystem : FileSystem {
 
             else -> error("FileHandle is not a FileHandleJS: ${file::class.simpleName}")
         }
+    }
+
+    actual suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle {
+        val handle = (file as FileHandleWasmJS).handle
+        val bytes = handle.getFile().bytes()
+        val byteArray = ByteArray(bytes.byteLength) { bytes[it].toByte() }
+        val zipFs = ZipVfs(byteArray.openAsync())
+        return DirectoryHandleKorio(FileSystemKorio, zipFs)
     }
 
 }

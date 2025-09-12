@@ -18,6 +18,8 @@ package net.akehurst.kotlinx.logging.common
 
 import net.akehurst.kotlinx.logging.api.*
 
+fun logger(prefix: String) : Logger = LoggerConsole(prefix)
+
 class LoggerCommon(
     val prefix: String,
     var bind: LogFunction
@@ -31,7 +33,6 @@ class LoggerCommon(
             else -> Unit // do nothing
         }
     }
-
 
 }
 

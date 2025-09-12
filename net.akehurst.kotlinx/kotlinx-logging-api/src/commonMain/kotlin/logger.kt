@@ -32,3 +32,4 @@ interface Logger {
     fun logDebug(t: Throwable? = null, lazyMessage: () -> String) = log(LogLevel.Debug, t, lazyMessage)
     fun logTrace(t: Throwable? = null, lazyMessage: () -> String) = log(LogLevel.Trace, t, lazyMessage)
 }
+

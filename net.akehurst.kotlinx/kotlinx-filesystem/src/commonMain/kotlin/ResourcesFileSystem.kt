@@ -29,31 +29,6 @@ import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
 class UserHomeFileSystem(path: String) : FileSystemFromVfs(userHomeVfs[path].jail())
 object ResourcesFileSystem : FileSystemFromVfs(resourcesVfs)
 
-open class FileSystemFromVfs(
-    private val _vfsRoot: VfsFile
-) :FileSystem {
-
-    constructor(path:String) : this(jailedLocalVfs(path))
-
-    val root get() = DirectoryHandleVfs(this, _vfsRoot)
-
-    suspend fun getDirectory(resourcePath: String): DirectoryHandle? {
-        return _vfsRoot[resourcePath].takeIfExists()?.let {
-            DirectoryHandleVfs(this, it)
-        }
-    }
-
-    suspend fun getFile(resourcePath: String): FileHandle? {
-        return _vfsRoot[resourcePath].takeIfExists()?.let {
-            FileHandleVfs(this, it)
-        }
-    }
-
-    suspend fun read(resourcePath: String): String {
-        return _vfsRoot[resourcePath].readString()
-    }
-}
-
 class DirectoryHandleVfs(
     val filesystem: FileSystemFromVfs,
     private val _handle: VfsFile
@@ -102,10 +77,35 @@ class FileHandleVfs(
 
     override val name: String get() = _handle.pathInfo.baseName
 
-    override suspend fun readContent(): String? =
-        _handle.readString()
+    override suspend fun readContent(): String? = _handle.readString()
 
-    override suspend fun writeContent(content: String) {
-        _handle.writeString(content)
+    override suspend fun writeContent(content: String)=_handle.writeString(content)
+    override suspend fun openAsZipDirectory(): DirectoryHandle {
+        TODO("not implemented")
+    }
+}
+
+open class FileSystemFromVfs(
+    private val _vfsRoot: VfsFile
+) :FileSystem {
+
+    constructor(path:String) : this(jailedLocalVfs(path))
+
+    val root get() = DirectoryHandleVfs(this, _vfsRoot)
+
+    suspend fun getDirectory(resourcePath: String): DirectoryHandle? {
+        return _vfsRoot[resourcePath].takeIfExists()?.let {
+            DirectoryHandleVfs(this, it)
+        }
+    }
+
+    suspend fun getFile(resourcePath: String): FileHandle? {
+        return _vfsRoot[resourcePath].takeIfExists()?.let {
+            FileHandleVfs(this, it)
+        }
+    }
+
+    suspend fun read(resourcePath: String): String {
+        return _vfsRoot[resourcePath].readString()
     }
 }

@@ -1,5 +1,7 @@
 package net.akehurst.kotlinx.filesystem
 
+import korlibs.io.file.std.ZipVfs
+import korlibs.io.stream.openAsync
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
 import net.akehurst.kotlinx.filesystem.api.FileSystem
@@ -13,6 +15,43 @@ import javax.swing.UIManager
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.listDirectoryEntries
+
+data class DirectoryHandleJVM(
+    val fileSystem: UserFileSystem,
+    val handle: File
+) : DirectoryHandleAbstract() {
+
+    override val name: String get() = handle.name
+
+    override val path: String get() = handle.path
+
+    override suspend fun entry(name: String): FileSystemObjectHandle? =
+        fileSystem.getEntry(this, name)
+
+
+    override suspend fun listContent(): List<FileSystemObjectHandle> =
+        fileSystem.listDirectoryContent(this)
+
+    override suspend fun createDirectory(name: String): DirectoryHandle? {
+       return fileSystem.createNewDirectory(this,name)
+    }
+
+    override suspend fun createFile(name: String): FileHandle? {
+        return fileSystem.createNewFile(this,name)
+    }
+}
+
+data class FileHandleJVM(
+    val fileSystem: UserFileSystem,
+    val handle: File
+) : FileHandleAbstract() {
+
+    override val name: String get() = handle.name
+
+    override suspend fun readContent(): String? = fileSystem.readFileContent(this)
+    override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
+    override suspend fun openAsZipDirectory(): DirectoryHandle = fileSystem.openFileAsZipDirectory(this)
+}
 
 actual object UserFileSystem : FileSystem {
 
@@ -188,43 +227,11 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-}
-
-data class DirectoryHandleJVM(
-    val fileSystem: UserFileSystem,
-    val handle: File
-) : DirectoryHandleAbstract() {
-
-    override val name: String get() = handle.name
-
-    override val path: String get() = handle.path
-
-    override suspend fun entry(name: String): FileSystemObjectHandle? =
-        fileSystem.getEntry(this, name)
-
-
-    override suspend fun listContent(): List<FileSystemObjectHandle> =
-        fileSystem.listDirectoryContent(this)
-
-    override suspend fun createDirectory(name: String): DirectoryHandle? {
-       return fileSystem.createNewDirectory(this,name)
+    actual suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle {
+        val handle = (file as FileHandleJVM).handle
+        val byteArray = handle.readBytes()
+        val zipFs = ZipVfs(byteArray.openAsync())
+        return DirectoryHandleKorio(FileSystemKorio, zipFs)
     }
 
-    override suspend fun createFile(name: String): FileHandle? {
-        return fileSystem.createNewFile(this,name)
-    }
-}
-
-data class FileHandleJVM(
-    val fileSystem: UserFileSystem,
-    val handle: File
-) : FileHandleAbstract() {
-
-    override val name: String get() = handle.name
-
-    override suspend fun readContent(): String? =
-        fileSystem.readFileContent(this)
-
-    override suspend fun writeContent(content: String) =
-        fileSystem.writeFileContent(this, content)
 }

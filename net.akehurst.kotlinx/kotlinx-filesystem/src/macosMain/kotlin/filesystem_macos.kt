@@ -46,4 +46,7 @@ actual object UserFileSystem : FileSystem {
         TODO()
     }
 
+    actual suspend fun openFileAsZipDirectory(file: FileHandle):DirectoryHandle {
+        TODO()
+    }
 }
