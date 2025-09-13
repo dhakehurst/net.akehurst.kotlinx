@@ -2,9 +2,9 @@
 dependencies {
 
     commonMainImplementation(project(":kotlinx-collections"))
-    jvm8MainImplementation(kotlin("reflect"))
+    jvmMainImplementation(kotlin("reflect"))
 
-    jvm8MainImplementation("org.jetbrains.kotlin:kotlin-metadata-jvm:${libs.versions.kotlin.get()}")
+    jvmMainImplementation("org.jetbrains.kotlin:kotlin-metadata-jvm:${libs.versions.kotlin.get()}")
 }
 
 

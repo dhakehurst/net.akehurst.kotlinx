@@ -18,6 +18,8 @@ package net.akehurst.kotlinx.logging.common
 
 import net.akehurst.kotlinx.logging.api.LogLevel
 import net.akehurst.kotlinx.logging.api.Logger
+import net.akehurst.kotlinx.logging.api.LoggingFramework
+import net.akehurst.kotlinx.logging.api.LoggingManager
 import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
 
@@ -25,7 +27,7 @@ class LoggerJsConsole(
 
 ) : Logger {
 
-    override var outputLevel: LogLevel = LogLevel.All
+    val outputLevel: LogLevel = LoggingManager.rootLoggingLevel
 
     override fun log(level: LogLevel, t: Throwable?, lazyMessage: () -> String) {
         when {

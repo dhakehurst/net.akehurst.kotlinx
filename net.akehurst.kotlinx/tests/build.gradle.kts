@@ -1,5 +1,5 @@
 
 dependencies {
-    jvm8MainImplementation(kotlin("reflect"))
+    jvmMainImplementation(kotlin("reflect"))
 }
 

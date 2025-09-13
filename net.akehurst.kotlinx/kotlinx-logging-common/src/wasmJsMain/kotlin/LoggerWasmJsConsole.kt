@@ -17,6 +17,7 @@ package net.akehurst.kotlinx.logging.common
 
 import net.akehurst.kotlinx.logging.api.LogLevel
 import net.akehurst.kotlinx.logging.api.Logger
+import net.akehurst.kotlinx.logging.api.LoggingManager
 import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
 import web.console.console
@@ -24,7 +25,7 @@ import web.console.console
 class LoggerWasmJsConsole(
 ) : Logger {
 
-    override var outputLevel: LogLevel = LogLevel.All
+    var outputLevel: LogLevel = LoggingManager.rootLoggingLevel
 
     override fun log(level: LogLevel, t: Throwable?, lazyMessage: () -> String) {
         when {

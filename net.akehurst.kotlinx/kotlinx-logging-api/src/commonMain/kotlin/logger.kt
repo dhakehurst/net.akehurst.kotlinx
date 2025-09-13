@@ -21,8 +21,6 @@ enum class LogLevel { None, Fatal, Error, Warning, Information, Debug, Trace, Al
 typealias LogFunction = (level: LogLevel, prefix: String, t: Throwable?, lazyMessage: () -> String) -> Unit
 
 interface Logger {
-    var outputLevel: LogLevel
-
     fun log(level: LogLevel, t: Throwable? = null, lazyMessage: () -> String)
 
     fun logFatal(t: Throwable? = null, lazyMessage: () -> String) = log(LogLevel.Fatal, t, lazyMessage)
@@ -33,3 +31,24 @@ interface Logger {
     fun logTrace(t: Throwable? = null, lazyMessage: () -> String) = log(LogLevel.Trace, t, lazyMessage)
 }
 
+interface LoggingFramework {
+    var rootLoggingLevel: LogLevel
+    fun logger(prefix: String): Logger
+}
+
+fun logger(prefix: String): Logger = LoggingManager.logger(prefix)
+
+object LoggingManager {
+
+    private var _framework: LoggingFramework? = null
+
+    var rootLoggingLevel
+        get() = _framework?.rootLoggingLevel ?: error("No LoggingFramework has been registered")
+        set(value) = _framework?.let { it.rootLoggingLevel = value } ?: error("No LoggingFramework has been registered")
+
+    fun use(framework: LoggingFramework) {
+        _framework = framework
+    }
+
+    fun logger(prefix: String): Logger = _framework?.logger(prefix) ?: error("No LoggingFramework has been registered")
+}

@@ -78,7 +78,7 @@ subprojects {
         }
 
         configure<KotlinMultiplatformExtension> {
-            jvm("jvm8") {
+            jvm {
                 val main by compilations.getting {
                     compileTaskProvider.configure {
                         compilerOptions {
@@ -98,7 +98,7 @@ subprojects {
                     }
                 }
             }
-            js("js", IR) {
+            js {
                 binaries.library()
                 nodejs()
                 browser()
