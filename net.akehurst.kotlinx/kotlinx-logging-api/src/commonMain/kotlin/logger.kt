@@ -29,7 +29,21 @@ interface Logger {
     fun logInformation(t: Throwable? = null, lazyMessage: () -> String) = log(LogLevel.Information, t, lazyMessage)
     fun logDebug(t: Throwable? = null, lazyMessage: () -> String) = log(LogLevel.Debug, t, lazyMessage)
     fun logTrace(t: Throwable? = null, lazyMessage: () -> String) = log(LogLevel.Trace, t, lazyMessage)
+
+
+    fun logIf(predicate: () -> Boolean, level: LogLevel, t: Throwable? = null, lazyMessage: () -> String) {
+        if (predicate.invoke()) {
+            log(level, t, lazyMessage)
+        }
+    }
+    fun logFatalIf(predicate: () -> Boolean, t: Throwable? = null, lazyMessage: () -> String) = logIf(predicate, LogLevel.Fatal, t, lazyMessage)
+    fun logErrorIf(predicate: () -> Boolean, t: Throwable? = null, lazyMessage: () -> String) = logIf(predicate, LogLevel.Error, t, lazyMessage)
+    fun logWarningIf(predicate: () -> Boolean, t: Throwable? = null, lazyMessage: () -> String) = logIf(predicate, LogLevel.Warning, t, lazyMessage)
+    fun logInformationIf(predicate: () -> Boolean, t: Throwable? = null, lazyMessage: () -> String) = logIf(predicate, LogLevel.Information, t, lazyMessage)
+    fun logDebugIf(predicate: () -> Boolean, t: Throwable? = null, lazyMessage: () -> String) = logIf(predicate, LogLevel.Debug, t, lazyMessage)
+    fun logTraceIf(predicate: () -> Boolean, t: Throwable? = null, lazyMessage: () -> String) = logIf(predicate, LogLevel.Trace, t, lazyMessage)
 }
+
 
 interface LoggingFramework {
     var rootLoggingLevel: LogLevel

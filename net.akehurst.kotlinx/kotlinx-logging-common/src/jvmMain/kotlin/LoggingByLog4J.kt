@@ -32,7 +32,7 @@ private val LogLevel.asLog4J: org.apache.logging.log4j.Level
         LogLevel.Information -> org.apache.logging.log4j.Level.INFO
         LogLevel.Debug -> org.apache.logging.log4j.Level.DEBUG
         LogLevel.Trace -> org.apache.logging.log4j.Level.TRACE
-        LogLevel.All -> org.apache.logging.log4j.Level.OFF
+        LogLevel.All -> org.apache.logging.log4j.Level.ALL
     }
 private val org.apache.logging.log4j.Level.asLevel: LogLevel
     get() = when (this) {
@@ -43,7 +43,7 @@ private val org.apache.logging.log4j.Level.asLevel: LogLevel
         org.apache.logging.log4j.Level.INFO -> LogLevel.Information
         org.apache.logging.log4j.Level.DEBUG -> LogLevel.Debug
         org.apache.logging.log4j.Level.TRACE -> LogLevel.Trace
-        else -> LogLevel.All
+        else -> LogLevel.All //TODO: this is wrong if there are customer logging levels!
     }
 
 object LoggingByLog4J : LoggingFramework {
