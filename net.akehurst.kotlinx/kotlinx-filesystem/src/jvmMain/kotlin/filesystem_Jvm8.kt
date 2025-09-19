@@ -33,11 +33,11 @@ data class DirectoryHandleJVM(
         fileSystem.listDirectoryContent(this)
 
     override suspend fun createDirectory(name: String): DirectoryHandle? {
-       return fileSystem.createNewDirectory(this,name)
+        return fileSystem.createNewDirectory(this, name)
     }
 
     override suspend fun createFile(name: String): FileHandle? {
-        return fileSystem.createNewFile(this,name)
+        return fileSystem.createNewFile(this, name)
     }
 }
 
@@ -59,23 +59,27 @@ actual object UserFileSystem : FileSystem {
         return when (parentDirectory) {
             is DirectoryHandleJVM -> {
                 val f = parentDirectory.handle.resolve(name)
-                FileHandleJVM(parentDirectory.fileSystem, f)
+                when {
+                    f.isDirectory -> DirectoryHandleJVM(parentDirectory.fileSystem, f)
+                    f.isFile -> FileHandleJVM(parentDirectory.fileSystem, f)
+                    else -> error("directory entry ${parentDirectory.path}/$name is neither a file nor a directory")
+                }
             }
 
             else -> null
         }
     }
 
-    actual suspend fun getDirectory(fullPath:String, mode: FileAccessMode):DirectoryHandle? {
+    actual suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
         val file = File(fullPath)
-        return if(file.exists() && file.isDirectory) {
-            DirectoryHandleJVM(this,file)
+        return if (file.exists() && file.isDirectory) {
+            DirectoryHandleJVM(this, file)
         } else {
             null
         }
     }
 
-    actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?,mode: FileAccessMode): DirectoryHandle? {
+    actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?, mode: FileAccessMode): DirectoryHandle? {
         return if (EventQueue.isDispatchThread()) {
             chooseDirectory2(current as DirectoryHandleJVM?)
         } else {
@@ -99,9 +103,9 @@ actual object UserFileSystem : FileSystem {
         return selectedFile?.let { DirectoryHandleJVM(this, it) }
     }
 
-    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?,mode: FileAccessMode, useNativeDialog:Boolean): FileHandle? {
+    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?, mode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         return if (EventQueue.isDispatchThread()) {
-            if(useNativeDialog) {
+            if (useNativeDialog) {
                 chooseFileNative(current as DirectoryHandleJVM?, FileDialog.LOAD)
             } else {
                 chooseFile(current as DirectoryHandleJVM?)
@@ -109,7 +113,7 @@ actual object UserFileSystem : FileSystem {
         } else {
             var handle: FileHandle? = null
             EventQueue.invokeAndWait() {
-                handle = if(useNativeDialog) {
+                handle = if (useNativeDialog) {
                     chooseFileNative(current as DirectoryHandleJVM?, FileDialog.LOAD)
                 } else {
                     chooseFile(current as DirectoryHandleJVM?)
@@ -129,8 +133,8 @@ actual object UserFileSystem : FileSystem {
         val fileChooser = JFileChooser()
         fileChooser.currentDirectory = current?.handle
         fileChooser.isMultiSelectionEnabled = false
-        fileChooser.fileSelectionMode =  JFileChooser.FILES_ONLY
-        fileChooser.dialogTitle =  "Choose File"
+        fileChooser.fileSelectionMode = JFileChooser.FILES_ONLY
+        fileChooser.dialogTitle = "Choose File"
         val result = fileChooser.showOpenDialog(null) // 'null' for parent component
         return if (result == JFileChooser.APPROVE_OPTION) {
             val selectedFile = fileChooser.selectedFile
@@ -140,7 +144,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    private fun chooseFileNative(current: DirectoryHandleJVM?, mode:Int): FileHandle? {
+    private fun chooseFileNative(current: DirectoryHandleJVM?, mode: Int): FileHandle? {
         val parentFrame = Frame("Choose File")
         System.clearProperty("apple.awt.fileDialogForDirectories")
         val fd = FileDialog(parentFrame, "Choose File")
@@ -183,7 +187,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun createNewFile(parentPath: DirectoryHandle, name:String): FileHandle? {
+    actual suspend fun createNewFile(parentPath: DirectoryHandle, name: String): FileHandle? {
         return when (parentPath) {
             is DirectoryHandleJVM -> {
                 val newFile = parentPath.handle.resolve(name)
@@ -195,7 +199,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun createNewDirectory(parentPath: DirectoryHandle, name:String): DirectoryHandle? {
+    actual suspend fun createNewDirectory(parentPath: DirectoryHandle, name: String): DirectoryHandle? {
         return when (parentPath) {
             is DirectoryHandleJVM -> {
                 val newDir = parentPath.handle.resolve(name)
