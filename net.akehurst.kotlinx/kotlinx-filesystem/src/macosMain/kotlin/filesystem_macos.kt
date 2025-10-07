@@ -7,7 +7,7 @@ import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
 
 actual object UserFileSystem : FileSystem {
     //actual var useDispatcher: Boolean = false
-    actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
+    actual suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
         TODO()
     }
 
@@ -23,7 +23,7 @@ actual object UserFileSystem : FileSystem {
         TODO()
     }
 
-    actual suspend fun selectNewFileFromDialog(parentDirectory: DirectoryHandle): FileHandle? {
+    actual suspend fun selectNewFileFromDialog(parent: DirectoryHandle): FileHandle? {
         TODO()
     }
 
@@ -31,11 +31,11 @@ actual object UserFileSystem : FileSystem {
         TODO()
     }
 
-    actual suspend fun createNewFile(parentPath: DirectoryHandle, name: String): FileHandle? {
+    actual suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
         TODO()
     }
 
-    actual suspend fun createNewDirectory(parentPath: DirectoryHandle, name: String): DirectoryHandle? {
+    actual suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
         TODO()
     }
 

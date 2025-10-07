@@ -20,6 +20,7 @@ interface FileSystem {
 }
 
 interface FileSystemObjectHandle {
+    val parent:DirectoryHandle?
     val name: String
 }
 
@@ -27,9 +28,22 @@ interface DirectoryHandle : FileSystemObjectHandle {
     val path: String
 
     suspend fun listContent(): List<FileSystemObjectHandle>
+
+    /**
+     * return null if the entry does not exist
+     */
     suspend fun entry(name: String): FileSystemObjectHandle?
+
+    /**
+     * return null if the file does not exist
+     */
     suspend fun file(name: String): FileHandle?
+
+    /**
+     * return null if the directory does not exist
+     */
     suspend fun directory(name: String): DirectoryHandle?
+
     suspend fun createFile(name: String): FileHandle?
     suspend fun createDirectory(name: String): DirectoryHandle?
 }

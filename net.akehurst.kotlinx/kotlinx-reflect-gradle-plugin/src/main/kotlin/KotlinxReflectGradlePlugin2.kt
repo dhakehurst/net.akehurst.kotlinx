@@ -2,28 +2,20 @@ package net.akehurst.kotlinx.reflect.gradle.plugin
 
 import net.akehurst.kotlin.reflect.gradle.plugin.KotlinPluginInfo
 import org.gradle.api.Project
-import org.gradle.api.logging.LogLevel
 import org.gradle.api.logging.Logger
 import org.gradle.api.provider.Provider
-import org.jetbrains.kotlin.analyzer.CompilationErrorException
-import org.jetbrains.kotlin.backend.common.CommonKLibResolver
 import org.jetbrains.kotlin.backend.common.serialization.metadata.DynamicTypeDeserializer
-import org.jetbrains.kotlin.backend.common.toLogger
 import org.jetbrains.kotlin.builtins.konan.KonanBuiltIns
-import org.jetbrains.kotlin.config.*
+import org.jetbrains.kotlin.config.ApiVersion
+import org.jetbrains.kotlin.config.LanguageVersion
+import org.jetbrains.kotlin.config.LanguageVersionSettingsImpl
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.*
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinMetadataCompilation
-import org.jetbrains.kotlin.js.config.JSConfigurationKeys
-import org.jetbrains.kotlin.konan.file.ZipFileSystemInPlaceAccessor
 import org.jetbrains.kotlin.library.metadata.KlibMetadataFactories
-import org.jetbrains.kotlin.library.nativeTargets
-import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import java.io.File
 import java.nio.file.FileSystem
 import java.nio.file.FileSystems
 import java.nio.file.Files
-import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.Path
 import kotlin.io.path.name
@@ -147,19 +139,20 @@ class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
                     project.logger.info("dep '${it.name}'")
                     it.name
                 }.filter { Files.exists(Path(it)) }
-                val res = CommonKLibResolver.resolveWithoutDependencies(
-                    dependencies,
-                    GradleToKotlin(logger),
-                    ZipFileSystemInPlaceAccessor,
-                    duplicatedUniqueNameStrategy = DuplicatedUniqueNameStrategy.DENY
-                )
-                val storageManager = LockBasedStorageManager("klib")
-                project.logger.info("Modules: ${res.libraries.size}")
-                res.resolveWithDependencies().forEach { lib, pa ->
-                    project.logger.info("module '${lib.libraryName}'")
-                    val module = KlibFactories.DefaultDeserializedDescriptorFactory.createDescriptorAndNewBuiltIns(lib, languageVersionSettings, storageManager, null)
-                    project.logger.info("module '${module.name}'")
-                }
+                TODO()
+//                val res = CommonKLibResolver.resolveWithoutDependencies(
+//                    dependencies,
+//                    GradleToKotlin(logger),
+//                    ZipFileSystemInPlaceAccessor,
+//                    duplicatedUniqueNameStrategy = DuplicatedUniqueNameStrategy.DENY
+//                )
+//                val storageManager = LockBasedStorageManager("klib")
+//                project.logger.info("Modules: ${res.libraries.size}")
+//                res.resolveWithDependencies().forEach { lib, pa ->
+//                    project.logger.info("module '${lib.libraryName}'")
+//                    val module = KlibFactories.DefaultDeserializedDescriptorFactory.createDescriptorAndNewBuiltIns(lib, languageVersionSettings, storageManager, null)
+//                    project.logger.info("module '${module.name}'")
+//                }
             }
         }
         return sb.toString()

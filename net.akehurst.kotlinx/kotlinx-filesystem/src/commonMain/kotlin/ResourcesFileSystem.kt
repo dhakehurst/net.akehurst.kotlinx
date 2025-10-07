@@ -31,6 +31,7 @@ object ResourcesFileSystem : FileSystemFromVfs(resourcesVfs)
 
 class DirectoryHandleVfs(
     val filesystem: FileSystemFromVfs,
+    override val parent: DirectoryHandleVfs?,
     private val _handle: VfsFile
 ) : DirectoryHandleAbstract() {
 
@@ -52,8 +53,8 @@ class DirectoryHandleVfs(
     override suspend fun entry(name: String): FileSystemObjectHandle? {
         return _handle[name].takeIfExists()?.let {
             when {
-                it.isDirectory() -> DirectoryHandleVfs(filesystem, it)
-                it.isFile() -> FileHandleVfs(filesystem, it)
+                it.isDirectory() -> DirectoryHandleVfs(filesystem, this,it)
+                it.isFile() -> FileHandleVfs(filesystem, this,it)
                 else -> null
             }
         }
@@ -66,12 +67,13 @@ class DirectoryHandleVfs(
     override suspend fun createFile(name: String): FileHandle? {
         _handle[name].ensureParents()
         _handle[name].writeString("")
-        return FileHandleVfs(filesystem, _handle[name])
+        return FileHandleVfs(filesystem, this,_handle[name])
     }
 }
 
 class FileHandleVfs(
     val filesystem: FileSystemFromVfs,
+    override val parent: DirectoryHandleVfs?,
     private val _handle: VfsFile
 ) : FileHandleAbstract() {
 
@@ -91,17 +93,17 @@ open class FileSystemFromVfs(
 
     constructor(path:String) : this(jailedLocalVfs(path))
 
-    val root get() = DirectoryHandleVfs(this, _vfsRoot)
+    val root get() = DirectoryHandleVfs(this, null,_vfsRoot)
 
     suspend fun getDirectory(resourcePath: String): DirectoryHandle? {
         return _vfsRoot[resourcePath].takeIfExists()?.let {
-            DirectoryHandleVfs(this, it)
+            DirectoryHandleVfs(this, null,it)
         }
     }
 
     suspend fun getFile(resourcePath: String): FileHandle? {
         return _vfsRoot[resourcePath].takeIfExists()?.let {
-            FileHandleVfs(this, it)
+            FileHandleVfs(this, null,it)
         }
     }
 

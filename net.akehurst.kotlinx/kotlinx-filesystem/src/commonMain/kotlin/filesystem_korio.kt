@@ -12,6 +12,7 @@ import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
 
 data class DirectoryHandleKorio(
     val fileSystem: FileSystemKorio,
+    override val parent: DirectoryHandleKorio?,
     val handle: VfsFile
 ) : DirectoryHandleAbstract() {
 
@@ -34,6 +35,7 @@ data class DirectoryHandleKorio(
 
 data class FileHandleKorio(
     val fileSystem: FileSystemKorio,
+    override val parent: DirectoryHandleKorio?,
     val handle: VfsFile
 ) : FileHandle {
     override val name: String get() = handle.pathInfo.baseName
@@ -46,13 +48,13 @@ data class FileHandleKorio(
 
 object FileSystemKorio : FileSystem {
 
-    suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
-        return when (parentDirectory) {
+    suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
+        return when (parent) {
             is DirectoryHandleKorio -> {
-                val child = parentDirectory.handle[name]
+                val child = parent.handle[name]
                 when {
-                    child.exists() && child.isDirectory() -> DirectoryHandleKorio(this, child)
-                    child.exists() && child.isFile() -> FileHandleKorio(this, child)
+                    child.exists() && child.isDirectory() -> DirectoryHandleKorio(this, parent,child)
+                    child.exists() && child.isFile() -> FileHandleKorio(this, parent,child)
                     else -> null //if not found in loop
                 }
             }
@@ -103,8 +105,8 @@ object FileSystemKorio : FileSystem {
             is DirectoryHandleKorio -> {
                 val list = dir.handle.list().map { child ->
                     when {
-                        child.isDirectory() -> DirectoryHandleKorio(this, child)
-                        child.isFile() -> FileHandleKorio(this, child)
+                        child.isDirectory() -> DirectoryHandleKorio(this, dir,child)
+                        child.isFile() -> FileHandleKorio(this, dir,child)
                         else -> error("Should not happen")
                     }
                 }
@@ -114,27 +116,27 @@ object FileSystemKorio : FileSystem {
             else -> error("DirectoryHandle is not a DirectoryHandleJS: ${dir::class.simpleName}")
         }
 
-    suspend fun createNewFile(parentPath: DirectoryHandle, name: String): FileHandle? {
-        return when (parentPath) {
+    suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
+        return when (parent) {
             is DirectoryHandleKorio -> {
-                val newFile = parentPath.handle[name]
+                val newFile = parent.handle[name]
                 newFile.writeString("") //creates the file
-                FileHandleKorio(this, newFile)
+                FileHandleKorio(this, parent,newFile)
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
         }
     }
 
-    suspend fun createNewDirectory(parentPath: DirectoryHandle, name: String): DirectoryHandle? {
-        return when (parentPath) {
+    suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
+        return when (parent) {
             is DirectoryHandleKorio -> {
-                val newDir = parentPath.handle[name]
+                val newDir = parent.handle[name]
                 newDir.mkdir()
-                DirectoryHandleKorio(this, newDir)
+                DirectoryHandleKorio(this, parent,newDir)
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
         }
     }
 
@@ -160,7 +162,7 @@ object FileSystemKorio : FileSystem {
     suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle {
         val handle = (file as FileHandleKorio).handle
         val zipFs = handle.openAsZip()
-        return DirectoryHandleKorio(this, zipFs)
+        return DirectoryHandleKorio(this, null,zipFs)
     }
 
 }

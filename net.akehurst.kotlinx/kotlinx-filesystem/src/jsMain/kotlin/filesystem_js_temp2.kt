@@ -3,12 +3,16 @@ package net.akehurst.kotlinx.filesystem
 import js.buffer.ArrayBuffer
 import js.core.Void
 import js.iterable.AsyncIterable
+import js.iterable.asFlow
 import js.iterable.iterator
 import js.typedarrays.Uint8Array
 import korlibs.io.file.std.ZipVfs
 import korlibs.io.stream.openAsync
 import kotlinx.browser.window
 import kotlinx.coroutines.await
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.toList
+import net.akehurst.kotlinx.filesystem.DirectoryHandleJS
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
 import net.akehurst.kotlinx.filesystem.api.FileSystem
@@ -70,6 +74,7 @@ external interface FileSystemFileHandle : FileSystemHandle {
 
 data class DirectoryHandleJS(
     val fileSystem: UserFileSystem,
+    override val parent: DirectoryHandleJS?,
     val handle: FileSystemDirectoryHandle
 ) : DirectoryHandleAbstract() {
 
@@ -95,6 +100,7 @@ data class DirectoryHandleJS(
 
 data class FileHandleJS(
     val fileSystem: UserFileSystem,
+    override val parent: DirectoryHandleJS?,
     val handle: FileSystemFileHandle
 ) : FileHandleAbstract() {
 
@@ -106,17 +112,16 @@ data class FileHandleJS(
 
 actual object UserFileSystem : FileSystem {
 
-    actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
-        return when (parentDirectory) {
+    actual suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
+        return when (parent) {
             is DirectoryHandleJS -> {
-                val iter = parentDirectory.handle.values().iterator()
-                while (iter.hasNext()) {
-                    val v = iter.next()
+                val list = parent.handle.values().asFlow().toList() //FIXME: iterate without making a list
+                for (v in list) {
                     when (v.name) {
                         name -> {
                             return when (v.kind) {
-                                "file" -> FileHandleJS(this, parentDirectory.handle.getFileHandle(v.name).await())
-                                "directory" -> DirectoryHandleJS(this, parentDirectory.handle.getDirectoryHandle(v.name).await())
+                                "file" -> FileHandleJS(this, parent, parent.handle.getFileHandle(v.name).await())
+                                "directory" -> DirectoryHandleJS(this, parent, parent.handle.getDirectoryHandle(v.name).await())
                                 else -> error("Should not happen")
                             }
                         }
@@ -131,7 +136,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun getDirectory(fullPath:String, mode: FileAccessMode):DirectoryHandle? {
+    actual suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
         return selectDirectoryFromDialog(null, mode)
     }
 
@@ -142,20 +147,20 @@ actual object UserFileSystem : FileSystem {
             FileAccessMode.READ_WRITE -> w.showDirectoryPicker(js("{mode:'readwrite'}"))
         }
         val cur = current?.let { (it as DirectoryHandleJS).handle }
-        val options = when(current) {
+        val options = when (current) {
             null -> js("{mode:rw}")
             else -> js("{mode:rw, startIn:cur}")
         }
-        val p: Promise<dynamic> =w.showDirectoryPicker(options)
+        val p: Promise<dynamic> = w.showDirectoryPicker(options)
         return try {
             val handle: FileSystemDirectoryHandle = p.await()
-            DirectoryHandleJS(this, handle)
+            DirectoryHandleJS(this, current as DirectoryHandleJS?, handle)
         } catch (t: Throwable) {
             null
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?, mode: FileAccessMode, useNativeDialog:Boolean): FileHandle? {
+    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?, mode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         val w: dynamic = window
         val p: Promise<dynamic> = when (mode) {
             FileAccessMode.READ_ONLY -> w.showOpenFilePicker(js("{mode:'read'}"))
@@ -163,18 +168,18 @@ actual object UserFileSystem : FileSystem {
         }
         return try {
             val handle: FileSystemFileHandle = p.await()
-            FileHandleJS(this, handle)
+            FileHandleJS(this, current as DirectoryHandleJS?, handle)
         } catch (t: Throwable) {
             null
         }
     }
 
-    actual suspend fun selectNewFileFromDialog(parentDirectory: DirectoryHandle): FileHandle? {
+    actual suspend fun selectNewFileFromDialog(parent: DirectoryHandle): FileHandle? {
         val w: dynamic = window
         val p: Promise<dynamic> = w.showSaveFilePicker(js("{}"))
         return try {
             val handle: FileSystemFileHandle = p.await()
-            FileHandleJS(this, handle)
+            FileHandleJS(this, parent as DirectoryHandleJS, handle)
         } catch (t: Throwable) {
             null
         }
@@ -184,10 +189,10 @@ actual object UserFileSystem : FileSystem {
         when (dir) {
             is DirectoryHandleJS -> {
                 val list = mutableListOf<FileSystemObjectHandle>()
-                for (v in dir.handle.values()) {
+                for (v in dir.handle.values().asFlow().toList()) {  //FIXME: iterate without making a list
                     val o = when (v.kind) {
-                        "file" -> FileHandleJS(this, dir.handle.getFileHandle(v.name).await())
-                        "directory" -> DirectoryHandleJS(this, dir.handle.getDirectoryHandle(v.name).await())
+                        "file" -> FileHandleJS(this, dir,dir.handle.getFileHandle(v.name).await())
+                        "directory" -> DirectoryHandleJS(this, dir,dir.handle.getDirectoryHandle(v.name).await())
                         else -> error("Should not happen")
                     }
                     list.add(o)
@@ -198,26 +203,26 @@ actual object UserFileSystem : FileSystem {
             else -> error("DirectoryHandle is not a DirectoryHandleJS: ${dir::class.simpleName}")
         }
 
-    actual suspend fun createNewFile(parentPath: DirectoryHandle, name:String): FileHandle? {
-        return when (parentPath) {
+    actual suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
+        return when (parent) {
             is DirectoryHandleJS -> {
-                val newFile = parentPath.handle.getFileHandle(name).await()
+                val newFile = parent.handle.getFileHandle(name).await()
                 newFile.createWritable().await()
-                FileHandleJS(this,newFile)
+                FileHandleJS(this, parent,newFile)
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
         }
     }
 
-    actual suspend fun createNewDirectory(parentPath: DirectoryHandle, name:String): DirectoryHandle? {
-        return when (parentPath) {
+    actual suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
+        return when (parent) {
             is DirectoryHandleJS -> {
-                val newDir = parentPath.handle.getDirectoryHandle(name).await()
-                DirectoryHandleJS(this, newDir)
+                val newDir = parent.handle.getDirectoryHandle(name).await()
+                DirectoryHandleJS(this, parent,newDir)
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
         }
     }
 
@@ -248,6 +253,6 @@ actual object UserFileSystem : FileSystem {
         val bytes = Uint8Array(arrBuf)
         val byteArray = ByteArray(bytes.byteLength) { bytes[it].toByte() }
         val zipFs = ZipVfs(byteArray.openAsync())
-        return DirectoryHandleKorio(FileSystemKorio, zipFs)
+        return DirectoryHandleKorio(FileSystemKorio, null,zipFs)
     }
 }

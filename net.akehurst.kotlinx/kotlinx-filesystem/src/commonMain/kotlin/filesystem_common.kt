@@ -24,7 +24,7 @@ enum class FileAccessMode {
 }
 
 
-abstract class DirectoryHandleAbstract : DirectoryHandle {
+abstract class DirectoryHandleAbstract: DirectoryHandle {
     override suspend fun directory(name: String): DirectoryHandle? {
         val entry = entry(name)
         return when (entry) {

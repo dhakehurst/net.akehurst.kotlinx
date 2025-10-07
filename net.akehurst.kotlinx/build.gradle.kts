@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+@file:OptIn(ExperimentalWasmDsl::class)
+
 import com.github.gmazzo.buildconfig.BuildConfigExtension
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import java.io.File
 
@@ -107,7 +110,6 @@ subprojects {
                 }
             }
 
-            @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
             wasmJs() {
                 binaries.library()
                 browser()

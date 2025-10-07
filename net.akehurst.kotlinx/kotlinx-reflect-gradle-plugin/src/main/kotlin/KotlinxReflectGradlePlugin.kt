@@ -134,14 +134,18 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
             KotlinCompilation.TEST_COMPILATION_NAME -> this.kotlinxReflectRegisterForModuleClassFqNameTest
             KotlinSourceSet.COMMON_MAIN_SOURCE_SET_NAME -> this.kotlinxReflectRegisterForModuleClassFqNameMain
             KotlinSourceSet.COMMON_TEST_SOURCE_SET_NAME -> this.kotlinxReflectRegisterForModuleClassFqNameTest
-            else -> error("Unhandled compilationName '${kotlinCompilation.compilationName}'")
+            "webMain" -> this.kotlinxReflectRegisterForModuleClassFqNameMain
+            "webTest" -> this.kotlinxReflectRegisterForModuleClassFqNameMain
+            else -> error("KotlinxReflect: Unhandled compilationName '${kotlinCompilation.compilationName}'")
         }
         val forReflection = when (kotlinCompilation.compilationName) {
             KotlinCompilation.MAIN_COMPILATION_NAME -> this.forReflectionMainStr
             KotlinCompilation.TEST_COMPILATION_NAME -> this.forReflectionTestStr
             KotlinSourceSet.COMMON_MAIN_SOURCE_SET_NAME -> this.forReflectionMainStr
             KotlinSourceSet.COMMON_TEST_SOURCE_SET_NAME -> this.forReflectionTestStr
-            else -> error("Unhandled compilationName '${kotlinCompilation.compilationName}'")
+            "webMain" -> this.forReflectionMainStr
+            "webTest" -> this.forReflectionTestStr
+            else -> error("KotlinxReflect: Unhandled compilationName '${kotlinCompilation.compilationName}'")
         }
         return project.provider {
             listOf(
@@ -237,7 +241,7 @@ class KotlinxReflectComponentRegistrar(
 
         messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: configuration = ${configuration}")
         messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: dependencies")
-        val dependencies = configuration.getList(JSConfigurationKeys.TRANSITIVE_LIBRARIES)
+        val dependencies = configuration.getList(JSConfigurationKeys.LIBRARIES)//TRANSITIVE_LIBRARIES)
         if (null != dependencies) {
             dependencies.forEach { dep ->
                 messageCollector.report(CompilerMessageSeverity.LOGGING,"KotlinxReflect: dep ${dep::class.simpleName} - $dep")

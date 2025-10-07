@@ -2,15 +2,13 @@ package net.akehurst.kotlinx.reflect.gradle.plugin
 
 import net.akehurst.kotlinx.reflect.KotlinxReflect
 import net.akehurst.kotlinx.text.toRegexFromGlob
-import org.jetbrains.kotlin.analyzer.moduleInfo
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
-import org.jetbrains.kotlin.backend.common.extensions.IrPluginContextImpl
 import org.jetbrains.kotlin.backend.common.ir.*
 import org.jetbrains.kotlin.backend.common.lower.DeclarationIrBuilder
-import org.jetbrains.kotlin.backend.common.serialization.KotlinIrLinker
-import org.jetbrains.kotlin.builtins.createFunctionType
+import org.jetbrains.kotlin.backend.common.lower.UpgradeCallableReferences
+import org.jetbrains.kotlin.backend.jvm.functionByName
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.descriptors.*
@@ -19,18 +17,12 @@ import org.jetbrains.kotlin.ir.*
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.safeName
 import org.jetbrains.kotlin.ir.backend.js.utils.isJsExport
 import org.jetbrains.kotlin.ir.builders.*
-import org.jetbrains.kotlin.ir.builders.declarations.addFunction
-import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
-import org.jetbrains.kotlin.ir.builders.declarations.buildClass
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.impl.IrFileImpl
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
-import org.jetbrains.kotlin.ir.expressions.impl.IrFunctionReferenceImpl
-import org.jetbrains.kotlin.ir.expressions.impl.IrRawFunctionReferenceImpl
-import org.jetbrains.kotlin.ir.overrides.isEffectivelyPrivate
+import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
-import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
@@ -42,7 +34,7 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.platform.JsPlatform
 import org.jetbrains.kotlin.platform.jvm.JvmPlatform
-import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
+import kotlin.collections.plus
 
 class KotlinxReflectIrGenerationExtension(
     private val messageCollector: MessageCollector,
@@ -330,6 +322,10 @@ class KotlinxReflectIrGenerationExtension(
         return IrFileImpl(object : IrFileEntry {
             override val name = moduleFragment.safeName
             override val maxOffset = UNDEFINED_OFFSET
+            override val firstRelevantLineIndex: Int
+                get() = TODO("not implemented")
+            override val lineStartOffsets: IntArray
+                get() = TODO("not implemented")
 
             override fun getSourceRangeInfo(beginOffset: Int, endOffset: Int) =
                 SourceRangeInfo(
@@ -465,14 +461,24 @@ class KotlinxReflectIrGenerationExtension(
 
                     when (refCls.descriptor.kind) {
                         ClassKind.ENUM_CLASS -> {
-                            val valuesFun = refCls.getSimpleFunction("values") ?: error("No function 'values' defined for '${refCls}'")
-                            //val valuesCall = irCall(valuesFun)
-                            val valuesFunType = pluginContext.irBuiltIns.getKFunctionType(
-                                pluginContext.irBuiltIns.listClass.starProjectedType,
-                                emptyList()
-                            )
-                            val funRef = irFunctionReference(valuesFunType, valuesFun)
-                            call.arguments[3] = funRef
+                            val valuesFun = refCls.functionByName("values")
+                            val valuesCall = irCall(valuesFun)
+                           // val valuesFunType = pluginContext.irBuiltIns.getKFunctionType(
+                           //     pluginContext.irBuiltIns.listClass.starProjectedType,
+                           //     emptyList()
+                            //)
+//                            val referenceType = context.irBuiltIns.functionN(0).typeWith(valuesFunType)
+//                            val funRef = irRichFunctionReference(
+//                                valuesFun.owner,
+//                                referenceType,
+//                                valuesFun,
+//                                UpgradeCallableReferences.selectSAMOverriddenFunction(referenceType),
+//                                emptyList(),
+//                                IrStatementOrigin.ADAPTED_FUNCTION_REFERENCE
+//                            )
+                            //val funRef = irRawFunctionReference(valuesFunType, valuesFun) //TODO: check richFunctionReference !
+
+                            call.arguments[3] = valuesCall//funRef
                             call.arguments[4] = irNull()
                         }
 

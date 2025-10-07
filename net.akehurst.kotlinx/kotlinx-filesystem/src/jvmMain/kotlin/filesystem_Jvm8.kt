@@ -18,6 +18,7 @@ import kotlin.io.path.listDirectoryEntries
 
 data class DirectoryHandleJVM(
     val fileSystem: UserFileSystem,
+    override val parent:DirectoryHandleJVM?,
     val handle: File
 ) : DirectoryHandleAbstract() {
 
@@ -27,7 +28,6 @@ data class DirectoryHandleJVM(
 
     override suspend fun entry(name: String): FileSystemObjectHandle? =
         fileSystem.getEntry(this, name)
-
 
     override suspend fun listContent(): List<FileSystemObjectHandle> =
         fileSystem.listDirectoryContent(this)
@@ -43,6 +43,7 @@ data class DirectoryHandleJVM(
 
 data class FileHandleJVM(
     val fileSystem: UserFileSystem,
+    override val parent:DirectoryHandleJVM?,
     val handle: File
 ) : FileHandleAbstract() {
 
@@ -55,14 +56,15 @@ data class FileHandleJVM(
 
 actual object UserFileSystem : FileSystem {
 
-    actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
-        return when (parentDirectory) {
+    actual suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
+        return when (parent) {
             is DirectoryHandleJVM -> {
-                val f = parentDirectory.handle.resolve(name)
+                val f = parent.handle.resolve(name)
                 when {
-                    f.isDirectory -> DirectoryHandleJVM(parentDirectory.fileSystem, f)
-                    f.isFile -> FileHandleJVM(parentDirectory.fileSystem, f)
-                    else -> error("directory entry ${parentDirectory.path}/$name is neither a file nor a directory")
+                    f.exists().not() -> null
+                    f.isDirectory -> DirectoryHandleJVM(parent.fileSystem, parent,f)
+                    f.isFile -> FileHandleJVM(parent.fileSystem, parent,f)
+                    else -> error("directory entry ${parent.path}/$name is neither a file nor a directory")
                 }
             }
 
@@ -73,7 +75,7 @@ actual object UserFileSystem : FileSystem {
     actual suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
         val file = File(fullPath)
         return if (file.exists() && file.isDirectory) {
-            DirectoryHandleJVM(this, file)
+            DirectoryHandleJVM(this, null,file)
         } else {
             null
         }
@@ -100,7 +102,11 @@ actual object UserFileSystem : FileSystem {
         fd.directory = current?.handle?.name
         fd.isVisible = true
         val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
-        return selectedFile?.let { DirectoryHandleJVM(this, it) }
+        return selectedFile?.let {
+            val pf:File? = selectedFile.parentFile
+            val parent = pf?.let { DirectoryHandleJVM(this, null,pf) }
+            DirectoryHandleJVM(this, parent,it)
+        }
     }
 
     actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?, mode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
@@ -138,7 +144,11 @@ actual object UserFileSystem : FileSystem {
         val result = fileChooser.showOpenDialog(null) // 'null' for parent component
         return if (result == JFileChooser.APPROVE_OPTION) {
             val selectedFile = fileChooser.selectedFile
-            selectedFile?.let { FileHandleJVM(this, selectedFile) }
+            selectedFile?.let {
+                val pf:File? = selectedFile.parentFile
+                val parent = pf?.let { DirectoryHandleJVM(this, null,pf) }
+                FileHandleJVM(this, parent,selectedFile)
+            }
         } else {
             null
         }
@@ -153,11 +163,15 @@ actual object UserFileSystem : FileSystem {
         fd.directory = current?.handle?.name
         fd.isVisible = true
         val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
-        return selectedFile?.let { FileHandleJVM(this, it) }
+        return selectedFile?.let {
+            val pf:File? = selectedFile.parentFile
+            val parent = pf?.let { DirectoryHandleJVM(this, null, pf) }
+            FileHandleJVM(this, parent,it)
+        }
     }
 
-    actual suspend fun selectNewFileFromDialog(parentDirectory: DirectoryHandle): FileHandle? {
-        val file = chooseFile(parentDirectory as DirectoryHandleJVM)
+    actual suspend fun selectNewFileFromDialog(parent: DirectoryHandle): FileHandle? {
+        val file = chooseFile(parent as DirectoryHandleJVM)
         return if (null != file) {
             val jFile = (file as FileHandleJVM).handle
             when {
@@ -176,8 +190,8 @@ actual object UserFileSystem : FileSystem {
                 val dirEntries = dir.handle.toPath().listDirectoryEntries()
                 dirEntries.map {
                     when {
-                        it.isDirectory() -> DirectoryHandleJVM(this, it.toFile())
-                        it.isRegularFile() -> FileHandleJVM(this, it.toFile())
+                        it.isDirectory() -> DirectoryHandleJVM(this, dir,it.toFile())
+                        it.isRegularFile() -> FileHandleJVM(this, dir,it.toFile())
                         else -> error("shoudl not happen")
                     }
                 }
@@ -187,27 +201,27 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun createNewFile(parentPath: DirectoryHandle, name: String): FileHandle? {
-        return when (parentPath) {
+    actual suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
+        return when (parent) {
             is DirectoryHandleJVM -> {
-                val newFile = parentPath.handle.resolve(name)
+                val newFile = parent.handle.resolve(name)
                 newFile.createNewFile()
-                FileHandleJVM(this, newFile)
+                FileHandleJVM(this, parent,newFile)
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
         }
     }
 
-    actual suspend fun createNewDirectory(parentPath: DirectoryHandle, name: String): DirectoryHandle? {
-        return when (parentPath) {
+    actual suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
+        return when (parent) {
             is DirectoryHandleJVM -> {
-                val newDir = parentPath.handle.resolve(name)
+                val newDir = parent.handle.resolve(name)
                 newDir.mkdirs()
-                DirectoryHandleJVM(this, newDir)
+                DirectoryHandleJVM(this, parent,newDir)
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
         }
     }
 
@@ -235,7 +249,7 @@ actual object UserFileSystem : FileSystem {
         val handle = (file as FileHandleJVM).handle
         val byteArray = handle.readBytes()
         val zipFs = ZipVfs(byteArray.openAsync())
-        return DirectoryHandleKorio(FileSystemKorio, zipFs)
+        return DirectoryHandleKorio(FileSystemKorio, null,zipFs)
     }
 
 }

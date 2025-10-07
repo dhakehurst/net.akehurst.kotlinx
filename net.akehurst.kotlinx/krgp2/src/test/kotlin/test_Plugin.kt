@@ -66,7 +66,7 @@ class test_Plugin {
         settingsFile.createNewFile()
         settingsFile.writeText(settingsFileContent)
 
-        val kv = "2.2.0"//KotlinVersion.CURRENT.toString()
+        val kv = "2.2.20"//KotlinVersion.CURRENT.toString()
         val buildFileContent = $$"""
 println("===============================================")
 println("Gradle: ${GradleVersion.current()}")
@@ -76,7 +76,7 @@ println("===============================================")
             
             plugins {
               kotlin("multiplatform") version ("$$kv")
-              id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") version("2.2.0-SNAPSHOT")
+              id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") version("2.2.20-SNAPSHOT")
             }
             repositories {
                 mavenLocal {

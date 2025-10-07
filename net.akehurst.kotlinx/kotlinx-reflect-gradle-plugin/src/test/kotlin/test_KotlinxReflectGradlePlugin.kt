@@ -49,9 +49,9 @@ class test_KotlinxReflectGradlePlugin {
         buildFile.writeText(
             """
                 plugins {
-                    kotlin("multiplatform") version ("2.2.0")
-                    id("net.akehurst.kotlin.gradle.plugin.exportPublic") version("2.2.0")
-                    id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") //version("2.2.0-SNAPSHOT") 
+                    kotlin("multiplatform") version ("2.2.20")
+                    id("net.akehurst.kotlin.gradle.plugin.exportPublic") version("2.2.20")
+                    id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") //version("2.2.20-SNAPSHOT") 
                 }
                 val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
                 val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2

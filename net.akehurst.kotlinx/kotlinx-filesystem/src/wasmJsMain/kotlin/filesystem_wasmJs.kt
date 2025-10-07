@@ -5,11 +5,13 @@ package net.akehurst.kotlinx.filesystem
 
 
 import js.core.JsPrimitives.toByte
+import js.iterable.asFlow
 import js.iterable.iterator
 import js.objects.JsPlainObject
 import korlibs.io.file.std.ZipVfs
 import korlibs.io.stream.openAsync
 import kotlinx.coroutines.await
+import kotlinx.coroutines.flow.toList
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
 import net.akehurst.kotlinx.filesystem.api.FileSystem
@@ -24,6 +26,7 @@ import kotlin.js.Promise
 
 data class DirectoryHandleWasmJS(
     val fileSystem: UserFileSystem,
+    override val parent: DirectoryHandleWasmJS?,
     val handle: FileSystemDirectoryHandle
 ) : DirectoryHandleAbstract() {
 
@@ -49,6 +52,7 @@ data class DirectoryHandleWasmJS(
 
 data class FileHandleWasmJS(
     val fileSystem: UserFileSystem,
+    override val parent: DirectoryHandleWasmJS?,
     val handle: FileSystemFileHandle
 ) : FileHandle {
     override val name: String get() = handle.name
@@ -56,7 +60,7 @@ data class FileHandleWasmJS(
 
     override suspend fun readContent(): String? = fileSystem.readFileContent(this)
     override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
-    override suspend fun openAsZipDirectory() : DirectoryHandle = fileSystem.openFileAsZipDirectory(this)
+    override suspend fun openAsZipDirectory(): DirectoryHandle = fileSystem.openFileAsZipDirectory(this)
 }
 
 external interface WasmWindow {
@@ -81,17 +85,16 @@ external class FilePickerOptions(
 
 actual object UserFileSystem : FileSystem {
 
-    actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
-        return when (parentDirectory) {
+    actual suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
+        return when (parent) {
             is DirectoryHandleWasmJS -> {
-                val iter = parentDirectory.handle.values().iterator()
-                while (iter.hasNext()) {
-                    val v = iter.next()
+                val list = parent.handle.values().asFlow().toList()  //FIXME: iterate without making a list
+                for (v in list) {
                     when (v.name) {
                         name -> {
                             return when (v.kind) {
-                                FileSystemHandleKind.file -> FileHandleWasmJS(this, parentDirectory.handle.getFileHandle(v.name))
-                                FileSystemHandleKind.directory -> DirectoryHandleWasmJS(this, parentDirectory.handle.getDirectoryHandle(v.name))
+                                FileSystemHandleKind.file -> FileHandleWasmJS(this, parent, parent.handle.getFileHandle(v.name))
+                                FileSystemHandleKind.directory -> DirectoryHandleWasmJS(this, parent, parent.handle.getDirectoryHandle(v.name))
                             }
                         }
 
@@ -115,29 +118,29 @@ actual object UserFileSystem : FileSystem {
         )
         return try {
             val handle: FileSystemDirectoryHandle = p.await()
-            DirectoryHandleWasmJS(this, handle)
+            DirectoryHandleWasmJS(this, null, handle)
         } catch (t: Throwable) {
             null
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?, mode: FileAccessMode, useNativeDialog:Boolean): FileHandle? {
+    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?, mode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         val p = (window as WasmWindow).showOpenFilePicker(
             FilePickerOptions(mode = mode.name)
         )
         return try {
             val handle: FileSystemFileHandle = p.await()
-            FileHandleWasmJS(this, handle)
+            FileHandleWasmJS(this, null, handle)
         } catch (t: Throwable) {
             null
         }
     }
 
-    actual suspend fun selectNewFileFromDialog(parentDirectory: DirectoryHandle): FileHandle? {
+    actual suspend fun selectNewFileFromDialog(parent: DirectoryHandle): FileHandle? {
         val p = (window as WasmWindow).showSaveFilePicker()
         return try {
             val handle: FileSystemFileHandle = p.await()
-            FileHandleWasmJS(this, handle)
+            FileHandleWasmJS(this, parent as DirectoryHandleWasmJS, handle)
         } catch (t: Throwable) {
             null
         }
@@ -147,12 +150,11 @@ actual object UserFileSystem : FileSystem {
         when (dir) {
             is DirectoryHandleWasmJS -> {
                 val list = mutableListOf<FileSystemObjectHandle>()
-                val iter = dir.handle.values().iterator()
-                while (iter.hasNext()) {
-                    val v = iter.next()
+                val iter = dir.handle.values().asFlow().toList()  //FIXME: iterate without making a list
+                for (v in iter) {
                     val o = when (v.kind) {
-                        FileSystemHandleKind.file -> FileHandleWasmJS(this, dir.handle.getFileHandle(v.name))
-                        FileSystemHandleKind.directory -> DirectoryHandleWasmJS(this, dir.handle.getDirectoryHandle(v.name))
+                        FileSystemHandleKind.file -> FileHandleWasmJS(this, dir,dir.handle.getFileHandle(v.name))
+                        FileSystemHandleKind.directory -> DirectoryHandleWasmJS(this, dir,dir.handle.getDirectoryHandle(v.name))
                         else -> error("Should not happen")
                     }
                     list.add(o)
@@ -163,26 +165,26 @@ actual object UserFileSystem : FileSystem {
             else -> error("DirectoryHandle is not a DirectoryHandleJS: ${dir::class.simpleName}")
         }
 
-    actual suspend fun createNewFile(parentPath: DirectoryHandle, name: String): FileHandle? {
-        return when (parentPath) {
+    actual suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
+        return when (parent) {
             is DirectoryHandleWasmJS -> {
-                val newFile = parentPath.handle.getFileHandle(name)
+                val newFile = parent.handle.getFileHandle(name)
                 newFile.createWritable()
-                FileHandleWasmJS(this, newFile)
+                FileHandleWasmJS(this, parent,newFile)
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
         }
     }
 
-    actual suspend fun createNewDirectory(parentPath: DirectoryHandle, name: String): DirectoryHandle? {
-        return when (parentPath) {
+    actual suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
+        return when (parent) {
             is DirectoryHandleWasmJS -> {
-                val newDir = parentPath.handle.getDirectoryHandle(name)
-                DirectoryHandleWasmJS(this, newDir)
+                val newDir = parent.handle.getDirectoryHandle(name)
+                DirectoryHandleWasmJS(this, parent,newDir)
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
         }
     }
 
@@ -212,7 +214,7 @@ actual object UserFileSystem : FileSystem {
         val bytes = handle.getFile().bytes()
         val byteArray = ByteArray(bytes.byteLength) { bytes[it].toByte() }
         val zipFs = ZipVfs(byteArray.openAsync())
-        return DirectoryHandleKorio(FileSystemKorio, zipFs)
+        return DirectoryHandleKorio(FileSystemKorio, null,zipFs)
     }
 
 }
