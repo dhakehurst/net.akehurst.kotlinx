@@ -20,15 +20,20 @@ import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 
+@OptIn(ExperimentalWasmJsInterop::class)
+fun getOwnPropertyNames(self: JsAny): JsArray<JsString> = js("Object.getOwnPropertyNames(self)")
+
+@OptIn(ExperimentalWasmJsInterop::class)
+fun getPropertyJs(jsObject: JsAny, propertyName: String): JsAny? = js("jsObject[propertyName]")
+
 actual fun KFunction<*>.isSuspend(): Boolean = TODO() //this.isSuspend
 
 actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler: Any, proxy: Any?, callable: KCallable<*>, methodName: String, args: Array<out Any>) -> Any?): T {
-    TODO()
+    TODO("wasmJs proxyFor")
 }
 
 actual fun Any.reflect() = ObjectReflection(this)
 actual fun KClass<*>.reflect() = ClassReflection(this)
-
 
 actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) {
 
@@ -41,23 +46,23 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
         }
 
     actual val allPropertyNames: List<String> by lazy {
-        TODO()
+        TODO("wasmJs reflection")
     }
 
     actual val allMemberFunctions: List<KFunction<*>> by lazy {
-        TODO()
+        TODO("wasmJs reflection")
     }
 
     actual val qualifiedName: String get() = KotlinxReflect.qualifiedNameForClass(this.kclass)
 
     actual val isEnum: Boolean
         get() {
-            TODO()
+            TODO("wasmJs reflection")
         }
 
     actual val isObject: Boolean
         get() {
-            TODO()
+            TODO("wasmJs reflection")
         }
 
     actual fun construct(vararg constructorArgs: Any?): T {
@@ -65,23 +70,25 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual fun <S : Any> isSupertypeOf(subtype: KClass<S>): Boolean {
-        TODO()
+        TODO("wasmJs reflection")
     }
 
     actual fun allPropertyNamesFor(self: T): List<String> {
-        TODO()
+        TODO("wasmJs reflection")
     }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
-        TODO()
+        TODO("wasmJs reflection")
     }
 
+    @OptIn(ExperimentalWasmJsInterop::class)
     actual fun getProperty(self: T, propertyName: String): Any? {
-        TODO()
+        val jsObject = self as JsAny
+        return getPropertyJs(jsObject, propertyName)
     }
 
     actual fun setProperty(self: T, propertyName: String, value: Any?) {
-        TODO()
+        TODO("wasmJs reflection")
     }
 
     actual fun <E : Enum<E>> enumValues(): List<E> {
@@ -99,7 +106,7 @@ actual class ClassReflection<T : Any> actual constructor(val kclass: KClass<T>) 
     }
 
     actual fun call(self: T, methodName: String, vararg args: Any?): Any? {
-        TODO()// return js("self[methodName](args)")
+        TODO("wasmJs reflection")
     }
 }
 
@@ -113,35 +120,38 @@ actual class ObjectReflection<T : Any> actual constructor(val self: T) {
 
     actual val isProxy: Boolean get() = TODO()
 
+    @OptIn(ExperimentalWasmJsInterop::class)
     actual val allPropertyNames: List<String> by lazy {
-        TODO()
+        getOwnPropertyNames(self.toJsReference()).toList().map { it.toString() }
     }
 
     actual fun construct(vararg constructorArgs: Any?): T {
-       TODO()
+        TODO("wasmJs reflection")
     }
 
     actual fun <S : Any> isSupertypeOf(subtype: KClass<S>): Boolean {
-        TODO()
+        TODO("wasmJs reflection")
     }
 
     actual fun isPropertyMutable(propertyName: String): Boolean {
-        TODO()
+        TODO("wasmJs reflection")
     }
 
+    @OptIn(ExperimentalWasmJsInterop::class)
     actual fun getProperty(propertyName: String): Any? {
-        TODO()
+        val jsObject = self.toJsReference()
+        return getPropertyJs(jsObject, propertyName)
     }
 
     actual fun setProperty(propertyName: String, value: Any?) {
-        TODO()
+        TODO("wasmJs reflection")
     }
 
     actual fun call(methodName: String, vararg args: Any?): Any? {
-        TODO()
+        TODO("wasmJs reflection")
     }
 
     actual suspend fun callSuspend(methodName: String, vararg args: Any?): Any? {
-        TODO()
+        TODO("wasmJs reflection")
     }
 }

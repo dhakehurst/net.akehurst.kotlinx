@@ -1,17 +1,16 @@
 [versions]
-project = "2.2.20-SNAPSHOT"
+project = "2.2.20"
 
 kotlin = "2.2.20"
-dokka = "2.0.0"
-exportPublic = "2.2.20-SNAPSHOT"
-
-buildconfig = "5.6.7"
-credentials = "3.0"
+dokka = "2.1.0"
+buildconfig = "5.7.0"
+exportPublic = "2.2.20"
+vanniktech = "0.34.0"
 
 korlibs = "6.0.2"
 kotlinx-coroutines = "1.10.2"
 kotlinx-html = "0.12.0"
-kotlinx-wrappers = "2025.9.8"
+kotlinx-wrappers = "2025.10.8"
 
 [libraries]
 korlibs-korio = { module = "com.soywiz:korlibs-io", version.ref = "korlibs" }
@@ -25,5 +24,5 @@ kotlin = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 exportPublic = { id = "net.akehurst.kotlin.gradle.plugin.exportPublic", version.ref = "exportPublic" }
 buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
-credentials = { id = "nu.studer.credentials", version.ref = "credentials" }
 jsPlainObjects = { id = "org.jetbrains.kotlin.plugin.js-plain-objects", version.ref = "kotlin" }
+vanniktech-maven-publish = { id="com.vanniktech.maven.publish", version.ref="vanniktech" }

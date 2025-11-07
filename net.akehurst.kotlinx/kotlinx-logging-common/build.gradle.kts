@@ -14,9 +14,10 @@ kotlin {
         jvmMain {
             dependencies {
                 implementation("org.apache.logging.log4j:log4j-core:$version_loj4j")
-                implementation("org.apache.logging.log4j:log4j-slf4j2-impl:$version_loj4j")
-                implementation("org.apache.logging.log4j:log4j-jcl:$version_loj4j")
+                runtimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:$version_loj4j")
+                runtimeOnly("org.apache.logging.log4j:log4j-jcl:$version_loj4j")
                 runtimeOnly("org.apache.logging.log4j:log4j-jul:$version_loj4j")
+                runtimeOnly("org.apache.logging.log4j:log4j-1.2-api:${version_loj4j}")
                 runtimeOnly("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.20.0")
             }
         }

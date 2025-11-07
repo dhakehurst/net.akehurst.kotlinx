@@ -8,22 +8,22 @@ plugins {
     kotlin("jvm")
     kotlin("kapt") // does not respect buildDir, fixed in kotlin 1.5.20
 }
-val pluginId = "net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin"
-/*
+val pluginId = "net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin2"
+
 gradlePlugin {
     website.set("https://github.com/dhakehurst/net.akehurst.kotlinx")
     vcsUrl.set("https://github.com/dhakehurst/net.akehurst.kotlinx")
     plugins {
-        create("kotlinx-reflect") {
+        create("kotlinx-reflect2") {
             id = pluginId
             implementationClass = "net.akehurst.kotlinx.reflect.gradle.plugin.KotlinxReflectGradlePlugin2"
             displayName = project.name
-            description = "Kotlin compiler plugin to support net.akehurst.kotlinx reflection on multi-platform"
+            description = "Kotlin compiler plugin to support net.akehurst.kotlinx reflection on multiplatform"
             tags.set(listOf("reflection","kotlin", "javascript", "typescript", "kotlin-js", "kotlin-multiplatform"))
         }
     }
 }
-*/
+
 configure<BuildConfigExtension>  {
     //val project = project(":kotlinx-gradle-plugin")
     packageName("${project.group}.reflect.gradle.plugin")

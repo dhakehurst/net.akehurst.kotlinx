@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2025 Dr. David H. Akehurst (http://dr.david.h.akehurst.net)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package net.akehurst.kotlinx.filesystem
 
 import korlibs.io.file.std.ZipVfs
@@ -15,10 +31,11 @@ import javax.swing.UIManager
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.listDirectoryEntries
+import kotlin.printStackTrace
 
 data class DirectoryHandleJVM(
     val fileSystem: UserFileSystem,
-    override val parent:DirectoryHandleJVM?,
+    override val parent: DirectoryHandleJVM?,
     val handle: File
 ) : DirectoryHandleAbstract() {
 
@@ -43,7 +60,7 @@ data class DirectoryHandleJVM(
 
 data class FileHandleJVM(
     val fileSystem: UserFileSystem,
-    override val parent:DirectoryHandleJVM?,
+    override val parent: DirectoryHandleJVM?,
     val handle: File
 ) : FileHandleAbstract() {
 
@@ -51,7 +68,7 @@ data class FileHandleJVM(
 
     override suspend fun readContent(): String? = fileSystem.readFileContent(this)
     override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
-    override suspend fun openAsZipDirectory(): DirectoryHandle = fileSystem.openFileAsZipDirectory(this)
+    override suspend fun openAsZipDirectory(): DirectoryHandle? = fileSystem.openFileAsZipDirectory(this)
 }
 
 actual object UserFileSystem : FileSystem {
@@ -62,8 +79,8 @@ actual object UserFileSystem : FileSystem {
                 val f = parent.handle.resolve(name)
                 when {
                     f.exists().not() -> null
-                    f.isDirectory -> DirectoryHandleJVM(parent.fileSystem, parent,f)
-                    f.isFile -> FileHandleJVM(parent.fileSystem, parent,f)
+                    f.isDirectory -> DirectoryHandleJVM(parent.fileSystem, parent, f)
+                    f.isFile -> FileHandleJVM(parent.fileSystem, parent, f)
                     else -> error("directory entry ${parent.path}/$name is neither a file nor a directory")
                 }
             }
@@ -75,21 +92,26 @@ actual object UserFileSystem : FileSystem {
     actual suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
         val file = File(fullPath)
         return if (file.exists() && file.isDirectory) {
-            DirectoryHandleJVM(this, null,file)
+            DirectoryHandleJVM(this, null, file)
         } else {
             null
         }
     }
 
-    actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?, mode: FileAccessMode): DirectoryHandle? {
-        return if (EventQueue.isDispatchThread()) {
-            chooseDirectory2(current as DirectoryHandleJVM?)
-        } else {
-            var handle: DirectoryHandle? = null
-            EventQueue.invokeAndWait() {
-                handle = chooseDirectory2(current as DirectoryHandleJVM?)
+    actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
+        try {
+            return if (EventQueue.isDispatchThread()) {
+                chooseDirectory2(current as DirectoryHandleJVM?)
+            } else {
+                var handle: DirectoryHandle? = null
+                EventQueue.invokeAndWait() {
+                    handle = chooseDirectory2(current as DirectoryHandleJVM?)
+                }
+                handle
             }
-            handle
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            return null
         }
     }
 
@@ -103,29 +125,34 @@ actual object UserFileSystem : FileSystem {
         fd.isVisible = true
         val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
         return selectedFile?.let {
-            val pf:File? = selectedFile.parentFile
-            val parent = pf?.let { DirectoryHandleJVM(this, null,pf) }
-            DirectoryHandleJVM(this, parent,it)
+            val pf: File? = selectedFile.parentFile
+            val parent = pf?.let { DirectoryHandleJVM(this, null, pf) }
+            DirectoryHandleJVM(this, parent, it)
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?, mode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
-        return if (EventQueue.isDispatchThread()) {
-            if (useNativeDialog) {
-                chooseFileNative(current as DirectoryHandleJVM?, FileDialog.LOAD)
-            } else {
-                chooseFile(current as DirectoryHandleJVM?)
-            }
-        } else {
-            var handle: FileHandle? = null
-            EventQueue.invokeAndWait() {
-                handle = if (useNativeDialog) {
+    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
+        try {
+            return if (EventQueue.isDispatchThread()) {
+                if (useNativeDialog) {
                     chooseFileNative(current as DirectoryHandleJVM?, FileDialog.LOAD)
                 } else {
                     chooseFile(current as DirectoryHandleJVM?)
                 }
+            } else {
+                var handle: FileHandle? = null
+                EventQueue.invokeAndWait() {
+                    handle = if (useNativeDialog) {
+                        chooseFileNative(current as DirectoryHandleJVM?, FileDialog.LOAD)
+                    } else {
+                        chooseFile(current as DirectoryHandleJVM?)
+                    }
+                }
+                handle
             }
-            handle
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            return null
         }
     }
 
@@ -145,9 +172,9 @@ actual object UserFileSystem : FileSystem {
         return if (result == JFileChooser.APPROVE_OPTION) {
             val selectedFile = fileChooser.selectedFile
             selectedFile?.let {
-                val pf:File? = selectedFile.parentFile
-                val parent = pf?.let { DirectoryHandleJVM(this, null,pf) }
-                FileHandleJVM(this, parent,selectedFile)
+                val pf: File? = selectedFile.parentFile
+                val parent = pf?.let { DirectoryHandleJVM(this, null, pf) }
+                FileHandleJVM(this, parent, selectedFile)
             }
         } else {
             null
@@ -164,9 +191,9 @@ actual object UserFileSystem : FileSystem {
         fd.isVisible = true
         val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
         return selectedFile?.let {
-            val pf:File? = selectedFile.parentFile
+            val pf: File? = selectedFile.parentFile
             val parent = pf?.let { DirectoryHandleJVM(this, null, pf) }
-            FileHandleJVM(this, parent,it)
+            FileHandleJVM(this, parent, it)
         }
     }
 
@@ -185,71 +212,100 @@ actual object UserFileSystem : FileSystem {
     }
 
     actual suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> {
-        return when (dir) {
-            is DirectoryHandleJVM -> {
-                val dirEntries = dir.handle.toPath().listDirectoryEntries()
-                dirEntries.map {
-                    when {
-                        it.isDirectory() -> DirectoryHandleJVM(this, dir,it.toFile())
-                        it.isRegularFile() -> FileHandleJVM(this, dir,it.toFile())
-                        else -> error("shoudl not happen")
+        try {
+            return when (dir) {
+                is DirectoryHandleJVM -> {
+                    val dirEntries = dir.handle.toPath().listDirectoryEntries()
+                    dirEntries.map {
+                        when {
+                            it.isDirectory() -> DirectoryHandleJVM(this, dir, it.toFile())
+                            it.isRegularFile() -> FileHandleJVM(this, dir, it.toFile())
+                            else -> error("shoudl not happen")
+                        }
                     }
                 }
-            }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${dir::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${dir::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            return emptyList()
         }
     }
 
     actual suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
-        return when (parent) {
-            is DirectoryHandleJVM -> {
-                val newFile = parent.handle.resolve(name)
-                newFile.createNewFile()
-                FileHandleJVM(this, parent,newFile)
-            }
+        try {
+            return when (parent) {
+                is DirectoryHandleJVM -> {
+                    val newFile = parent.handle.resolve(name)
+                    newFile.createNewFile()
+                    FileHandleJVM(this, parent, newFile)
+                }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            return null
         }
     }
 
     actual suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
-        return when (parent) {
-            is DirectoryHandleJVM -> {
-                val newDir = parent.handle.resolve(name)
-                newDir.mkdirs()
-                DirectoryHandleJVM(this, parent,newDir)
-            }
+        try {
+            return when (parent) {
+                is DirectoryHandleJVM -> {
+                    val newDir = parent.handle.resolve(name)
+                    newDir.mkdirs()
+                    DirectoryHandleJVM(this, parent, newDir)
+                }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            return null
         }
     }
 
     actual suspend fun readFileContent(file: FileHandle): String? {
-        return when (file) {
-            is FileHandleJVM -> {
-                file.handle.readText()
-            }
+        try {
+            return when (file) {
+                is FileHandleJVM -> {
+                    file.handle.readText()
+                }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${file::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${file::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            return null
         }
     }
 
     actual suspend fun writeFileContent(file: FileHandle, content: String) {
-        return when (file) {
-            is FileHandleJVM -> {
-                file.handle.writeText(content)
-            }
+        try {
+            return when (file) {
+                is FileHandleJVM -> {
+                    file.handle.writeText(content)
+                }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${file::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${file::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
         }
     }
 
-    actual suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle {
-        val handle = (file as FileHandleJVM).handle
-        val byteArray = handle.readBytes()
-        val zipFs = ZipVfs(byteArray.openAsync())
-        return DirectoryHandleKorio(FileSystemKorio, null,zipFs)
+    actual suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
+        try {
+            val handle = (file as FileHandleJVM).handle
+            val byteArray = handle.readBytes()
+            val zipFs = ZipVfs(byteArray.openAsync())
+            return DirectoryHandleKorio(FileSystemKorio, null, zipFs)
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            return null
+        }
     }
 
 }

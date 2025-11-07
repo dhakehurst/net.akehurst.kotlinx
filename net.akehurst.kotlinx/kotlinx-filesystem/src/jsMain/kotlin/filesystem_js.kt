@@ -1,212 +1,253 @@
+/**
+ * Copyright (C) 2025 Dr. David H. Akehurst (http://dr.david.h.akehurst.net)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package net.akehurst.kotlinx.filesystem
 
-//The underlying web.fs lib does not seem to work
-// here issues with getFile().text()
-
-
-/*
-
-import js.iterable.iterator
-import js.objects.JsPlainObject
+import js.iterable.asFlow
 import js.objects.unsafeJso
+import js.promise.await
+import js.typedarrays.Uint8Array
+import korlibs.io.file.std.ZipVfs
+import korlibs.io.stream.openAsync
 import kotlinx.browser.window
 import kotlinx.coroutines.await
-import web.fs.FileSystemDirectoryHandle
-import web.fs.FileSystemFileHandle
-import web.fs.FileSystemHandleKind
+import kotlinx.coroutines.flow.toList
+import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
+import net.akehurst.kotlinx.filesystem.api.FileHandle
+import net.akehurst.kotlinx.filesystem.api.FileSystem
+import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
+import web.blob.arrayBuffer
+import web.blob.text
+import web.experimental.ExperimentalWebApi
+import web.fs.*
+import web.streams.close
 import kotlin.js.Promise
-import kotlin.js.iterator
 
 data class DirectoryHandleJS(
     val fileSystem: UserFileSystem,
+    override val parent: DirectoryHandleJS?,
     val handle: FileSystemDirectoryHandle
 ) : DirectoryHandleAbstract() {
 
-    override val path: String get() = handle.name
+    override val path: String get() = "${parent?.path?:""}/$name"
 
     override val name: String get() = handle.name
 
     override suspend fun entry(name: String): FileSystemObjectHandle? =
         fileSystem.getEntry(this, name)
 
+    override suspend fun createFile(name: String): FileHandle? =
+        fileSystem.createNewFile(this, name)
+
+    override suspend fun createDirectory(name: String): DirectoryHandle? =
+        fileSystem.createNewDirectory(this, name)
+
     override suspend fun listContent(): List<FileSystemObjectHandle> =
         fileSystem.listDirectoryContent(this)
-
-    override suspend fun createDirectory(name: String): DirectoryHandle? {
-        TODO("not implemented")
-    }
-
-    override suspend fun createFile(name: String): FileHandle? {
-        TODO("not implemented")
-    }
 
 }
 
 data class FileHandleJS(
     val fileSystem: UserFileSystem,
+    override val parent: DirectoryHandleJS?,
     val handle: FileSystemFileHandle
-) : FileHandle {
+) : FileHandleAbstract() {
     override val name: String get() = handle.name
-    override val extension: String get() = name.substringAfterLast('.')
-
-    override suspend fun readContent(): String? =
-        fileSystem.readFileContent(this)
-
-    override suspend fun writeContent(content: String) =
-        fileSystem.writeFileContent(this, content)
+    override suspend fun readContent(): String? = fileSystem.readFileContent(this)
+    override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
+    override suspend fun openAsZipDirectory(): DirectoryHandle? = fileSystem.openFileAsZipDirectory(this)
 }
 
-@JsPlainObject
-external interface FilePickerOptions {
-    var mode:String
-}
+actual object UserFileSystem : FileSystem {
 
-actual object UserFileSystem: FileSystem {
-    //actual var useDispatcher: Boolean = false
-    actual suspend fun getEntry(parentDirectory: DirectoryHandle, name: String): FileSystemObjectHandle? {
-        return when (parentDirectory) {
+    actual suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
+        return when (parent) {
             is DirectoryHandleJS -> {
-                val iter =  parentDirectory.handle.values().iterator()
-                while(iter.hasNext()){
-                    val v = iter.next()
+                val list = parent.handle.values().asFlow().toList() //FIXME: iterate without making a list
+                for (v in list) {
                     when (v.name) {
                         name -> {
                             return when (v.kind) {
-                                FileSystemHandleKind.file -> FileHandleJS(this, parentDirectory.handle.getFileHandle(v.name))
-                                FileSystemHandleKind.directory -> DirectoryHandleJS(this, parentDirectory.handle.getDirectoryHandle(v.name))
-                                else -> error("Should not happen")
+                                FileSystemHandleKind.file -> FileHandleJS(this, parent, parent.handle.getFileHandle(v.name))
+                                FileSystemHandleKind.directory -> DirectoryHandleJS(this, parent, parent.handle.getDirectoryHandle(v.name))
+                               // else -> error("Should not happen")
                             }
                         }
 
                         else -> null
                     }
                 }
-                null //if not found in loop
+                null
             }
 
             else -> null
         }
     }
 
-    actual suspend fun getDirectory(fullPath:String, mode: FileAccessMode):DirectoryHandle? {
+    actual suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
         return selectDirectoryFromDialog(null, mode)
     }
 
-    actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?, mode: FileAccessMode): DirectoryHandle? {
-        val w: dynamic = window
-        val rw = when (mode) {
-            FileAccessMode.READ_ONLY -> w.showDirectoryPicker(js("{mode:'read'}"))
-            FileAccessMode.READ_WRITE -> w.showDirectoryPicker(js("{mode:'readwrite'}"))
-        }
-        val cur = current?.let { (it as DirectoryHandleJS).handle }
-        val options = when(current) {
-            null -> js("{mode:rw}")
-            else -> js("{mode:rw, startIn:cur}")
-        }
-        val p: Promise<dynamic> =w.showDirectoryPicker(options)
+    @OptIn(ExperimentalWebApi::class)
+    actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
         return try {
-            val handle: FileSystemDirectoryHandle = p.await()
-            DirectoryHandleJS(this, handle)
+            val dpo: DirectoryPickerOptions = when (accessMode) {
+                FileAccessMode.READ_ONLY -> unsafeJso { mode = FileSystemPermissionMode.read }
+                FileAccessMode.READ_WRITE -> unsafeJso { mode = FileSystemPermissionMode.readwrite }
+            }
+            val handle: FileSystemDirectoryHandle = showDirectoryPicker(dpo)
+            DirectoryHandleJS(fileSystem = this, parent =  null, handle = handle)
         } catch (t: Throwable) {
+            t.printStackTrace()
             null
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(mode: FileAccessMode): FileHandle? {
+    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         val w: dynamic = window
-        val p: Promise<dynamic> = when (mode) {
+        val p: Promise<dynamic> = when (accessMode) {
             FileAccessMode.READ_ONLY -> w.showOpenFilePicker(js("{mode:'read'}"))
             FileAccessMode.READ_WRITE -> w.showOpenFilePicker(js("{mode:'readwrite'}"))
         }
         return try {
             val handle: FileSystemFileHandle = p.await()
-            FileHandleJS(this, handle)
+            FileHandleJS(this, current as DirectoryHandleJS?, handle)
         } catch (t: Throwable) {
+            t.printStackTrace()
             null
         }
     }
 
-    actual suspend fun selectNewFileFromDialog(parentDirectory: DirectoryHandle): FileHandle? {
-        val w: dynamic = window
-        val p: Promise<dynamic> = w.showSaveFilePicker(
-            unsafeJso {
-//                types = arrayOf(
-//                    objectJS {
-//                        description = "SysML v2 file"
-//                        accept = objectJS {}.set("text/plain", arrayOf(".sysml"))
-//                    }
-//                )
-            }
-        )
+    actual suspend fun selectNewFileFromDialog(parent: DirectoryHandle): FileHandle? {
         return try {
+            val w: dynamic = window
+            val p: Promise<dynamic> = w.showSaveFilePicker(js("{}"))
             val handle: FileSystemFileHandle = p.await()
-            FileHandleJS(this, handle)
+            FileHandleJS(this, parent as DirectoryHandleJS, handle)
         } catch (t: Throwable) {
+            t.printStackTrace()
             null
         }
     }
 
     actual suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> =
-        when (dir) {
-            is DirectoryHandleJS -> {
-                val list = mutableListOf<FileSystemObjectHandle>()
-                val iter =  dir.handle.values().iterator()
-                while(iter.hasNext()){
-                    val v = iter.next()
-                    val o = when (v.kind) {
-                        FileSystemHandleKind.file -> FileHandleJS(this, dir.handle.getFileHandle(v.name))
-                        FileSystemHandleKind.directory -> DirectoryHandleJS(this, dir.handle.getDirectoryHandle(v.name))
-                        else -> error("Should not happen")
+        try {
+            when (dir) {
+                is DirectoryHandleJS -> {
+                    val list = mutableListOf<FileSystemObjectHandle>()
+                    dir.handle.values().asFlow().collect { v ->
+                        val o = when (v.kind) {
+                            FileSystemHandleKind.file -> FileHandleJS(this, dir, dir.handle.getFileHandle(v.name))
+                            FileSystemHandleKind.directory -> DirectoryHandleJS(this, dir, dir.handle.getDirectoryHandle(v.name))
+                            //   else -> error("Should not happen")
+                        }
+                        list.add(o)
                     }
-                    list.add(o)
+//                    for (v in values) {
+//                        val o = when (v.kind) {
+//                            FileSystemHandleKind.file -> FileHandleJS(this, dir, dir.handle.getFileHandle(v.name))
+//                            FileSystemHandleKind.directory -> DirectoryHandleJS(this, dir, dir.handle.getDirectoryHandle(v.name))
+//                         //   else -> error("Should not happen")
+//                        }
+//                        list.add(o)
+//                    }
+                    list
                 }
-                list
-            }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${dir::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${dir::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            emptyList()
         }
 
-    actual suspend fun createNewFile(parentPath: DirectoryHandle): FileHandle? {
-        return when (parentPath) {
-            is DirectoryHandleJS -> {
-                TODO()
-            }
+    actual suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
+        return try {
+            when (parent) {
+                is DirectoryHandleJS -> {
+                    val newFile = parent.handle.getFileHandle(name)
+                    newFile.createWritable()
+                    FileHandleJS(this, parent, newFile)
+                }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            null
         }
     }
 
-    actual suspend fun createNewDirectory(parentPath: DirectoryHandle): DirectoryHandle? {
-        return when (parentPath) {
-            is DirectoryHandleJS -> {
-                TODO()
-            }
+    actual suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
+        return try {
+            when (parent) {
+                is DirectoryHandleJS -> {
+                    val newDir = parent.handle.getDirectoryHandle(name)
+                    DirectoryHandleJS(this, parent, newDir)
+                }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parentPath::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            null
         }
     }
 
     actual suspend fun readFileContent(file: FileHandle): String? =
-        when (file) {
-            is FileHandleJS -> {
-                file.handle.getFile().text()
-            }
+        try {
+            when (file) {
+                is FileHandleJS -> {
+                    file.handle.getFile().text()
+                }
 
-            else -> error("FileHandle is not a FileHandleJS: ${file::class.simpleName}")
+                else -> error("FileHandle is not a FileHandleJS: ${file::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            null
         }
 
     actual suspend fun writeFileContent(file: FileHandle, content: String) {
-        when (file) {
-            is FileHandleJS -> {
-                val w = file.handle.createWritable()
-                w.write(content)
-                w.close()
-            }
+        try {
+            when (file) {
+                is FileHandleJS -> {
+                    val w = file.handle.createWritable()
+                    w.write(content)
+                    w.close()
+                }
 
-            else -> error("FileHandle is not a FileHandleJS: ${file::class.simpleName}")
+                else -> error("FileHandle is not a FileHandleJS: ${file::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
         }
     }
 
+    actual suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
+        return try {
+            val handle = (file as FileHandleJS).handle
+            val arrBuf = handle.getFile().arrayBuffer()
+            val bytes = Uint8Array(arrBuf)
+            val byteArray = ByteArray(bytes.byteLength) { bytes[it].toByte() }
+            val zipFs = ZipVfs(byteArray.openAsync())
+            DirectoryHandleKorio(FileSystemKorio, null, zipFs)
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            null
+        }
+    }
 }
-
- */

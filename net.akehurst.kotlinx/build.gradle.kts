@@ -26,9 +26,8 @@ plugins {
     alias(libs.plugins.jsPlainObjects) apply false
     alias(libs.plugins.dokka) apply false
     alias(libs.plugins.buildconfig) apply false
-    alias(libs.plugins.credentials) apply true
     alias(libs.plugins.exportPublic) apply false
-
+    alias(libs.plugins.vanniktech.maven.publish) apply false
 }
 val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
 val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
@@ -58,12 +57,13 @@ fun getProjectProperty(s: String) = project.findProperty(s) as String?
 
 subprojects {
 
-    apply(plugin = "maven-publish")
-    apply(plugin = "signing")
+    //apply(plugin = "maven-publish")
     apply(plugin = "org.jetbrains.dokka")
     apply(plugin = "com.github.gmazzo.buildconfig")
 
     if (name != "kotlinx-reflect-gradle-plugin" && name != "krgp2") {
+        apply(plugin = "com.vanniktech.maven.publish")
+        apply(plugin = "signing")
         apply(plugin = "org.jetbrains.kotlin.multiplatform")
         apply(plugin = "org.jetbrains.kotlin.plugin.js-plain-objects")
         apply(plugin = "net.akehurst.kotlin.gradle.plugin.exportPublic")
@@ -132,73 +132,52 @@ subprojects {
             "commonTestImplementation"(kotlin("test-annotations-common"))
         }
 
-        val creds = project.properties["credentials"] as nu.studer.gradle.credentials.domain.CredentialsContainer
-        val sonatype_pwd = creds.forKey("SONATYPE_PASSWORD")
-            ?: getProjectProperty("SONATYPE_PASSWORD")
-            ?: error("Must set project property with Sonatype Password (-P SONATYPE_PASSWORD=<...> or set in ~/.gradle/gradle.properties)")
-        project.ext.set("signing.password", sonatype_pwd)
-
-        configure<PublishingExtension> {
-            repositories {
-                maven {
-                    name = "sonatype"
-                    setUrl("https://oss.sonatype.org/service/local/staging/deploy/maven2/")
-                    credentials {
-                        username = getProjectProperty("SONATYPE_USERNAME")
-                            ?: error("Must set project property with Sonatype Username (-P SONATYPE_USERNAME=<...> or set in ~/.gradle/gradle.properties)")
-                        password = sonatype_pwd
-                    }
-                }
-                maven {
-                    name = "Other"
-                    setUrl(getProjectProperty("PUB_URL") ?: "<use -P PUB_URL=<...> to set>")
-                    credentials {
-                        username = getProjectProperty("PUB_USERNAME")
-                            ?: error("Must set project property with Username (-P PUB_USERNAME=<...> or set in ~/.gradle/gradle.properties)")
-                        password = getProjectProperty("PUB_PASSWORD") ?: creds.forKey(getProjectProperty("PUB_USERNAME"))
-                    }
-                }
-                publications.withType<MavenPublication> {
-                    artifact(javadocJar.get())
-
-                    pom {
-                        name.set("akehurst-kotlinx")
-                        description.set("Useful Kotlin stuff that is missing from the stdlib, e.g. reflection, logging, native-filesystem-dialogs, etc")
-                        url.set("https://github.com/dhakehurst/net.akehurst.kotlinx")
-
-                        licenses {
-                            license {
-                                name.set("The Apache License, Version 2.0")
-                                url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
-                            }
-                        }
-                        developers {
-                            developer {
-                                name.set("Dr. David H. Akehurst")
-                                email.set("dr.david.h@akehurst.net")
-                            }
-                        }
-                        scm {
-                            url.set("https://github.com/dhakehurst/net.akehurst.kotlinx")
-                        }
-                    }
+        configure<SigningExtension> {
+            useGpgCmd()
+            val publishing = project.properties["publishing"] as PublishingExtension
+            sign(publishing.publications)
+        }
+        val signTasks = tasks.matching { it.name.matches(Regex("sign(.)+")) }.toTypedArray()
+        tasks.forEach {
+            when {
+                it.name.matches(Regex("publish(.)+")) -> {
+                    //               println("${it.name}.mustRunAfter(${signTasks.toList()})")
+                    it.mustRunAfter(*signTasks)
                 }
             }
         }
-    }
 
-    configure<SigningExtension> {
-        useGpgCmd()
-        val publishing = project.properties["publishing"] as PublishingExtension
-        sign(publishing.publications)
-    }
-    val signTasks = tasks.matching { it.name.matches(Regex("sign(.)+")) }.toTypedArray()
-    tasks.forEach {
-        when {
-            it.name.matches(Regex("publish(.)+")) -> {
- //               println("${it.name}.mustRunAfter(${signTasks.toList()})")
-                it.mustRunAfter(*signTasks)
+        configure<com.vanniktech.maven.publish.MavenPublishBaseExtension>{
+            signAllPublications()
+            publishToMavenCentral(automaticRelease = false)
+
+            coordinates(group as String, project.name, version as String)
+            pom {
+                name.set("akehurst-kotlinx")
+                description.set("Useful Kotlin stuff that is missing from the stdlib, e.g. reflection, logging, native-filesystem-dialogs, etc")
+                url.set("https://github.com/dhakehurst/net.akehurst.kotlinx")
+
+                licenses {
+                    license {
+                        name.set("The Apache License, Version 2.0")
+                        url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                        distribution.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                    }
+                }
+                developers {
+                    developer {
+                        name.set("Dr. David H. Akehurst")
+                        email.set("dr.david.h@akehurst.net")
+                        url.set("https://github.com/dhakehurst")
+                    }
+                }
+                scm {
+                    url.set("https://github.com/dhakehurst/net.akehurst.kotlinx")
+                }
             }
         }
+
     }
+
+
 }

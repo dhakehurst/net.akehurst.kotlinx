@@ -2,11 +2,14 @@ package net.akehurst.kotlinx.reflect.gradle.plugin
 
 //import net.akehurst.kotlinx.text.toRegexFromGlob
 import com.google.auto.service.AutoService
+import net.akehurst.kotlinx.text.toRegexFromGlob
 import org.gradle.api.Project
 import org.gradle.api.logging.Logger
 import org.gradle.api.provider.Provider
+import org.jetbrains.kotlin.backend.common.reportLoadingProblemsIfAny
 import org.jetbrains.kotlin.backend.common.serialization.metadata.DynamicTypeDeserializer
 import org.jetbrains.kotlin.builtins.konan.KonanBuiltIns
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.compiler.plugin.CliOption
 import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
@@ -26,6 +29,18 @@ import java.nio.file.Paths
 import kotlin.io.path.Path
 import kotlin.io.path.name
 import kotlin.reflect.KClass
+import org.jetbrains.kotlin.library.impl.*
+import org.jetbrains.kotlin.library.*
+import org.jetbrains.kotlin.library.loader.*
+import org.jetbrains.kotlin.backend.common.loadMetadataKlibs
+import org.jetbrains.kotlin.konan.file.*
+import org.jetbrains.kotlin.library.metadata.parseModuleHeader
+
+import org.jetbrains.kotlin.library.metadata.parsePackageFragment
+import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.utils.addToStdlib.flatMapToNullable
+
+typealias KFile = org.jetbrains.kotlin.konan.file.File
 
 open class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
 
@@ -71,11 +86,11 @@ open class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
 
     override fun getCompilerPluginId(): String = KotlinxReflectPluginInfo.KOTLIN_PLUGIN_ID
 
-    override fun getPluginArtifact(): SubpluginArtifact =  SubpluginArtifact(
-            groupId = KotlinxReflectPluginInfo.PROJECT_GROUP,
-            artifactId = KotlinxReflectPluginInfo.PROJECT_NAME,
-            version = KotlinxReflectPluginInfo.PROJECT_VERSION
-        )
+    override fun getPluginArtifact(): SubpluginArtifact = SubpluginArtifact(
+        groupId = KotlinxReflectPluginInfo.PROJECT_GROUP,
+        artifactId = KotlinxReflectPluginInfo.PROJECT_NAME,
+        version = KotlinxReflectPluginInfo.PROJECT_VERSION
+    )
 
     override fun getPluginArtifactForNative(): SubpluginArtifact = SubpluginArtifact(
         groupId = KotlinxReflectPluginInfo.PROJECT_GROUP,
@@ -103,12 +118,31 @@ open class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
 
     override fun applyToCompilation(kotlinCompilation: KotlinCompilation<*>): Provider<List<SubpluginOption>> {
         val project = kotlinCompilation.target.project
-        project.logger.info("KotlinxReflect: ${kotlinCompilation.name}")
-        project.logger.info("KotlinxReflect: ${kotlinCompilation.target.platformType.name}")
-        project.logger.info("KotlinxReflect: ${kotlinCompilation.kotlinSourceSets}")
-        project.logger.info("KotlinxReflect: ${kotlinCompilation.compileDependencyConfigurationName}")
-
         val kotlinExtension = project.extensions.getByName("kotlin") as KotlinMultiplatformExtension
+        val reflectExtension = project.extensions.getByType(KotlinxReflectGradlePluginExtension::class.java)
+        val forReflectionMain = reflectExtension.forReflectionMain.get()
+        val total = reflectExtension.forReflectionMain.get() + reflectExtension.forReflectionTest.get()
+        val forReflectionTest = forReflectionMain + reflectExtension.forReflectionTest.get()
+        val globRegexesMain = forReflectionMain.mapNotNull {
+            if (it.isBlank()) {
+                project.logger.warn("InternalError: Got and ignored null or blank class name!")
+                null
+            } else {
+                Pair(it.toRegexFromGlob('.'), it)
+            }
+        }.associate {
+            Pair(it.first, Pair(it.second, false))
+        }.toMutableMap()
+        val globRegexesTest = forReflectionMain.mapNotNull {
+            if (it.isBlank()) {
+                project.logger.warn( "InternalError: Got and ignored null or blank class name!")
+                null
+            } else {
+                Pair(it.toRegexFromGlob('.'), it)
+            }
+        }.associate {
+            Pair(it.first, Pair(it.second, false))
+        }.toMutableMap()
 
         val moduleSafeName = project.name.replace(Regex("[^a-zA-Z0-9]"), "_")
         kotlinCompilation.kotlinSourceSets.forEach { ss ->
@@ -121,7 +155,7 @@ open class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
                     moduleFile.createNewFile()
                     val packageName = "${moduleSafeName}_${ss.name}"
                     this.kotlinxReflectRegisterForModuleClassFqNameMain = "$packageName.${KotlinxReflectRegisterForModuleClassName}"
-                    val statements = generateStatements(project, kotlinCompilation.compileDependencyConfigurationName)
+                    val statements = generateStatements(project, globRegexesMain, kotlinCompilation)
                     moduleFile.printWriter().use { pw -> pw.println(KotlinxReflectRegisterForModuleTemplate(ss.name, packageName, statements)) }
 
                 }
@@ -134,7 +168,7 @@ open class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
                     moduleFile.createNewFile()
                     val packageName = "${moduleSafeName}_${ss.name}"
                     this.kotlinxReflectRegisterForModuleClassFqNameTest = "$packageName.${KotlinxReflectRegisterForModuleClassName}"
-                    val statements = generateStatements(project, kotlinCompilation.compileDependencyConfigurationName)
+                    val statements = generateStatements(project, globRegexesTest, kotlinCompilation)
                     moduleFile.printWriter().use { pw -> pw.println(KotlinxReflectRegisterForModuleTemplate(ss.name, packageName, statements)) }
                 }
 
@@ -144,64 +178,47 @@ open class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
         return kotlinCompilation.target.project.provider { emptyList<SubpluginOption>() }
     }
 
-    private fun generateStatements(project: Project, configurationName: String): String {
-        project.logger.info("KotlinxReflect: generating for $configurationName")
-        project.logger.info("KotlinxReflect: configuration ${project.configurations.findByName(configurationName)}")
+    // this will handle dependencies, but not the current module being built
+    private fun generateStatements(project: Project, globRegexes:MutableMap<Regex,Pair<String,Boolean>>, kotlinCompilation: KotlinCompilation<*>): String {
+        val configurationName = kotlinCompilation.compileDependencyConfigurationName
+        val regexes = globRegexes.keys
 
         val sb = StringBuilder()
         project.configurations.findByName(configurationName)?.let { cfg1 ->
-            project.logger.info("KotlinxReflect: doing ${cfg1.name}")
             val c2 = cfg1.copy()
             project.afterEvaluate {
-                project.logger.info("KotlinxReflect: afterEvaluate ${cfg1.name}")
-                c2.allArtifacts.forEach {
-                    project.logger.info("KotlinxReflect:   artifact ${it.name} ${it.file} ${it.classifier}")
+                val currentModuleMetadata = kotlinCompilation.output.allOutputs
+                project.logger.error("currentModuleMetadata ${currentModuleMetadata.files}")
+                val paths = c2.resolvedConfiguration.resolvedArtifacts.map { resArt -> resArt.file.path }
+                val qualifiedNames = paths.flatMap { canonicalPath ->
+                    val libraryFile = KFile(canonicalPath)
+                    val component = "commonMain/default"
+                    val zipAccessor = ZipFileSystemInPlaceAccessor
+                    val metadataAccess = MetadataLibraryAccess<MetadataKotlinLibraryLayout>(libraryFile, component, zipAccessor)
+                    val metadata = MetadataLibraryImpl(metadataAccess)
+                    val mdh = parseModuleHeader(metadata.moduleHeaderData)
+                    val qnames = mdh.packageFragmentNameList.flatMap { pkfFragName ->
+                        metadata.packageMetadataParts(pkfFragName).flatMap { partName ->
+                            val pf = parsePackageFragment(metadata.packageMetadata(pkfFragName, partName))
+                            pf.class_List.map { pkfFragName+"."+pf.strings.getString(it.fqName) }
+                        }
+                    }
+                    qnames
                 }
-                val dependencies = cfg1.dependencies.map {
-                    project.logger.info("dep '${it.name}'")
-                    it.name
-                }.filter { Files.exists(Path(it)) }
-                TODO()
-//                val res = CommonKLibResolver.resolveWithoutDependencies(
-//                    dependencies,
-//                    GradleToKotlin(logger),
-//                    ZipFileSystemInPlaceAccessor,
-//                    duplicatedUniqueNameStrategy = DuplicatedUniqueNameStrategy.DENY
-//                )
-//                val storageManager = LockBasedStorageManager("klib")
-//                project.logger.info("KotlinxReflect: Modules: ${res.libraries.size}")
-//                res.resolveWithDependencies().forEach { lib, pa ->
-//                    project.logger.info("module '${lib.libraryName}'")
-//                    val module = KlibFactories.DefaultDeserializedDescriptorFactory.createDescriptorAndNewBuiltIns(lib, languageVersionSettings, storageManager, null)
-//                    project.logger.info("module '${module.name}'")
-//                }
+                project.logger.error("trying to match $qualifiedNames")
+                project.logger.error("against $regexes")
+                val matchingNames = qualifiedNames.forEach{ qn ->
+                    regexes.forEach { rg ->
+                        if(rg.matches(qn)) {
+                            sb.append("\"qn\"")
+                        }
+                    }
+                }
             }
         }
         return sb.toString()
     }
 
-    private fun findClasses(packageName: String): List<KClass<*>> {
-        val result = mutableListOf<KClass<*>>()
-        val path = "/" + packageName.replace('.', '/')
-        val uri = this::class.java.getResource(path)!!.toURI()
-        var fileSystem: FileSystem? = null
-        val filePath = if (uri.scheme == "jar") {
-            fileSystem = FileSystems.newFileSystem(uri, emptyMap<String, Any>())
-            fileSystem.getPath(path)
-        } else {
-            Paths.get(uri)
-        }
-        val stream = Files.walk(filePath, 1)
-            .filter { f -> !f.name.contains('$') && f.name.endsWith(".class") }
-        for (file in stream) {
-            val cn = file.name.dropLast(6) // remove .class
-            val qn = "${packageName}.$cn"
-            val kclass = Class.forName(qn).kotlin
-            result.add(kclass)
-        }
-        fileSystem?.close()
-        return result
-    }
 }
 
 // without the following 2 classes, the KotlinCompilerPluginSupportPlugin methods are not called

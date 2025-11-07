@@ -19,11 +19,13 @@ package net.akehurst.kotlinx.collections
 
 import kotlin.jvm.JvmInline
 
-@JvmInline
-value class GraphNodeId(val value: String)
+// @JvmInline
+// TODO: value classes don't work (fully) in js and wasm
+data class GraphNodeId(val value: String)
 
-@JvmInline
-value class GraphEdgeId(val value: String)
+// @JvmInline
+// TODO: value classes don't work (fully) in js and wasm
+data class GraphEdgeId(val value: String)
 
 interface Graph {
     val nodes: Iterable<GraphNode>

@@ -57,17 +57,17 @@ operator fun <T> MutableOrderedSet<T>.plusAssign(elements: Iterable<T>) {
 }
 
 class OrderedSetImpl<E> : OrderedSet<E> {
-    constructor() {
-        this._impl = LinkedHashSet()
-    }
+//    constructor() {
+//        this._impl = LinkedHashSet()
+//    }
 
     constructor(collection: Collection<E>) {
         this._impl = LinkedHashSet(collection)
     }
 
-    constructor(initialCapacity: Int) {
-        this._impl = LinkedHashSet(initialCapacity)
-    }
+//    constructor(initialCapacity: Int) {
+//        this._impl = LinkedHashSet(initialCapacity)
+//    }
 
     private val _impl: LinkedHashSet<E>
 
@@ -102,17 +102,17 @@ class OrderedSetImpl<E> : OrderedSet<E> {
 }
 
 class MutableOrderedSetImpl<E> : MutableOrderedSet<E> {
-    constructor() {
-        this._impl = LinkedHashSet()
-    }
+//    constructor() {
+//        this._impl = LinkedHashSet()
+//    }
 
     constructor(collection: Collection<E>) {
         this._impl = LinkedHashSet(collection)
     }
 
-    constructor(initialCapacity: Int) {
-        this._impl = LinkedHashSet(initialCapacity)
-    }
+//    constructor(initialCapacity: Int) {
+//        this._impl = LinkedHashSet(initialCapacity)
+//    }
 
     private val _impl: LinkedHashSet<E>
 

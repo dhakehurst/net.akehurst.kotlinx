@@ -30,8 +30,8 @@ expect object UserFileSystem : FileSystem{
      */
     suspend fun getDirectory(fullPath:String, mode: FileAccessMode = FileAccessMode.READ_WRITE):DirectoryHandle?
 
-    suspend fun selectDirectoryFromDialog(current: DirectoryHandle? = null, mode: FileAccessMode = FileAccessMode.READ_WRITE): DirectoryHandle?
-    suspend fun selectExistingFileFromDialog(current: DirectoryHandle? = null, mode: FileAccessMode = FileAccessMode.READ_WRITE, useNativeDialog:Boolean=false): FileHandle?
+    suspend fun selectDirectoryFromDialog(current: DirectoryHandle? = null, accessMode: FileAccessMode = FileAccessMode.READ_WRITE): DirectoryHandle?
+    suspend fun selectExistingFileFromDialog(current: DirectoryHandle? = null, accessMode: FileAccessMode = FileAccessMode.READ_WRITE, useNativeDialog:Boolean=false): FileHandle?
     suspend fun selectNewFileFromDialog(parent: DirectoryHandle): FileHandle?
 
     suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle>
@@ -43,5 +43,5 @@ expect object UserFileSystem : FileSystem{
 
     suspend fun writeFileContent(file: FileHandle, content: String)
 
-    suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle
+    suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle?
 }

@@ -5,10 +5,13 @@ import org.gradle.testkit.runner.GradleRunner
 import org.gradle.testkit.runner.TaskOutcome
 import java.io.File
 import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.Path
+import kotlin.io.path.createDirectory
 import kotlin.io.path.createFile
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.deleteRecursively
 import kotlin.test.AfterTest
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -36,7 +39,7 @@ class test_Plugin {
         classpathFile.readLines().map { File(it) }
     }
 
-    val testProjectDir = createTempDirectory("test_plugin")
+    val testProjectDir = createTempDirectory(Path("./temp"),"test_plugin")
     private val buildFile = testProjectDir.resolve("build.gradle.kts").toFile()
     private val settingsFile = testProjectDir.resolve("settings.gradle.kts").toFile()
     private val codeFile = testProjectDir.resolve("src/commonMain/kotlin/test/code.kt").toFile()
@@ -76,7 +79,7 @@ println("===============================================")
             
             plugins {
               kotlin("multiplatform") version ("$$kv")
-              id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") version("2.2.20-SNAPSHOT")
+              id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin2") version("2.2.20-SNAPSHOT")
             }
             repositories {
                 mavenLocal {
@@ -89,13 +92,13 @@ println("===============================================")
             kotlin {
                 //applyDefaultHierarchyTemplate()
                 jvm()
-                //js {
-                //    browser()
-                //}
+                js {
+                    browser()
+                }
             }
             kotlinxReflect {
                 forReflectionMain.set(listOf(
-                    "test",
+                    "test.**",
                 ))
             }
             """.trimIndent()

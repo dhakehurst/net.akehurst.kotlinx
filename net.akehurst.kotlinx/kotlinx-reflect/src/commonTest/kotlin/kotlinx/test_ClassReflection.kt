@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
-package net.akehurst.kotlinx.reflect
+package net.akehurst.kotlinx.reflect.test
 
+import net.akehurst.kotlinx.reflect.KotlinxReflect
+import net.akehurst.kotlinx.reflect.reflect
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
@@ -51,8 +53,8 @@ class test_ClassReflection {
 
     @Test
     fun A_isSupertypeOf_B() {
-        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.CR_A",CR_A::class)
-        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.CR_B",CR_B::class)
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.test.CR_A",CR_A::class)
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.test.CR_B",CR_B::class)
         val actual = CR_A::class.reflect().isSupertypeOf(CR_B::class)
         assertEquals(true, actual)
     }
@@ -71,7 +73,7 @@ class test_ClassReflection {
 
     @Test
     fun construct() {
-        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.CR_A",CR_A::class)
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.test.CR_A",CR_A::class)
         val actual = CR_A::class.reflect().construct()
         assertEquals(CR_A::class, actual::class)
     }
@@ -89,7 +91,7 @@ class test_ClassReflection {
     }
 
     @Test fun accessObject() {
-        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.AnObject",AnObject::class,null, AnObject)
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.test.AnObject",AnObject::class,null, AnObject)
         val actual = AnObject::class.reflect().construct()
         assertEquals(AnObject, actual)
         assertEquals("hello", (actual as AnObject).x)

@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
-package net.akehurst.kotlinx.reflect
+package net.akehurst.kotlinx.reflect.test
 
+import net.akehurst.kotlinx.reflect.EnumValuesFunction
+import net.akehurst.kotlinx.reflect.KotlinxReflect
+import net.akehurst.kotlinx.reflect.reflect
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -46,30 +49,30 @@ class test_KotlinxReflect {
 
     @Test
     fun classForName() {
-        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.KR_A",KR_A::class)
-        val actual = KotlinxReflect.classForName("net.akehurst.kotlinx.reflect.KR_A")
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.test.KR_A",KR_A::class)
+        val actual = KotlinxReflect.classForName("net.akehurst.kotlinx.reflect.test.KR_A")
         assertEquals(KR_A::class, actual)
     }
 
     @Test
     fun isEnum() {
-        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.KR_A",KR_A::class)
-        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.KR_Colour",KR_Colour::class)
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.test.KR_A",KR_A::class)
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.test.KR_Colour",KR_Colour::class)
         assertEquals(false, KR_A::class.reflect().isEnum)
         assertEquals(true, KR_Colour::class.reflect().isEnum)
     }
 
     @Test
     fun enumValues() {
-        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.KR_Colour",KR_Colour::class,KR_Colour::values as EnumValuesFunction)
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.test.KR_Colour",KR_Colour::class,KR_Colour::values as EnumValuesFunction)
         val actual = KR_Colour::class.reflect().enumValues()
-        val expected = KR_Colour.values().asList()
+        val expected = KR_Colour.entries
         assertEquals(expected, actual)
     }
 
     @Test
     fun enumValueOf() {
-        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.KR_Colour",KR_Colour::class)
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.test.KR_Colour",KR_Colour::class)
         val actual = KR_Colour::class.reflect().enumValueOf("RED")
         assertEquals(KR_Colour.RED, actual)
     }

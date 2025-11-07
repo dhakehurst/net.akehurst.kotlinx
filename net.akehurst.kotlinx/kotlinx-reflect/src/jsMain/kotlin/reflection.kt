@@ -24,7 +24,7 @@ import kotlin.reflect.createInstance
 actual fun KFunction<*>.isSuspend(): Boolean = TODO() //this.isSuspend
 
 actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler: Any, proxy: Any?, callable: KCallable<*>, methodName: String, args: Array<out Any>) -> Any?): T {
-    TODO()
+    TODO("JS proxyFor")
 }
 
 actual fun Any.reflect() = ObjectReflection(this)

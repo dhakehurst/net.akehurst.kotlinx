@@ -17,12 +17,14 @@ package net.akehurst.kotlinx.logging.common
 
 import net.akehurst.kotlinx.logging.api.LogLevel
 import net.akehurst.kotlinx.logging.api.Logger
+import net.akehurst.kotlinx.logging.api.LoggingFramework
 import net.akehurst.kotlinx.logging.api.LoggingManager
 import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
 import web.console.console
 
 class LoggerWasmJsConsole(
+    val prefix: String
 ) : Logger {
 
     var outputLevel: LogLevel = LoggingManager.rootLoggingLevel
@@ -45,9 +47,9 @@ class LoggerWasmJsConsole(
             else -> error("Internal Error: cannot log a message to '$lvl'")
         }
         if (null == t) {
-            func(msg)
+            func("$prefix - $msg")
         } else {
-            func(msg)
+            func("$prefix - $msg")
             t.printStackTrace()
         }
     }
@@ -74,4 +76,11 @@ class LoggerWasmJsConsole(
             "$lev: $msg"
         }
     }
+}
+
+object LoggingByBrowserConsole : LoggingFramework {
+    override var rootLoggingLevel: LogLevel = LogLevel.Information
+
+    override fun logger(prefix: String): Logger = LoggerWasmJsConsole(prefix)
+
 }

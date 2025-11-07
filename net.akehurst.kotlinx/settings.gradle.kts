@@ -36,6 +36,8 @@ rootProject.name = file(".").name
 fileTree(".") {
     include ("**/build.gradle.kts")
     exclude ("build.gradle.kts") // Exclude the root _build file.
+    exclude("**/temp/**")
+    exclude(".gradle-build/**")
 }.forEach {
     val prj = it.parentFile.name
     println( "including $prj at "+relativePath(it.parent))

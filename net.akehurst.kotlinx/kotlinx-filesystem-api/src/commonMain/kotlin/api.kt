@@ -52,5 +52,5 @@ interface FileHandle : FileSystemObjectHandle {
     val extension: String
     suspend fun readContent(): String?
     suspend fun writeContent(content: String)
-    suspend fun openAsZipDirectory(): DirectoryHandle
+    suspend fun openAsZipDirectory(): DirectoryHandle?
 }

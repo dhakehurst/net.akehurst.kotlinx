@@ -14,14 +14,12 @@
  * limitations under the License.
  */
 
-package net.akehurst.kotlinx.reflect
+package net.akehurst.kotlinx.reflect.test
 
-import kotlin.js.JsExport
+import net.akehurst.kotlinx.reflect.reflect
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.fail
 
-//@JsExport
 open class OR_A {
     val prop1 = "hello"
     var prop2 = "world"
@@ -47,10 +45,22 @@ class OR_B : OR_A() {
 class test_ObjectReflection {
 
     @Test
+    fun allPropertyNames() {
+        val obj1 = OR_A()
+        val actual = obj1.reflect().allPropertyNames
+        assertEquals(listOf("prop1", "prop2", "prop3", "prop4", "prop5"), actual)
+    }
+
+    @Test
     fun getProperty() {
         val obj1 = OR_A()
         val actual = obj1.reflect().getProperty("prop1")
         assertEquals(obj1.prop1, actual)
+
+//        class MyClass(val property1:String)
+//        val obj = MyClass("hello")
+//        val v = obj::class.getPropertyValue(obj, "property1")
+//        assertEquals("hello", v)
     }
 
     @Test

@@ -1,5 +1,7 @@
+plugins {
+    alias(libs.plugins.jsPlainObjects)
+}
 kotlin {
-
     sourceSets {
         commonMain {
             dependencies {
