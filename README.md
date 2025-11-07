@@ -6,4 +6,11 @@
 
 # net.akehurst.kotlinx
 
-A collection of useful extensions to the kotlin stdlib
+A collection of useful multiplatform extensions to the kotlin stdlib
+
+- Filsystem
+- Logging
+- Reflection
+- Collections
+  - OrderedSet
+  - Stack 
