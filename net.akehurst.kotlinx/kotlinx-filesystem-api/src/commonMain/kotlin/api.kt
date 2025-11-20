@@ -22,11 +22,12 @@ interface FileSystem {
 interface FileSystemObjectHandle {
     val parent:DirectoryHandle?
     val name: String
+    val path: String
+
+    val absolutePath:String
 }
 
 interface DirectoryHandle : FileSystemObjectHandle {
-    val path: String
-
     suspend fun listContent(): List<FileSystemObjectHandle>
 
     /**

@@ -18,9 +18,8 @@
 
 package net.akehurst.kotlinx.filesystem
 
-import js.core.JsPrimitives.toByte
+import js.core.JsPrimitives.toKotlinByte
 import js.iterable.asFlow
-import js.objects.JsPlainObject
 import js.objects.unsafeJso
 import korlibs.io.file.std.ZipVfs
 import korlibs.io.stream.openAsync
@@ -39,14 +38,11 @@ import web.window.window
 import kotlin.js.Promise
 
 
-
 data class DirectoryHandleWasmJS(
     val fileSystem: UserFileSystem,
     override val parent: DirectoryHandleWasmJS?,
     val handle: FileSystemDirectoryHandle
 ) : DirectoryHandleAbstract() {
-
-    override val path: String get() = "${parent?.path ?: ""}/$name"
 
     override val name: String get() = handle.name
 
@@ -70,9 +66,8 @@ data class FileHandleWasmJS(
     val fileSystem: UserFileSystem,
     override val parent: DirectoryHandleWasmJS?,
     val handle: FileSystemFileHandle
-) : FileHandle {
+) : FileHandleAbstract() {
     override val name: String get() = handle.name
-    override val extension: String get() = name.substringAfterLast('.')
 
     override suspend fun readContent(): String? = fileSystem.readFileContent(this)
     override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
@@ -247,7 +242,7 @@ actual object UserFileSystem : FileSystem {
         try {
             val handle = (file as FileHandleWasmJS).handle
             val bytes = handle.getFile().bytes()
-            val byteArray = ByteArray(bytes.byteLength) { bytes[it].toByte() }
+            val byteArray = ByteArray(bytes.byteLength) { bytes[it].toKotlinByte() }
             val zipFs = ZipVfs(byteArray.openAsync())
             return DirectoryHandleKorio(FileSystemKorio, null, zipFs)
         } catch (t: Throwable) {

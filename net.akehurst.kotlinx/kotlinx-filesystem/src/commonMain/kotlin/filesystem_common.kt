@@ -25,6 +25,10 @@ enum class FileAccessMode {
 
 
 abstract class DirectoryHandleAbstract: DirectoryHandle {
+
+    override val path: String get() = "${parent?.path?:""}/$name"
+    override val absolutePath: String get() = path
+
     override suspend fun directory(name: String): DirectoryHandle? {
         val entry = entry(name)
         return when (entry) {
@@ -44,4 +48,8 @@ abstract class DirectoryHandleAbstract: DirectoryHandle {
 
 abstract class FileHandleAbstract : FileHandle {
     override val extension: String get() = name.substringAfterLast('.')
+
+    override val path: String get() = "${parent?.path?:""}/$name"
+    override val absolutePath: String get() = path
+
 }

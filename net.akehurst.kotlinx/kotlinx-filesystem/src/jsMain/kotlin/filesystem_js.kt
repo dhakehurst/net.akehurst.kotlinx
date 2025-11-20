@@ -42,8 +42,6 @@ data class DirectoryHandleJS(
     val handle: FileSystemDirectoryHandle
 ) : DirectoryHandleAbstract() {
 
-    override val path: String get() = "${parent?.path?:""}/$name"
-
     override val name: String get() = handle.name
 
     override suspend fun entry(name: String): FileSystemObjectHandle? =

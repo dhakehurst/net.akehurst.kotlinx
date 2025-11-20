@@ -25,6 +25,9 @@ pluginManagement {
             content{
                 includeGroupByRegex("net\\.akehurst.+")
             }
+            mavenContent {
+                snapshotsOnly()
+            }
         }
         gradlePluginPortal()
         mavenCentral()

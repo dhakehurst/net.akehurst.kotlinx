@@ -53,9 +53,8 @@ data class FileHandleKorio(
     val fileSystem: FileSystemKorio,
     override val parent: DirectoryHandleKorio?,
     val handle: VfsFile
-) : FileHandle {
+) : FileHandleAbstract() {
     override val name: String get() = handle.pathInfo.baseName
-    override val extension: String get() = name.substringAfterLast('.')
 
     override suspend fun readContent(): String? = fileSystem.readFileContent(this)
     override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)

@@ -78,7 +78,7 @@ class LoggerWasmJsConsole(
     }
 }
 
-object LoggingByBrowserConsole : LoggingFramework {
+object LoggingByBrowserConsoleWasm : LoggingFramework {
     override var rootLoggingLevel: LogLevel = LogLevel.Information
 
     override fun logger(prefix: String): Logger = LoggerWasmJsConsole(prefix)

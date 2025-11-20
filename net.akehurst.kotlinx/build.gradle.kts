@@ -40,6 +40,9 @@ allprojects {
             content {
                 includeGroupByRegex("net\\.akehurst.+")
             }
+            mavenContent {
+                snapshotsOnly()
+            }
         }
         mavenCentral()
         gradlePluginPortal()

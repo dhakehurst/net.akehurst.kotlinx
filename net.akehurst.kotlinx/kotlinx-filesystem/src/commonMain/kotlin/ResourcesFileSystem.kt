@@ -35,9 +35,8 @@ class DirectoryHandleVfs(
     private val _handle: VfsFile
 ) : DirectoryHandleAbstract() {
 
-    override val path: String get() = _handle.path
-
     override val name: String get() = _handle.pathInfo.baseName
+    override val absolutePath: String get() = _handle.absolutePath
 
     override suspend fun listContent(): List<FileSystemObjectHandle> {
         return when {
@@ -78,6 +77,7 @@ class FileHandleVfs(
 ) : FileHandleAbstract() {
 
     override val name: String get() = _handle.pathInfo.baseName
+    override val absolutePath: String get() = _handle.absolutePath
 
     override suspend fun readContent(): String? = _handle.readString()
 

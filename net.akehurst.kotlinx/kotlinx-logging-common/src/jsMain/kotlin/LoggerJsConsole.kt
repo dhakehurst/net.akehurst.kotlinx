@@ -24,7 +24,7 @@ import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
 
 class LoggerJsConsole(
-
+    val prefix: String
 ) : Logger {
 
     val outputLevel: LogLevel = LoggingManager.rootLoggingLevel
@@ -47,9 +47,9 @@ class LoggerJsConsole(
             else -> error("Internal Error: cannot log a message to '$lvl'")
         }
         if (null == t) {
-            func(msg)
+            func("$prefix - $msg")
         } else {
-            func(msg)
+            func("$prefix - $msg")
             t.printStackTrace()
         }
     }
@@ -76,4 +76,11 @@ class LoggerJsConsole(
             "$lev: $msg"
         }
     }
+}
+
+object LoggingByBrowserConsoleJs: LoggingFramework {
+    override var rootLoggingLevel: LogLevel = LogLevel.Information
+
+    override fun logger(prefix: String): Logger = LoggerJsConsole(prefix)
+
 }

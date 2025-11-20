@@ -40,8 +40,7 @@ data class DirectoryHandleJVM(
 ) : DirectoryHandleAbstract() {
 
     override val name: String get() = handle.name
-
-    override val path: String get() = handle.path
+    override val absolutePath: String get() = handle.path
 
     override suspend fun entry(name: String): FileSystemObjectHandle? =
         fileSystem.getEntry(this, name)
@@ -65,6 +64,7 @@ data class FileHandleJVM(
 ) : FileHandleAbstract() {
 
     override val name: String get() = handle.name
+    override val absolutePath: String get() = handle.path
 
     override suspend fun readContent(): String? = fileSystem.readFileContent(this)
     override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
