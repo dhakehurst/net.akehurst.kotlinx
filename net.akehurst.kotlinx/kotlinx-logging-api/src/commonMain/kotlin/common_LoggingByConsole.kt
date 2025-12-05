@@ -16,19 +16,29 @@
 
 package net.akehurst.kotlinx.logging.common
 
-import net.akehurst.kotlinx.logging.api.*
+import net.akehurst.kotlinx.logging.api.LogLevel
+import net.akehurst.kotlinx.logging.api.Logger
+import net.akehurst.kotlinx.logging.api.LoggingFramework
+import net.akehurst.kotlinx.logging.api.LoggingManager
 
-class LoggerCommon(
-    val prefix: String,
-    var bind: LogFunction
+
+class LoggerConsole(
+    val prefix: String
 ) : Logger {
+
     val outputLevel = LoggingManager.rootLoggingLevel
+
     override fun log(level: LogLevel, t: Throwable?, lazyMessage: () -> String) {
         when {
-            level <= this.outputLevel -> this.bind.invoke(level, prefix, t, lazyMessage)
+            level <= this.outputLevel -> println("$level: $prefix - ${lazyMessage()}")
             else -> Unit // do nothing
         }
     }
 }
 
+object LoggingByConsole : LoggingFramework {
+    override var rootLoggingLevel: LogLevel = LogLevel.Information
 
+    override fun logger(prefix: String): Logger = LoggerConsole(prefix)
+
+}

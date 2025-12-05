@@ -16,6 +16,8 @@
 
 package net.akehurst.kotlinx.logging.api
 
+import net.akehurst.kotlinx.logging.common.LoggingByConsole
+
 enum class LogLevel { None, Fatal, Error, Warning, Information, Debug, Trace, All }
 
 typealias LogFunction = (level: LogLevel, prefix: String, t: Throwable?, lazyMessage: () -> String) -> Unit
@@ -54,15 +56,20 @@ fun logger(prefix: String): Logger = LoggingManager.logger(prefix)
 
 object LoggingManager {
 
-    private var _framework: LoggingFramework? = null
+    private var _framework: LoggingFramework = LoggingByConsole
 
     var rootLoggingLevel
-        get() = _framework?.rootLoggingLevel ?: error("No LoggingFramework has been registered")
-        set(value) = _framework?.let { it.rootLoggingLevel = value } ?: error("No LoggingFramework has been registered")
+        get() = _framework.rootLoggingLevel
+        set(value) = _framework.let { it.rootLoggingLevel = value }
 
     fun use(framework: LoggingFramework) {
         _framework = framework
+        LoggingByConsole.logger("LoggingManager").logInformation { "using ${_framework::class.simpleName}" }
     }
 
-    fun logger(prefix: String): Logger = _framework?.logger(prefix) ?: error("No LoggingFramework has been registered")
+    fun logger(prefix: String): Logger = _framework.logger(prefix)
+
+    init {
+        LoggingByConsole.logger("LoggingManager").logInformation { "using ${_framework::class.simpleName}" }
+    }
 }
