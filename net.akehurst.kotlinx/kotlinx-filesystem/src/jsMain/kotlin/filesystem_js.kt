@@ -72,8 +72,9 @@ data class FileHandleJS(
 actual object UserFileSystem : FileSystem {
 
     actual suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
-        return when (parent) {
-            is DirectoryHandleJS -> {
+        return when {
+            name.isEmpty() -> parent
+            parent is DirectoryHandleJS -> {
                 val list = parent.handle.values().asFlow().toList() //FIXME: iterate without making a list
                 for (v in list) {
                     when (v.name) {

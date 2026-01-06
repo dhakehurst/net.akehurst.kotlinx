@@ -87,8 +87,9 @@ fun FilePickerOptions(mode: String): JsAny = js("({mode:mode})")
 actual object UserFileSystem : FileSystem {
 
     actual suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
-        return when (parent) {
-            is DirectoryHandleWasmJS -> {
+        return when {
+            name.isEmpty() -> parent
+            parent is DirectoryHandleWasmJS -> {
                 val list = parent.handle.values().asFlow().toList()  //FIXME: iterate without making a list
                 for (v in list) {
                     when (v.name) {

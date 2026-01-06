@@ -15,15 +15,19 @@
  *
  */
 
-package net.akehurst.kotlinx.utils
+package net.akehurst.kotlinx.collections
 
-fun <IN, OUT> cachedSuspend(initializer: suspend (IN) -> OUT) = CachedValueSuspend(initializer)
+fun <IN, OUT> cachedByKeySuspend(initializer: suspend (IN) -> OUT) = CachedValueSuspend(initializer)
 
 class CachedValueSuspend<IN, OUT>(
     var initializer: suspend (IN) -> OUT
 ) {
 
     private val _cache = mutableMapOf<IN, OUT>()
+
+    fun containsKey(key: IN) = _cache.containsKey(key)
+
+    fun getCachedValueOrNull(key: IN): OUT? = _cache[key]
 
     suspend operator fun get(key: IN): OUT? = when {
         _cache.containsKey(key) -> _cache[key]

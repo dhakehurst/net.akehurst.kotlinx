@@ -74,8 +74,9 @@ data class FileHandleJVM(
 actual object UserFileSystem : FileSystem {
 
     actual suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
-        return when (parent) {
-            is DirectoryHandleJVM -> {
+        return when {
+            name.isEmpty() -> parent
+            parent is DirectoryHandleJVM -> {
                 val f = parent.handle.resolve(name)
                 when {
                     f.exists().not() -> null
