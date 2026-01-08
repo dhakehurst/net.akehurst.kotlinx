@@ -36,6 +36,7 @@ data class DirectoryHandleKorio(
 
     override val name: String get() = handle.pathInfo.baseName
 
+    override suspend fun exists(): Boolean = fileSystem.exists(this)
     override suspend fun entry(name: String): FileSystemObjectHandle? = fileSystem.getEntry(this, name)
     override suspend fun listContent(): List<FileSystemObjectHandle> = fileSystem.listDirectoryContent(this)
 
@@ -56,6 +57,7 @@ data class FileHandleKorio(
 ) : FileHandleAbstract() {
     override val name: String get() = handle.pathInfo.baseName
 
+    override suspend fun exists(): Boolean = fileSystem.exists(this)
     override suspend fun readContent(): String? = fileSystem.readFileContent(this)
     override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
     override suspend fun openAsZipDirectory(): DirectoryHandle = fileSystem.openFileAsZipDirectory(this)
@@ -152,6 +154,14 @@ object FileSystemKorio : FileSystem {
             }
 
             else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+        }
+    }
+
+    suspend fun exists(fileHandle: FileSystemObjectHandle): Boolean {
+        return when (fileHandle) {
+            is FileHandleKorio -> fileHandle.handle.exists()
+            is DirectoryHandleKorio -> fileHandle.handle.exists()
+            else -> error("fileHandle is not a DirectoryHandleKorio or a FileHandleKorio: ${fileHandle::class.simpleName}")
         }
     }
 

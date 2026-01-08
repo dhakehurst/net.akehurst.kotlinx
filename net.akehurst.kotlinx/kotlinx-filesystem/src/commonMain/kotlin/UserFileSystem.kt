@@ -30,14 +30,16 @@ expect object UserFileSystem : FileSystem{
      */
     suspend fun getDirectory(fullPath:String, mode: FileAccessMode = FileAccessMode.READ_WRITE):DirectoryHandle?
 
-    suspend fun selectDirectoryFromDialog(current: DirectoryHandle? = null, accessMode: FileAccessMode = FileAccessMode.READ_WRITE): DirectoryHandle?
-    suspend fun selectExistingFileFromDialog(current: DirectoryHandle? = null, accessMode: FileAccessMode = FileAccessMode.READ_WRITE, useNativeDialog:Boolean=false): FileHandle?
-    suspend fun selectNewFileFromDialog(parent: DirectoryHandle): FileHandle?
+    suspend fun selectDirectoryFromDialog(dialogTitle:String, current: DirectoryHandle? = null, accessMode: FileAccessMode = FileAccessMode.READ_WRITE): DirectoryHandle?
+    suspend fun selectExistingFileFromDialog(dialogTitle:String, current: DirectoryHandle? = null, accessMode: FileAccessMode = FileAccessMode.READ_WRITE, useNativeDialog:Boolean=false): FileHandle?
+    suspend fun selectNewFileFromDialog(dialogTitle:String, parent: DirectoryHandle): FileHandle?
 
     suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle>
 
     suspend fun createNewFile(parent: DirectoryHandle, name:String): FileHandle?
     suspend fun createNewDirectory(parent: DirectoryHandle, name:String): DirectoryHandle?
+
+    suspend fun exists(entry: FileSystemObjectHandle): Boolean
 
     suspend fun readFileContent(file: FileHandle): String?
 

@@ -20,11 +20,12 @@ interface FileSystem {
 }
 
 interface FileSystemObjectHandle {
-    val parent:DirectoryHandle?
+    val parent: DirectoryHandle?
     val name: String
     val path: String
+    val absolutePath: String
 
-    val absolutePath:String
+    suspend fun exists(): Boolean
 }
 
 interface DirectoryHandle : FileSystemObjectHandle {

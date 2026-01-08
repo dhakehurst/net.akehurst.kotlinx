@@ -30,7 +30,7 @@ class UserHomeFileSystem(path: String) : FileSystemFromVfs(userHomeVfs[path].jai
 object ResourcesFileSystem : FileSystemFromVfs(resourcesVfs)
 
 class DirectoryHandleVfs(
-    val filesystem: FileSystemFromVfs,
+    val fileSystem: FileSystemFromVfs,
     override val parent: DirectoryHandleVfs?,
     private val _handle: VfsFile
 ) : DirectoryHandleAbstract() {
@@ -38,6 +38,7 @@ class DirectoryHandleVfs(
     override val name: String get() = _handle.pathInfo.baseName
     override val absolutePath: String get() = _handle.absolutePath
 
+    override suspend fun exists(): Boolean = fileSystem.exists(_handle)
     override suspend fun listContent(): List<FileSystemObjectHandle> {
         return when {
             _handle.isFile() -> emptyList()
@@ -52,8 +53,8 @@ class DirectoryHandleVfs(
     override suspend fun entry(name: String): FileSystemObjectHandle? {
         return _handle[name].takeIfExists()?.let {
             when {
-                it.isDirectory() -> DirectoryHandleVfs(filesystem, this,it)
-                it.isFile() -> FileHandleVfs(filesystem, this,it)
+                it.isDirectory() -> DirectoryHandleVfs(fileSystem, this,it)
+                it.isFile() -> FileHandleVfs(fileSystem, this,it)
                 else -> null
             }
         }
@@ -66,12 +67,12 @@ class DirectoryHandleVfs(
     override suspend fun createFile(name: String): FileHandle? {
         _handle[name].ensureParents()
         _handle[name].writeString("")
-        return FileHandleVfs(filesystem, this,_handle[name])
+        return FileHandleVfs(fileSystem, this,_handle[name])
     }
 }
 
 class FileHandleVfs(
-    val filesystem: FileSystemFromVfs,
+    val fileSystem: FileSystemFromVfs,
     override val parent: DirectoryHandleVfs?,
     private val _handle: VfsFile
 ) : FileHandleAbstract() {
@@ -79,8 +80,8 @@ class FileHandleVfs(
     override val name: String get() = _handle.pathInfo.baseName
     override val absolutePath: String get() = _handle.absolutePath
 
+    override suspend fun exists(): Boolean = fileSystem.exists(_handle)
     override suspend fun readContent(): String? = _handle.readString()
-
     override suspend fun writeContent(content: String)=_handle.writeString(content)
     override suspend fun openAsZipDirectory(): DirectoryHandle {
         TODO("not implemented")
@@ -105,6 +106,10 @@ open class FileSystemFromVfs(
         return _vfsRoot[resourcePath].takeIfExists()?.let {
             FileHandleVfs(this, null,it)
         }
+    }
+
+    suspend fun exists(resourcePath: VfsFile): Boolean {
+        return resourcePath.exists()
     }
 
     suspend fun read(resourcePath: String): String {

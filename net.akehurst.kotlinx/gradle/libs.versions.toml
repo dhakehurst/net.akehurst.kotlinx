@@ -12,14 +12,19 @@ kotlinx-coroutines = "1.10.2"
 kotlinx-wrappers = "2025.11.8"
 datastore = "1.2.0"
 kotlinx-serialization = "1.9.0"
-
+cryptography = "0.5.0"
 
 [libraries]
 korlibs-korio = { module = "com.soywiz:korlibs-io", version.ref = "korlibs" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-wrappers-js = { module = "org.jetbrains.kotlin-wrappers:kotlin-js", version.ref = "kotlinx-wrappers"  }
 kotlinx-wrappers-browser = { module = "org.jetbrains.kotlin-wrappers:kotlin-browser", version.ref = "kotlinx-wrappers" }
+kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+cryptography-core = {module="dev.whyoleg.cryptography:cryptography-core", version.ref="cryptography"}
+cryptography-provider-optimal = {module="dev.whyoleg.cryptography:cryptography-provider-optimal", version.ref="cryptography"}
+
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 
 
 [plugins]

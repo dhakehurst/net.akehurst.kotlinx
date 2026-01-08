@@ -44,6 +44,8 @@ data class DirectoryHandleJS(
 
     override val name: String get() = handle.name
 
+    override suspend fun exists(): Boolean = fileSystem.exists(this)
+
     override suspend fun entry(name: String): FileSystemObjectHandle? =
         fileSystem.getEntry(this, name)
 
@@ -64,6 +66,8 @@ data class FileHandleJS(
     val handle: FileSystemFileHandle
 ) : FileHandleAbstract() {
     override val name: String get() = handle.name
+
+    override suspend fun exists(): Boolean = fileSystem.exists(this)
     override suspend fun readContent(): String? = fileSystem.readFileContent(this)
     override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
     override suspend fun openAsZipDirectory(): DirectoryHandle? = fileSystem.openFileAsZipDirectory(this)
@@ -97,11 +101,11 @@ actual object UserFileSystem : FileSystem {
     }
 
     actual suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
-        return selectDirectoryFromDialog(null, mode)
+        return selectDirectoryFromDialog("Choose Directory",null, mode)
     }
 
     @OptIn(ExperimentalWebApi::class)
-    actual suspend fun selectDirectoryFromDialog(current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
+    actual suspend fun selectDirectoryFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
         return try {
             val dpo: DirectoryPickerOptions = when (accessMode) {
                 FileAccessMode.READ_ONLY -> unsafeJso { mode = FileSystemPermissionMode.read }
@@ -115,7 +119,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
+    actual suspend fun selectExistingFileFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         val w: dynamic = window
         val p: Promise<dynamic> = when (accessMode) {
             FileAccessMode.READ_ONLY -> w.showOpenFilePicker(js("{mode:'read'}"))
@@ -130,7 +134,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectNewFileFromDialog(parent: DirectoryHandle): FileHandle? {
+    actual suspend fun selectNewFileFromDialog(dialogTitle:String,parent: DirectoryHandle): FileHandle? {
         return try {
             val w: dynamic = window
             val p: Promise<dynamic> = w.showSaveFilePicker(js("{}"))
@@ -203,6 +207,14 @@ actual object UserFileSystem : FileSystem {
         } catch (t: Throwable) {
             t.printStackTrace()
             null
+        }
+    }
+
+    actual suspend fun exists(entry: FileSystemObjectHandle): Boolean  {
+        return when (entry) {
+            is FileHandleJS -> try { entry.handle.getFile(); true } catch (_: Exception) { false }
+            is DirectoryHandleJS -> try { entry.handle.values(); true } catch (_: Exception) { false }
+            else -> error("entry is not a FileHandleJS or a DirectoryHandleJS: ${entry::class.simpleName}")
         }
     }
 

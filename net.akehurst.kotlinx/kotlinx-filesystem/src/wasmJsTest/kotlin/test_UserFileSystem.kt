@@ -11,7 +11,7 @@ class test_UserFileSystem {
     @Test
     fun test_ReadStream() {
         runBlockingNoJs {
-            val file = UserFileSystem.selectExistingFileFromDialog(null, FileAccessMode.READ_ONLY)
+            val file = UserFileSystem.selectExistingFileFromDialog("Select file",null, FileAccessMode.READ_ONLY)
 
             val content = file?.readContent()
 
