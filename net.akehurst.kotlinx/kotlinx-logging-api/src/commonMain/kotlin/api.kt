@@ -62,14 +62,15 @@ object LoggingManager {
         get() = _framework.rootLoggingLevel
         set(value) = _framework.let { it.rootLoggingLevel = value }
 
-    fun use(framework: LoggingFramework) {
+    fun use(framework: LoggingFramework, rootLoggingLevel:LogLevel = LogLevel.Information) {
         _framework = framework
-        LoggingByConsole.logger("LoggingManager").logInformation { "using ${_framework::class.simpleName}" }
+        this.rootLoggingLevel = rootLoggingLevel
+        framework.logger("LoggingManager").logInformation { "using ${_framework::class.simpleName}" }
     }
 
     fun logger(prefix: String): Logger = _framework.logger(prefix)
 
     init {
-        LoggingByConsole.logger("LoggingManager").logInformation { "using ${_framework::class.simpleName}" }
+        _framework.logger("LoggingManager").logInformation { "using ${_framework::class.simpleName}" }
     }
 }
