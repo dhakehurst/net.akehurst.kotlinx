@@ -3,9 +3,9 @@ project = "2.2.21-SNAPSHOT"
 
 kotlin = "2.2.21"
 dokka = "2.1.0"
-buildconfig = "5.7.1"
+buildconfig = "6.0.7"
 vanniktech = "0.35.0"
-exportPublic = "2.2.21-SNAPSHOT"
+exportPublic = "2.2.21"
 
 korlibs = "6.0.2"
 kotlinx-coroutines = "1.10.2"

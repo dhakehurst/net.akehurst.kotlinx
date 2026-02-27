@@ -45,22 +45,11 @@ data class DirectoryHandleWasmJS(
 ) : DirectoryHandleAbstract() {
 
     override val name: String get() = handle.name
-
     override suspend fun exists(): Boolean = fileSystem.exists(this)
-
-    override suspend fun entry(name: String): FileSystemObjectHandle? =
-        fileSystem.getEntry(this, name)
-
-    override suspend fun listContent(): List<FileSystemObjectHandle> =
-        fileSystem.listDirectoryContent(this)
-
-    override suspend fun createDirectory(name: String): DirectoryHandle? {
-        TODO("not implemented")
-    }
-
-    override suspend fun createFile(name: String): FileHandle? {
-        TODO("not implemented")
-    }
+    override suspend fun entry(name: String): FileSystemObjectHandle? = fileSystem.getEntry(this, name)
+    override suspend fun listContent(): List<FileSystemObjectHandle> = fileSystem.listDirectoryContent(this)
+    override suspend fun createDirectory(name: String): DirectoryHandle? = fileSystem.createNewDirectory(this, name)
+    override suspend fun createFile(name: String): FileHandle? = fileSystem.createNewFile(this, name)
 
 }
 
@@ -114,11 +103,11 @@ actual object UserFileSystem : FileSystem {
     }
 
     actual suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
-        return selectDirectoryFromDialog("Choose Directory",null, mode)
+        return selectDirectoryFromDialog("Choose Directory", null, mode)
     }
 
     @OptIn(ExperimentalWebApi::class)
-    actual suspend fun selectDirectoryFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
+    actual suspend fun selectDirectoryFromDialog(dialogTitle: String, current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
         return try {
             val dpo: DirectoryPickerOptions = when (accessMode) {
                 FileAccessMode.READ_ONLY -> unsafeJso { mode = FileSystemPermissionMode.read }
@@ -132,7 +121,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
+    actual suspend fun selectExistingFileFromDialog(dialogTitle: String, current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         return try {
             val p = (window as WasmWindow).showOpenFilePicker(
                 FilePickerOptions(mode = accessMode.name)
@@ -145,7 +134,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectNewFileFromDialog(dialogTitle:String,parent: DirectoryHandle): FileHandle? {
+    actual suspend fun selectNewFileFromDialog(dialogTitle: String, parent: DirectoryHandle): FileHandle? {
         val p = (window as WasmWindow).showSaveFilePicker()
         return try {
             val handle: FileSystemFileHandle = p.await()
@@ -165,7 +154,7 @@ actual object UserFileSystem : FileSystem {
                         val o = when (v.kind) {
                             FileSystemHandleKind.file -> FileHandleWasmJS(this, dir, dir.handle.getFileHandle(v.name))
                             FileSystemHandleKind.directory -> DirectoryHandleWasmJS(this, dir, dir.handle.getDirectoryHandle(v.name))
-                          //  else -> error("Should not happen")
+                            //  else -> error("Should not happen")
                         }
                         list.add(o)
                     }
@@ -212,10 +201,20 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun exists(entry: FileSystemObjectHandle): Boolean  {
+    actual suspend fun exists(entry: FileSystemObjectHandle): Boolean {
         return when (entry) {
-            is FileHandleWasmJS -> try { entry.handle.getFile(); true } catch (_: Exception) { false }
-            is DirectoryHandleWasmJS -> try { entry.handle.values(); true } catch (_: Exception) { false }
+            is FileHandleWasmJS -> try {
+                entry.handle.getFile(); true
+            } catch (_: Exception) {
+                false
+            }
+
+            is DirectoryHandleWasmJS -> try {
+                entry.handle.values(); true
+            } catch (_: Exception) {
+                false
+            }
+
             else -> error("entry is not a FileHandleWasmJS or a DirectoryHandleWasmJS: ${entry::class.simpleName}")
         }
     }

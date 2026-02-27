@@ -43,7 +43,7 @@ private val org.apache.logging.log4j.Level.asLevel: LogLevel
         org.apache.logging.log4j.Level.INFO -> LogLevel.Information
         org.apache.logging.log4j.Level.DEBUG -> LogLevel.Debug
         org.apache.logging.log4j.Level.TRACE -> LogLevel.Trace
-        else -> LogLevel.All //TODO: this is wrong if there are customer logging levels!
+        else -> LogLevel.All //TODO: this is wrong if there are custom logging levels!
     }
 
 object LoggingByLog4J : LoggingFramework {
