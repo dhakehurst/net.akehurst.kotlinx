@@ -85,11 +85,12 @@ fun String.toRegexFromGlob(separator: Char, options: Set<RegexOption> = emptySet
             '[' -> {
                 inCharacterClass++
                 firstIndexInClass = i + 1
-                regex += '['
+                // Wrap the user-provided class so we can always intersect with "not separator" safely.
+                regex += "[["
             }
             ']' -> {
                 inCharacterClass--
-                regex += "&&[^$separator]]"
+                regex += "]&&[^$separator]]"
             }
             '{' -> {
                 inGroup++
