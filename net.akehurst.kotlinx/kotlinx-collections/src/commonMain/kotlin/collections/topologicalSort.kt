@@ -16,6 +16,8 @@
 
 package net.akehurst.kotlinx.collections
 
+import kotlin.collections.iterator
+
 /**
  * A Partial Order Sort, because sometimes things are unrelated but still need sorting.
  * Using a Topological Sort from Kahn's Algorithm [https://en.wikipedia.org/wiki/Topological_sorting]

@@ -16,17 +16,16 @@
 
 package net.akehurst.kotlinx.collections
 
-
 inline fun <K, V> mutableMapNonNullOf() = MutableMapNonNullDefault(mutableMapOf<K, V>())
 
-interface MapNonNull<K, out V> : Map<K, V> {
+interface MapNotNull<K, out V> : Map<K, V> {
     override operator fun get(key: K): V
 }
 
-interface MutableMapNonNull<K, V> : MapNonNull<K, V>, MutableMap<K, V> {
+interface MutableMapNotNull<K, V> : MapNotNull<K, V>, MutableMap<K, V> {
     override operator fun get(key: K): V
 }
 
-class MutableMapNonNullDefault<K, V>(private val map: MutableMap<K, V>) : MutableMapNonNull<K, V>, MutableMap<K, V> by map {
+class MutableMapNonNullDefault<K, V>(private val map: MutableMap<K, V>) : MutableMapNotNull<K, V>, MutableMap<K, V> by map {
     override fun get(key: K): V = this.map[key]!!
 }

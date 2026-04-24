@@ -18,7 +18,6 @@ package net.akehurst.kotlinx.reflect
 
 import net.akehurst.kotlinx.collections.transitveClosure
 import java.lang.reflect.InvocationHandler
-import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import kotlin.reflect.*

@@ -17,8 +17,6 @@
 
 package net.akehurst.kotlinx.collections
 
-import kotlin.jvm.JvmInline
-
 // @JvmInline
 // TODO: value classes don't work (fully) in js and wasm
 data class GraphNodeId(val value: String)
