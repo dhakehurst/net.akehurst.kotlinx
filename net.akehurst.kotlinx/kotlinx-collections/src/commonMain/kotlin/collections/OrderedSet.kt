@@ -57,17 +57,10 @@ operator fun <T> MutableOrderedSet<T>.plusAssign(elements: Iterable<T>) {
 }
 
 class OrderedSetImpl<E> : OrderedSet<E> {
-//    constructor() {
-//        this._impl = LinkedHashSet()
-//    }
 
     constructor(collection: Collection<E>) {
         this._impl = LinkedHashSet(collection)
     }
-
-//    constructor(initialCapacity: Int) {
-//        this._impl = LinkedHashSet(initialCapacity)
-//    }
 
     private val _impl: LinkedHashSet<E>
 
@@ -89,7 +82,7 @@ class OrderedSetImpl<E> : OrderedSet<E> {
             other !is OrderedSet<*> -> false
             other.size != this.size -> false
             else -> {
-                for (i in 0..this.size) {
+                for (i in 0 until this.size) {
                     if (this[i] != other[i]) return false
                 }
                 true
@@ -102,17 +95,10 @@ class OrderedSetImpl<E> : OrderedSet<E> {
 }
 
 class MutableOrderedSetImpl<E> : MutableOrderedSet<E> {
-//    constructor() {
-//        this._impl = LinkedHashSet()
-//    }
 
     constructor(collection: Collection<E>) {
         this._impl = LinkedHashSet(collection)
     }
-
-//    constructor(initialCapacity: Int) {
-//        this._impl = LinkedHashSet(initialCapacity)
-//    }
 
     private val _impl: LinkedHashSet<E>
 
