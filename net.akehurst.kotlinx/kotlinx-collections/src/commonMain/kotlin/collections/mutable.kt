@@ -17,7 +17,18 @@
 
 package net.akehurst.kotlinx.collections
 
-inline val <E> Collection<E>.mutableCollection get() = this as MutableCollection
-inline val <E> List<E>.mutableList get() = this as MutableList
-inline val <E> Set<E>.mutableSet get() = this as MutableSet
-inline val <E> OrderedSet<E>.mutableOrderedSet get() = this as MutableOrderedSet
+object ListExt {
+    inline val <E> List<E>.mutable get() = this as MutableList
+}
+
+object CollectionExt {
+    inline val <E> Collection<E>.mutableCollection get() = this as MutableCollection
+}
+
+object SetExt {
+    inline val <E> Set<E>.mutable get() = this as MutableSet
+}
+
+object OrderedSetExt {
+    inline val <E> OrderedSet<E>.mutable get() = this as MutableOrderedSet
+}

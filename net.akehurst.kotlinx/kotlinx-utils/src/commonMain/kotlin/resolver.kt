@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 Dr. David H. Akehurst (http://dr.david.h.akehurst.net)
+ * Copyright (C) 2026 Dr. David H. Akehurst (http://dr.david.h.akehurst.net)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,21 +17,12 @@
 
 package net.akehurst.kotlinx.utils
 
-class UniqueIdentityGenerator(
-    val commonPrefix:String = ""
-) {
+interface Resolver {
+    val identity: Any
+}
 
-    companion object {
-        val GLOBAL = UniqueIdentityGenerator()
-    }
-
-    internal val next = mutableMapOf<String, Long>()
-
-    fun generate(prefix: String = "id"): String {
-        val p = commonPrefix+prefix
-        val num = next[p] ?: 0L
-        next[p] = num + 1
-        return "${p}${num}"
-    }
-
+interface HierarchicalResolver : Resolver {
+    val parentResolver: HierarchicalResolver?
+    val rootResolver: HierarchicalResolver
+    val qualifiedIdentity: List<Any>
 }

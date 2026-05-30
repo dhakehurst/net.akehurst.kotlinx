@@ -30,8 +30,8 @@ import kotlin.reflect.KClass
 class ManagedList<E : Any>(
     private val name: String,
     private val expectedType: KClass<*>,
-    private val onAdd: ((E) -> Unit)? = null,
-    private val onRemove: ((E) -> Unit)? = null
+    private val onAdded: ((E) -> Unit)? = null,
+    private val onRemoved: ((E) -> Unit)? = null
 ) : AbstractMutableList<E>() {
 
     // The actual raw data storage
@@ -56,21 +56,21 @@ class ManagedList<E : Any>(
         validateType(element)
         delegate.add(index, element)
         // Trigger the mutation management
-        onAdd?.invoke(element)
+        onAdded?.invoke(element)
     }
 
     override fun set(index: Int, element: E): E {
         validateType(element)
         val oldElement = delegate.set(index, element)
-        onRemove?.invoke(oldElement)
-        onAdd?.invoke(element)
+        onRemoved?.invoke(oldElement)
+        onAdded?.invoke(element)
         return oldElement
     }
 
     override fun removeAt(index: Int): E {
         val removedElement = delegate.removeAt(index)
         // Trigger mutation management
-        onRemove?.invoke(removedElement)
+        onRemoved?.invoke(removedElement)
         return removedElement
     }
 }
@@ -86,8 +86,8 @@ class ManagedList<E : Any>(
 class ManagedSet<E : Any>(
     private val name: String,
     private val expectedType: KClass<*>,
-    private val onAdd: ((E) -> Unit)? = null,
-    private val onRemove: ((E) -> Unit)? = null
+    private val onAdded: ((E) -> Unit)? = null,
+    private val onRemoved: ((E) -> Unit)? = null
 ) : AbstractMutableSet<E>() {
 
     // The actual raw data storage
@@ -110,7 +110,7 @@ class ManagedSet<E : Any>(
         validateType(element)
         val res = delegate.add(element)
         // Trigger the mutation management
-        if(res) onAdd?.invoke(element)
+        if(res) onAdded?.invoke(element)
         return res
     }
 
@@ -130,7 +130,7 @@ class ManagedSet<E : Any>(
             override fun remove() {
                 val item = lastReturned ?: throw IllegalStateException("next() must be called before remove()")
                 baseIterator.remove()
-                onRemove?.invoke(item) // Safely fires your SysML reference tracking
+                onRemoved?.invoke(item) // Safely fires your SysML reference tracking
                 lastReturned = null
             }
         }
@@ -140,8 +140,8 @@ class ManagedSet<E : Any>(
 class ManagedOrderedSet<E : Any>(
     private val name: String,
     private val expectedType: KClass<*>,
-    private val onAdd: ((E) -> Unit)? = null,
-    private val onRemove: ((E) -> Unit)? = null
+    private val onAdded: ((E) -> Unit)? = null,
+    private val onRemoved: ((E) -> Unit)? = null
 ) : AbstractMutableSet<E>(), MutableOrderedSet<E> {
 
     // The actual raw data storage
@@ -164,7 +164,7 @@ class ManagedOrderedSet<E : Any>(
         validateType(element)
         val res = delegate.add(element)
         // Trigger the mutation management
-        if(res) onAdd?.invoke(element)
+        if(res) onAdded?.invoke(element)
         return res
     }
 
@@ -184,7 +184,7 @@ class ManagedOrderedSet<E : Any>(
             override fun remove() {
                 val item = lastReturned ?: throw IllegalStateException("next() must be called before remove()")
                 baseIterator.remove()
-                onRemove?.invoke(item) // Safely fires your SysML reference tracking
+                onRemoved?.invoke(item) // Safely fires your SysML reference tracking
                 lastReturned = null
             }
         }
