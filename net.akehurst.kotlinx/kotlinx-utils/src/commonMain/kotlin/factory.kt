@@ -25,4 +25,5 @@ interface HierarchicalFactory : Factory {
     val parentFactory: HierarchicalFactory?
     val rootFactory: HierarchicalFactory
     val qualifiedIdentity: List<Any>
+    val qualifiedName: String get() = qualifiedIdentity.joinToString(".")
 }

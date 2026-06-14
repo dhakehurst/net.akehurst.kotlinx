@@ -17,7 +17,71 @@
 
 package net.akehurst.kotlinx.collections
 
+import net.akehurst.kotlinx.utils.Reference
 import kotlin.reflect.KClass
+
+/**
+ * A custom collection (Bag) that enforces runtime type safety and triggers mutation hooks.
+ *
+ * @param name A name for the list - assists with informative error reporting about violations.
+ * @param expectedType The strict type required (for runtime checking).
+ * @param onAdd Callback fired when an element is successfully added.
+ * @param onRemove Callback fired when an element is removed.
+ */
+open class ManagedCollection<E : Any>(
+    private val name: String,
+    private val expectedType: KClass<*>,
+    private val onAdded: ((E) -> Unit)? = null,
+    private val onRemoved: ((E) -> Unit)? = null
+) : AbstractMutableCollection<E>() {
+
+    // The actual raw data storage
+    private val delegate = mutableListOf<E>()
+
+    override val size: Int get() = delegate.size
+
+    /**
+     * This intercepts elements coming from generic upcasts.
+     */
+    protected open fun validateType(element: E) {
+        if (!expectedType.isInstance(element)) {
+            throw IllegalArgumentException(
+                "Managed List violation on '$name': Expected '${expectedType.simpleName}', but got '${element::class.simpleName}'."
+            )
+        }
+    }
+
+    override fun add(element: E): Boolean {
+        validateType(element)
+        val res = delegate.add(element)
+        // Trigger the mutation management
+        if(res) onAdded?.invoke(element)
+        return res
+    }
+
+    override fun iterator(): MutableIterator<E> {
+        val baseIterator = delegate.iterator()
+        return object : MutableIterator<E> {
+            private var lastReturned: E? = null
+
+            override fun hasNext(): Boolean = baseIterator.hasNext()
+
+            override fun next(): E {
+                val nextVal = baseIterator.next()
+                lastReturned = nextVal
+                return nextVal
+            }
+
+            override fun remove() {
+                val item = lastReturned ?: throw IllegalStateException("next() must be called before remove()")
+                baseIterator.remove()
+                onRemoved?.invoke(item) // Safely fires your SysML reference tracking
+                lastReturned = null
+            }
+        }
+    }
+
+}
 
 /**
  * A custom list that enforces runtime type safety and triggers mutation hooks.
@@ -27,7 +91,7 @@ import kotlin.reflect.KClass
  * @param onAdd Callback fired when an element is successfully added.
  * @param onRemove Callback fired when an element is removed.
  */
-class ManagedList<E : Any>(
+open class ManagedList<E : Any>(
     private val name: String,
     private val expectedType: KClass<*>,
     private val onAdded: ((E) -> Unit)? = null,
@@ -44,7 +108,7 @@ class ManagedList<E : Any>(
     /**
      * This intercepts elements coming from generic upcasts.
      */
-    private fun validateType(element: E) {
+    protected open fun validateType(element: E) {
         if (!expectedType.isInstance(element)) {
             throw IllegalArgumentException(
                 "Managed List violation on '$name': Expected '${expectedType.simpleName}', but got '${element::class.simpleName}'."
@@ -83,7 +147,7 @@ class ManagedList<E : Any>(
  * @param onAdd Callback fired when an element is successfully added.
  * @param onRemove Callback fired when an element is removed.
  */
-class ManagedSet<E : Any>(
+open class ManagedSet<E : Any>(
     private val name: String,
     private val expectedType: KClass<*>,
     private val onAdded: ((E) -> Unit)? = null,
@@ -98,7 +162,7 @@ class ManagedSet<E : Any>(
     /**
      * This intercepts elements coming from generic upcasts.
      */
-    private fun validateType(element: E) {
+    protected open fun validateType(element: E) {
         if (!expectedType.isInstance(element)) {
             throw IllegalArgumentException(
                 "Managed List violation on '$name': Expected '${expectedType.simpleName}', but got '${element::class.simpleName}'."
@@ -137,7 +201,7 @@ class ManagedSet<E : Any>(
     }
 }
 
-class ManagedOrderedSet<E : Any>(
+open class ManagedOrderedSet<E : Any>(
     private val name: String,
     private val expectedType: KClass<*>,
     private val onAdded: ((E) -> Unit)? = null,
@@ -152,7 +216,7 @@ class ManagedOrderedSet<E : Any>(
     /**
      * This intercepts elements coming from generic upcasts.
      */
-    private fun validateType(element: E) {
+    protected open fun validateType(element: E) {
         if (!expectedType.isInstance(element)) {
             throw IllegalArgumentException(
                 "Managed List violation on '$name': Expected '${expectedType.simpleName}', but got '${element::class.simpleName}'."
@@ -195,5 +259,75 @@ class ManagedOrderedSet<E : Any>(
             if (index == i) return e
         }
         throw IndexOutOfBoundsException("$index")
+    }
+}
+
+// collections of references need different runtime validation of content
+
+open class ManagedReferenceCollection<T : Any>(
+    name: String,
+    private val referenceType: KClass<T>,
+    onAdded: ((Reference<Any, T>) -> Unit)? = null,
+    onRemoved: ((Reference<Any, T>) -> Unit)? = null
+) : ManagedCollection<Reference<Any, T>>(name, Reference::class, onAdded, onRemoved) {
+
+    override fun validateType(element: Reference<Any, T>) {
+        val resolvedValue = element.resolved
+        if (resolvedValue != null && !referenceType.isInstance(resolvedValue)) {
+            throw IllegalArgumentException(
+                "Managed Reference List violation: Reference payload type mismatch. Expected reference to '${referenceType.simpleName}', but got '${resolvedValue::class.simpleName}'."
+            )
+        }
+    }
+}
+
+open class ManagedReferenceList<T : Any>(
+    name: String,
+    private val referenceType: KClass<T>,
+    onAdded: ((Reference<Any, T>) -> Unit)? = null,
+    onRemoved: ((Reference<Any, T>) -> Unit)? = null
+) : ManagedList<Reference<Any, T>>(name, Reference::class, onAdded, onRemoved) {
+
+    override fun validateType(element: Reference<Any, T>) {
+        val resolvedValue = element.resolved
+        if (resolvedValue != null && !referenceType.isInstance(resolvedValue)) {
+            throw IllegalArgumentException(
+                "Managed Reference List violation: Reference payload type mismatch. Expected reference to '${referenceType.simpleName}', but got '${resolvedValue::class.simpleName}'."
+            )
+        }
+    }
+}
+
+open class ManagedReferenceSet<T : Any>(
+    name: String,
+    private val referenceType: KClass<T>,
+    onAdded: ((Reference<Any, T>) -> Unit)? = null,
+    onRemoved: ((Reference<Any, T>) -> Unit)? = null
+) : ManagedSet<Reference<Any, T>>(name, Reference::class, onAdded, onRemoved) {
+
+    override fun validateType(element: Reference<Any, T>) {
+        val resolvedValue = element.resolved
+        if (resolvedValue != null && !referenceType.isInstance(resolvedValue)) {
+            throw IllegalArgumentException(
+                "Managed Reference List violation: Reference payload type mismatch. Expected reference to '${referenceType.simpleName}', but got '${resolvedValue::class.simpleName}'."
+            )
+        }
+    }
+}
+
+open class ManagedReferenceOrderedSet<T : Any>(
+    name: String,
+    private val referenceType: KClass<T>,
+    onAdded: ((Reference<Any, T>) -> Unit)? = null,
+    onRemoved: ((Reference<Any, T>) -> Unit)? = null
+) : ManagedOrderedSet<Reference<Any, T>>(name, Reference::class, onAdded, onRemoved) {
+
+    override fun validateType(element: Reference<Any, T>) {
+        val resolvedValue = element.resolved
+        if (resolvedValue != null && !referenceType.isInstance(resolvedValue)) {
+            throw IllegalArgumentException(
+                "Managed Reference List violation: Reference payload type mismatch. Expected reference to '${referenceType.simpleName}', but got '${resolvedValue::class.simpleName}'."
+            )
+        }
     }
 }

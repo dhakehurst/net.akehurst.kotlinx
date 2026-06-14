@@ -24,6 +24,12 @@ interface Value<out T> {
     fun get(): T
 }
 
+data class ValueImmutable<out T>(
+    val value: T
+) : Value<T> {
+    override fun get(): T = value
+}
+
 interface MutableValue<T> : Value<T> {
     fun set(value: T)
 }
@@ -52,7 +58,7 @@ data class ManagedValue<T>(
     override var value: T,
     private val name: String,
     private val expectedType: KClass<*>,
-    private val onChanged: ((T?) -> Unit)? = null,
+    private val onChanged: ((old:T?, new:T?) -> Unit)? = null,
 ) : MutableValueAbstract<T>() {
 
     private fun validateType(element: T) {
@@ -64,9 +70,14 @@ data class ManagedValue<T>(
     }
 
     override fun set(value: T) {
-        validateType(value)
-        super.set(value)
-        onChanged?.invoke(value)
+        if (this.value != value) {
+            val old = this.value
+            validateType(value)
+            super.set(value)
+            onChanged?.invoke(old, value)
+        } else {
+            // already set
+        }
     }
 }
 

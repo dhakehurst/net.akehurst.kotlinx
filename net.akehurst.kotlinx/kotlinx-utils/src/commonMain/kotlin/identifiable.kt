@@ -15,21 +15,14 @@
  *
  */
 
-package net.akehurst.kotlinx.collections
+package net.akehurst.kotlinx.utils
 
-object ListExt {
-    inline val <E> List<E>.mutable get() = this as MutableList
+interface Identifiable<I : Any> {
+    val identity: I
 }
 
-object CollectionExt {
-    inline fun <E> Collection<E>.toCollection(): Collection<E> = this
-    inline val <E> Collection<E>.mutable get() = this as MutableCollection
-}
-
-object SetExt {
-    inline val <E> Set<E>.mutable get() = this as MutableSet
-}
-
-object OrderedSetExt {
-    inline val <E> OrderedSet<E>.mutable get() = this as MutableOrderedSet
+interface NestedIdentifiable<I:Any> : Identifiable<I> {
+    val parent: NestedIdentifiable<I>?
+    val rootIdentifiable: Identifiable<I>
+    val qualifiedIdentity : List<I>
 }
