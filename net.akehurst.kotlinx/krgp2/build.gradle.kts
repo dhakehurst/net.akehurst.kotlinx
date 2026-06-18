@@ -52,3 +52,6 @@ dependencies {
     testImplementation(kotlin("test-annotations-common"))
 }
 
+tasks.withType<AbstractPublishToMaven> {
+    onlyIf { false }
+}

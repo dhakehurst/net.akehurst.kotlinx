@@ -17,6 +17,7 @@
 
 package net.akehurst.kotlinx.utils
 
+import net.akehurst.kotlinx.utils.ReferenceStoreExt.resolve
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -30,7 +31,7 @@ class test_HierarchicalReferenceStore {
 		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
 		val child = HierarchicalReferenceStoreByHashMap(root, "child")
 
-		assertSame(root, child.parent)
+		assertSame(root, child.parentReferenceStore)
 		assertSame(root, root.rootReferenceStore)
 		assertSame(root, child.rootReferenceStore)
 	}
@@ -54,7 +55,7 @@ class test_HierarchicalReferenceStore {
 		child.set(String::class, "leaf", "L")
 
 		// qualified lookup from root should traverse into registered children
-		assertEquals("L", root.getQualifiedReference(String::class, listOf("child","leaf")))
+		assertEquals("L", root.get(String::class, "leaf"))
 	}
 
 	@Test

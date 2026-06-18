@@ -14,15 +14,36 @@
  * limitations under the License.
  */
 
+println("===============================================")
+println("Gradle: ${GradleVersion.current()}")
+println("JVM: ${org.gradle.internal.jvm.Jvm.current()} '${org.gradle.internal.jvm.Jvm.current().javaHome}'")
+println("===============================================")
+
 pluginManagement {
     repositories {
-        mavenLocal()
+        mavenLocal {
+            content{
+                includeGroupByRegex("net\\.akehurst.+")
+            }
+            mavenContent {
+                snapshotsOnly()
+            }
+        }
         gradlePluginPortal()
+        mavenCentral()
     }
 }
-
 rootProject.name = file(".").name
 
-include("kotlinx-reflect-gradle-plugin-test")
-include("kotlinx-reflect-gradle-plugin-test-moduleForReflection")
-includeBuild("../net.akehurst.kotlinx")
+
+fileTree(".") {
+    include ("**/build.gradle.kts")
+    exclude ("build.gradle.kts") // Exclude the root _build file.
+    exclude("**/temp/**")
+    exclude(".gradle-build/**")
+}.forEach {
+    val prj = it.parentFile.name
+    println( "including $prj at "+relativePath(it.parent))
+    include(prj)
+    project(":$prj").projectDir = File(relativePath(it.parent))
+}

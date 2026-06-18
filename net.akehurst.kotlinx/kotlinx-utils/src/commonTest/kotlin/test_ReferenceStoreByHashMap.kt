@@ -17,6 +17,7 @@
 
 package net.akehurst.kotlinx.utils
 
+import net.akehurst.kotlinx.utils.ReferenceStoreExt.resolve
 import kotlin.test.*
 
 class test_ReferenceStoreByHashMap {

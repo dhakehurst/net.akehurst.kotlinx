@@ -12,7 +12,6 @@ class UseReflection {
 
     fun reflect_construct_simpleName(): String {
         val cls = KotlinxReflect.classForName("net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.AAAA")
-        //val cls = KotlinxReflect.classForNameAfterRegistration("net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.AAAA")
         val obj = cls.reflect().construct()
 
         return obj::class.simpleName ?: error("Cannot get simpleName")
@@ -20,26 +19,8 @@ class UseReflection {
 
     fun reflect_access_property(): Any {
         val cls = KotlinxReflect.classForName("net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.AAAA")
-        //val cls = KotlinxReflect.classForNameAfterRegistration("net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.AAAA")
         val obj = cls.reflect().construct()
 
-        return obj.reflect().getProperty("prop1") ?: error("Cannot get simpleName")
+        return obj.reflect().getProperty("prop1") ?: error("Cannot get property prop 1")
     }
 }
-/*
-object KotlinxReflectEg {
-
-    //private var _unregistered = true
-
-    fun registerClasses() {
-        //if (_unregistered) {
-            ModuleRegistry.registerClass("net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.A", A::class)
-        //    _unregistered = false
-        //}
-    }
-
-    fun classForNameAfterRegistration(qualifiedName: String): KClass<*> {
-        registerClasses()
-        return ModuleRegistry.classForName(qualifiedName)
-    }
-}*/

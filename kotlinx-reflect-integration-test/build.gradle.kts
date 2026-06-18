@@ -14,52 +14,81 @@
  * limitations under the License.
  */
 
+@file:OptIn(ExperimentalWasmDsl::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import java.io.File
 
 plugins {
-    //kotlin("multiplatform") version ("1.5.255-SNAPSHOT") apply false
-    kotlin("multiplatform") version ("1.6.0-RC") apply false
+    kotlin("multiplatform") version ("2.2.21") apply false
 }
+val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
+val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
+val jvmTargetVersion = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8
 
 allprojects {
 
-    val version_project: String by project
-    val group_project = rootProject.name
+    repositories {
+        mavenLocal {
+            content {
+                includeGroupByRegex("net\\.akehurst.+")
+            }
+            mavenContent {
+                snapshotsOnly()
+            }
+        }
+        mavenCentral()
+        gradlePluginPortal()
+        google()
+    }
 
-    group = group_project
-    version = version_project
+    group = rootProject.name
+    version = "2.2.21"
 
-    buildDir = File(rootProject.projectDir, ".gradle-build/${project.name}")
+    project.layout.buildDirectory = File(rootProject.projectDir, ".gradle-build/${project.name}")
 
 }
 
 subprojects {
 
-    repositories {
-        mavenLocal()
-        mavenCentral()
-    }
-
     apply(plugin = "org.jetbrains.kotlin.multiplatform")
 
     configure<KotlinMultiplatformExtension> {
-        jvm("jvm8") {
+        applyDefaultHierarchyTemplate()
+        jvm {
             val main by compilations.getting {
-                kotlinOptions {
-                    jvmTarget = JavaVersion.VERSION_1_8.toString()
+                compileTaskProvider.configure {
+                    compilerOptions {
+                        languageVersion.set(kotlin_languageVersion)
+                        apiVersion.set(kotlin_apiVersion)
+                        jvmTarget.set(jvmTargetVersion)
+                    }
                 }
             }
             val test by compilations.getting {
-                kotlinOptions {
-                    jvmTarget = JavaVersion.VERSION_1_8.toString()
+                compileTaskProvider.configure {
+                    compilerOptions {
+                        languageVersion.set(kotlin_languageVersion)
+                        apiVersion.set(kotlin_apiVersion)
+                        jvmTarget.set(jvmTargetVersion)
+                    }
                 }
             }
         }
-        js("js",IR) {
+        js {
+            binaries.library()
             nodejs()
             browser()
+            compilerOptions {
+                target.set("es2015")
+            }
         }
+        wasmJs() {
+            binaries.library()
+            browser()
+        }
+       // macosArm64()
     }
 
     dependencies {

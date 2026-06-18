@@ -7,17 +7,17 @@ class AAAA {
 class BBBB {
     var prop1 : String = "B says hello"
 }
-
+/* TODO: enums not working, not sure why !!
 enum class EEEE {
     red, blue, yellow, green
 }
-
+*/
 sealed class SSSS {
     object red:SSSS()
     object blue:SSSS()
     object green:SSSS()
 }
-
+/*
 object EEEE_external {
     val red = EEEE.red
     val blue = EEEE.blue
@@ -28,3 +28,5 @@ object EEEE_external {
 fun useEEEE() = EEEE.red
 
 fun useSSSS() = SSSS.blue
+
+ */

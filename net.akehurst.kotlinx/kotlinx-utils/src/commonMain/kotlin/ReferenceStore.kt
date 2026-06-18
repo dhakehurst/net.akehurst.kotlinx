@@ -96,14 +96,8 @@ class HierarchicalReferenceStoreByHashMap<R : Any>(
     private val _map = HashMap<KClass<*>, HashMap<R, Any>>()
     private val _ownerForReferenceType = HashMap<KClass<*>,ReferenceStore<R>>()
 
-    override fun <T : Any> get(clazz: KClass<T>, reference: R): T? = when {
-        reference is String -> when {
-//            reference is List<*> -> rootReferenceStore.getQualifiedReference(clazz, reference as List<R>) as T?
-            else -> _map[clazz]?.get(reference) as? T
-        }
-
-        else -> _map[clazz]?.get(reference) as? T
-    }
+    override fun <T : Any> get(clazz: KClass<T>, reference: R): T? =
+        _map[clazz]?.get(reference) as? T
 
     override fun <T : Any> set(clazz: KClass<T>, reference: R, value: T?) {
         value?.let {
