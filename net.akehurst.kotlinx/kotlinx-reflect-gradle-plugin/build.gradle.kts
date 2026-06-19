@@ -32,7 +32,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().con
 }
 
 gradlePlugin {
-    website.set("https://github.com/dhakehurst/net.akehurst.kotlinx")
+    website.set("https://github.com/dhakehurst/net.akehurst.kotlinx/tree/master/net.akehurst.kotlinx/kotlinx-reflect-gradle-plugin")
     vcsUrl.set("https://github.com/dhakehurst/net.akehurst.kotlinx")
     plugins {
         create("kotlinx-reflect") {

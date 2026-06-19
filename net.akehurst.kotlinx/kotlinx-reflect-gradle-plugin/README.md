@@ -20,6 +20,8 @@ this worked in older version of kotlin, but not any more.
 
 # Example Usage
 
+There is an example project here: https://github.com/dhakehurst/net.akehurst.kotlinx/tree/master/kotlinx-reflect-integration-test
+
 ## Provider
 
 Configure, in the providing module build.gradle.kts file which classes to generate reflection information for. 
