@@ -1,18 +1,18 @@
 [versions]
-project = "2.2.21"
+project = "2.3.21-SNAPSHOT"
 
-kotlin = "2.2.21"
+kotlin = "2.3.21"
 dokka = "2.1.0"
-buildconfig = "6.0.7"
-vanniktech = "0.35.0"
-exportPublic = "2.2.21"
+buildconfig = "6.0.10"
+vanniktech = "0.37.0"
+exportPublic = "2.3.21-SNAPSHOT"
 
 korlibs = "6.0.2"
-kotlinx-coroutines = "1.10.2"
-kotlinx-wrappers = "2025.11.8"
+kotlinx-coroutines = "1.11.0"
+kotlinx-wrappers = "2026.5.7"
 datastore = "1.2.0"
-kotlinx-serialization = "1.9.0"
-cryptography = "0.5.0"
+kotlinx-serialization = "1.10.0"
+cryptography = "0.6.0"
 
 [libraries]
 korlibs-korio = { module = "com.soywiz:korlibs-io", version.ref = "korlibs" }

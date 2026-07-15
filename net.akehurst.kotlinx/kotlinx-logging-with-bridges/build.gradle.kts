@@ -1,8 +1,6 @@
-@file:OptIn(ExperimentalWasmDsl::class)
-
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 val version_logj4j = "2.25.1"
+
 kotlin {
     sourceSets {
         commonMain {

@@ -7,7 +7,6 @@ import org.gradle.api.logging.Logger
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
-import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.jvm.config.jvmClasspathRoots
@@ -22,7 +21,6 @@ import org.jetbrains.kotlin.config.CompilerConfigurationKey
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.*
-import org.jetbrains.kotlin.js.config.JSConfigurationKeys
 import org.jetbrains.kotlin.resolve.extensions.ExtraImportsProviderExtension
 import java.io.File
 
@@ -70,7 +68,6 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
     override fun isApplicable(kotlinCompilation: KotlinCompilation<*>): Boolean = true
 
     override fun apply(project: Project) {
-        //Note: the values assigned to the extension are not available here, only available in 'applyToCompilation'
         project.extensions.create(KotlinxReflectGradlePluginExtension.NAME, KotlinxReflectGradlePluginExtension::class.java)
         this.logger = project.logger
 
@@ -92,7 +89,6 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
                     val packageName = "${moduleSafeName}_${ss.name}"
                     this.kotlinxReflectRegisterForModuleClassFqNameMain = "$packageName.${KotlinxReflectRegisterForModuleClassName}"
                     moduleFile.printWriter().use { pw -> pw.println(KotlinxReflectRegisterForModuleTemplate(ss.name, packageName)) }
-
                 }
 
                 (ss.name == KotlinSourceSet.COMMON_TEST_SOURCE_SET_NAME) -> {
@@ -105,7 +101,6 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
                     this.kotlinxReflectRegisterForModuleClassFqNameTest = "$packageName.${KotlinxReflectRegisterForModuleClassName}"
                     moduleFile.printWriter().use { pw -> pw.println(KotlinxReflectRegisterForModuleTemplate(ss.name, packageName)) }
                 }
-
                 else -> Unit
             }
         }
@@ -115,38 +110,20 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
         val project = kotlinCompilation.target.project
         val extension: KotlinxReflectGradlePluginExtension = project.extensions.getByType(KotlinxReflectGradlePluginExtension::class.java)
 
-        // TODO: ensure kotlinx-reflect lib is a dependency
-        //TODO: remove kotlin stdlib stuff
         this.forReflectionMainStr = extension.forReflectionMain.get().distinct().let {
-            if (it.isNotEmpty())
-                it.joinToString(java.io.File.pathSeparator) else
-                null
+            if (it.isNotEmpty()) it.joinToString(java.io.File.pathSeparator) else null
         } ?: ""
         val total = extension.forReflectionMain.get() + extension.forReflectionTest.get()
         this.forReflectionTestStr = total.distinct().let {
-            if (it.isNotEmpty())
-                it.joinToString(java.io.File.pathSeparator) else
-                null
+            if (it.isNotEmpty()) it.joinToString(java.io.File.pathSeparator) else null
         } ?: ""
 
-        val classFqName = when (kotlinCompilation.compilationName) {
-            KotlinCompilation.MAIN_COMPILATION_NAME -> this.kotlinxReflectRegisterForModuleClassFqNameMain
-            KotlinCompilation.TEST_COMPILATION_NAME -> this.kotlinxReflectRegisterForModuleClassFqNameTest
-            KotlinSourceSet.COMMON_MAIN_SOURCE_SET_NAME -> this.kotlinxReflectRegisterForModuleClassFqNameMain
-            KotlinSourceSet.COMMON_TEST_SOURCE_SET_NAME -> this.kotlinxReflectRegisterForModuleClassFqNameTest
-            "webMain" -> this.kotlinxReflectRegisterForModuleClassFqNameMain
-            "webTest" -> this.kotlinxReflectRegisterForModuleClassFqNameMain
-            else -> error("KotlinxReflect: Unhandled compilationName '${kotlinCompilation.compilationName}'")
-        }
-        val forReflection = when (kotlinCompilation.compilationName) {
-            KotlinCompilation.MAIN_COMPILATION_NAME -> this.forReflectionMainStr
-            KotlinCompilation.TEST_COMPILATION_NAME -> this.forReflectionTestStr
-            KotlinSourceSet.COMMON_MAIN_SOURCE_SET_NAME -> this.forReflectionMainStr
-            KotlinSourceSet.COMMON_TEST_SOURCE_SET_NAME -> this.forReflectionTestStr
-            "webMain" -> this.forReflectionMainStr
-            "webTest" -> this.forReflectionTestStr
-            else -> error("KotlinxReflect: Unhandled compilationName '${kotlinCompilation.compilationName}'")
-        }
+        // Determine profile targeting cleanly to survive K2 JS/Wasm variant injections
+        val isTestCompilation = kotlinCompilation.compilationName.contains("test", ignoreCase = true)
+
+        val classFqName = if (isTestCompilation) this.kotlinxReflectRegisterForModuleClassFqNameTest else this.kotlinxReflectRegisterForModuleClassFqNameMain
+        val forReflection = if (isTestCompilation) this.forReflectionTestStr else this.forReflectionMainStr
+
         return project.provider {
             listOf(
                 SubpluginOption(key = KotlinxReflectCommandLineProcessor.OPTION_kotlinxReflectRegisterForModuleClassFqName, value = classFqName),
@@ -154,32 +131,19 @@ class KotlinxReflectGradlePlugin : KotlinCompilerPluginSupportPlugin {
             )
         }
     }
-
 }
 
 open class KotlinxReflectGradlePluginExtension(objects: ObjectFactory) {
-
     companion object {
         val NAME = "kotlinxReflect"
     }
-
-    /**
-     * list of globs that define the classes for reflection
-     */
     val forReflectionMain = objects.listProperty(String::class.java)
-
-    /**
-     * list of globs that define the classes for reflection
-     * added to forReflectionMain for test modules
-     */
     val forReflectionTest = objects.listProperty(String::class.java)
-
 }
 
 @AutoService(CommandLineProcessor::class)
 class KotlinxReflectCommandLineProcessor : CommandLineProcessor {
     companion object {
-        const val OPTION_forReflectionMain = "forReflection"
         const val OPTION_forReflection = "forReflection"
         const val OPTION_kotlinxReflectRegisterForModuleClassFqName = "kotlinxReflectRegisterForModuleClassFqName"
         val ARG_forReflection = CompilerConfigurationKey<String>(OPTION_forReflection)
@@ -187,27 +151,12 @@ class KotlinxReflectCommandLineProcessor : CommandLineProcessor {
     }
 
     override val pluginId: String = KotlinPluginInfo.KOTLIN_PLUGIN_ID
-
     override val pluginOptions: Collection<CliOption> = listOf(
-        CliOption(
-            optionName = OPTION_forReflection,
-            valueDescription = "string",
-            description = "list of libraries for reflection access",
-            required = false,
-        ),
-        CliOption(
-            optionName = OPTION_kotlinxReflectRegisterForModuleClassFqName,
-            valueDescription = "string",
-            description = "name of the class/object that is the Reflection Registry for this module & compilation",
-            required = false,
-        )
+        CliOption(optionName = OPTION_forReflection, valueDescription = "string", description = "list of libraries for reflection access", required = false),
+        CliOption(optionName = OPTION_kotlinxReflectRegisterForModuleClassFqName, valueDescription = "string", description = "name of the class/object that is the Reflection Registry for this module & compilation", required = false)
     )
 
-    override fun processOption(
-        option: AbstractCliOption,
-        value: String,
-        configuration: CompilerConfiguration
-    ) {
+    override fun processOption(option: AbstractCliOption, value: String, configuration: CompilerConfiguration) {
         return when (option.optionName) {
             OPTION_forReflection -> configuration.put(ARG_forReflection, value)
             OPTION_kotlinxReflectRegisterForModuleClassFqName -> configuration.put(ARG_kotlinxReflectRegisterForModuleClassFqName, value)
@@ -217,20 +166,13 @@ class KotlinxReflectCommandLineProcessor : CommandLineProcessor {
 }
 
 @AutoService(CompilerPluginRegistrar::class)
-class KotlinxReflectComponentRegistrar(
-    private val defaultReflectionLibs: String
-) : CompilerPluginRegistrar() {
-
-    @Suppress("unused") // Used by service loader
-    constructor() : this(
-        defaultReflectionLibs = ""
-    )
-
+class KotlinxReflectComponentRegistrar(private val defaultReflectionLibs: String) : CompilerPluginRegistrar() {
+    @Suppress("unused") constructor() : this(defaultReflectionLibs = "")
+    override val pluginId: String = KotlinPluginInfo.KOTLIN_PLUGIN_ID
     override val supportsK2: Boolean get() = true
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
         val messageCollector = configuration.get(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
-
         messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: modularRoot = ${configuration.jvmModularRoots}")
 
         val forReflection = configuration.get(KotlinxReflectCommandLineProcessor.ARG_forReflection, defaultReflectionLibs)
@@ -240,40 +182,14 @@ class KotlinxReflectComponentRegistrar(
             configuration.get(KotlinxReflectCommandLineProcessor.ARG_kotlinxReflectRegisterForModuleClassFqName, defaultReflectionLibs)
 
         messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: configuration = ${configuration}")
-        messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect: dependencies")
-        val dependencies = configuration.getList(JSConfigurationKeys.LIBRARIES)//TRANSITIVE_LIBRARIES)
-        if (null != dependencies) {
-            dependencies.forEach { dep ->
-                messageCollector.report(CompilerMessageSeverity.LOGGING,"KotlinxReflect: dep ${dep::class.simpleName} - $dep")
-            }
-            /*
-                        val allResolvedDependencies =  jsResolveLibraries(
-                            dependencies,
-                            configuration[JSConfigurationKeys.REPOSITORIES] ?: emptyList(),
-                            configuration.resolverLogger
-                        )
-                        allResolvedDependencies.forEach { kotlinLibrary, packageAccessHandler ->
-                            messageCollector.report(CompilerMessageSeverity.LOGGING, "moduleName = ${kotlinLibrary.moduleName}")
-                            if ("kotlin" != kotlinLibrary.moduleName) {
-                                packageAccessHandler.loadModuleHeader(kotlinLibrary).packageFragmentNameList.forEach {
-                                    messageCollector.report(CompilerMessageSeverity.LOGGING, "packageFragmentName = ${it}")
-                                }
-                            }
-                        }
-             */
-        }
         configuration.jvmClasspathRoots.forEach { dep ->
             messageCollector.report(CompilerMessageSeverity.LOGGING,"KotlinxReflect: jvm-dep - '$dep'")
         }
-        //JsSyntheticTranslateExtension.registerExtension(project, KotlinxReflectJsSyntheticTranslateExtension(messageCollector, forReflection))
-        //AnalysisHandlerExtension.registerExtension(project, KotlinxReflectAnalysisHandlerExtension(messageCollector, forReflection))
+
         ExtraImportsProviderExtension.registerExtension(KotlinxReflectExtraImportsProviderExtension(messageCollector, forReflection))
         IrGenerationExtension.registerExtension(KotlinxReflectIrGenerationExtension(messageCollector, kotlinxReflectRegisterForModuleClassFqName, forReflection))
 
         messageCollector.report(CompilerMessageSeverity.LOGGING, "KotlinxReflect-FIR: FirExtensionRegistrarAdapter.registerExtension")
         FirExtensionRegistrarAdapter.registerExtension(KotlinxReflectFirExtensionRegistrar(messageCollector, kotlinxReflectRegisterForModuleClassFqName, forReflection))
-
     }
-
 }
-

@@ -6,41 +6,14 @@ import net.akehurst.kotlinx.text.toRegexFromGlob
 import org.gradle.api.Project
 import org.gradle.api.logging.Logger
 import org.gradle.api.provider.Provider
-import org.jetbrains.kotlin.backend.common.reportLoadingProblemsIfAny
-import org.jetbrains.kotlin.backend.common.serialization.metadata.DynamicTypeDeserializer
-import org.jetbrains.kotlin.builtins.konan.KonanBuiltIns
-import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.compiler.plugin.CliOption
 import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
-import org.jetbrains.kotlin.config.ApiVersion
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.config.LanguageVersion
-import org.jetbrains.kotlin.config.LanguageVersionSettingsImpl
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.*
-import org.jetbrains.kotlin.library.metadata.KlibMetadataFactories
 import java.io.File
-import java.nio.file.FileSystem
-import java.nio.file.FileSystems
-import java.nio.file.Files
-import java.nio.file.Paths
-import kotlin.io.path.Path
-import kotlin.io.path.name
-import kotlin.reflect.KClass
-import org.jetbrains.kotlin.library.impl.*
-import org.jetbrains.kotlin.library.*
-import org.jetbrains.kotlin.library.loader.*
-import org.jetbrains.kotlin.backend.common.loadMetadataKlibs
-import org.jetbrains.kotlin.konan.file.*
-import org.jetbrains.kotlin.library.metadata.parseModuleHeader
-
-import org.jetbrains.kotlin.library.metadata.parsePackageFragment
-import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.utils.addToStdlib.flatMapToNullable
-
-typealias KFile = org.jetbrains.kotlin.konan.file.File
 
 open class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
 
@@ -61,9 +34,6 @@ open class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
               }
             }
         """.trimIndent()
-
-        private val KlibFactories = KlibMetadataFactories(::KonanBuiltIns, DynamicTypeDeserializer)
-        val languageVersionSettings = LanguageVersionSettingsImpl(LanguageVersion.LATEST_STABLE, ApiVersion.LATEST_STABLE)
 
         class GradleToKotlin(val logger: Logger) : org.jetbrains.kotlin.util.Logger {
             override fun fatal(message: String): Nothing {
@@ -184,6 +154,8 @@ open class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
         val regexes = globRegexes.keys
 
         val sb = StringBuilder()
+        /*
+        // metadata APIs that are no longer available (MetadataLibraryAccess, MetadataKotlinLibraryLayout, MetadataLibraryImpl
         project.configurations.findByName(configurationName)?.let { cfg1 ->
             val c2 = cfg1.copy()
             project.afterEvaluate {
@@ -216,6 +188,8 @@ open class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
                 }
             }
         }
+
+         */
         return sb.toString()
     }
 
@@ -238,6 +212,7 @@ class KotlinxReflectCommandLineProcessor : CommandLineProcessor {
 class KotlinxReflectComponentRegistrar(
     private val defaultReflectionLibs: String
 ) : CompilerPluginRegistrar() {
+    override val pluginId: String = KotlinxReflectPluginInfo.KOTLIN_PLUGIN_ID
     override val supportsK2 = true
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
 

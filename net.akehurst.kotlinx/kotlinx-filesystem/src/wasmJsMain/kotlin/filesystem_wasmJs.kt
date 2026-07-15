@@ -18,8 +18,9 @@
 
 package net.akehurst.kotlinx.filesystem
 
-import js.core.JsPrimitives.toKotlinByte
+
 import js.iterable.asFlow
+import js.numbers.JsNumbers.toKotlinByte
 import js.objects.unsafeJso
 import korlibs.io.file.std.ZipVfs
 import korlibs.io.stream.openAsync
@@ -126,8 +127,9 @@ actual object UserFileSystem : FileSystem {
             val p = (window as WasmWindow).showOpenFilePicker(
                 FilePickerOptions(mode = accessMode.name)
             )
-            val handle: FileSystemFileHandle = p.await()
-            FileHandleWasmJS(this, null, handle)
+            p.await()[0]?.let { handle ->
+                FileHandleWasmJS(this, null, handle)
+            }
         } catch (t: Throwable) {
             t.printStackTrace()
             null

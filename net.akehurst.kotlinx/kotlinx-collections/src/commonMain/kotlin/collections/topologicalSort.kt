@@ -65,6 +65,6 @@ fun <E> Collection<E>.topologicalSort(comparator: Comparator<in E>): List<E> {
     if (comparisons.isEmpty()) {
         return sortedElements
     } else {
-        error("Internal Error: Could not sort elements ")
+        error("Internal Error: Could not sort elements:\n${comparisons.keys.joinToString("\n") { it.toString() }} ")
     }
 }
