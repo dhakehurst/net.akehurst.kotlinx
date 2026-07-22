@@ -22,7 +22,9 @@ class LoggerCommon(
     val prefix: String,
     var bind: LogFunction
 ) : Logger {
-    val outputLevel = LoggingManager.rootLoggingLevel
+
+    val outputLevel get() = LoggingManager.rootLoggingLevel
+
     override fun log(level: LogLevel, t: Throwable?, lazyMessage: () -> String) {
         when {
             level <= this.outputLevel -> this.bind.invoke(level, prefix, t, lazyMessage)

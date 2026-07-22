@@ -27,7 +27,7 @@ class LoggerJsConsole(
     val prefix: String
 ) : Logger {
 
-    val outputLevel: LogLevel = LoggingManager.rootLoggingLevel
+    val outputLevel: LogLevel get() = LoggingManager.rootLoggingLevel
 
     override fun log(level: LogLevel, t: Throwable?, lazyMessage: () -> String) {
         when {

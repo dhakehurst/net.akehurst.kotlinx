@@ -1,11 +1,11 @@
 [versions]
-project = "2.3.21-SNAPSHOT"
+project = "2.3.21"
 
 kotlin = "2.3.21"
 dokka = "2.1.0"
 buildconfig = "6.0.10"
 vanniktech = "0.37.0"
-exportPublic = "2.3.21-SNAPSHOT"
+exportPublic = "2.3.21"
 
 korlibs = "6.0.2"
 kotlinx-coroutines = "1.11.0"
