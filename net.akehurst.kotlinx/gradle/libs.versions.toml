@@ -1,17 +1,16 @@
 [versions]
-project = "2.3.21"
+project = "2.4.0-SNAPSHOT"
 
-kotlin = "2.3.21"
-dokka = "2.1.0"
-buildconfig = "6.0.10"
+kotlin = "2.4.0"
+dokka = "2.2.0"
+buildconfig = "6.1.2"
 vanniktech = "0.37.0"
-exportPublic = "2.3.21"
+exportPublic = "2.4.0-SNAPSHOT"
 
 korlibs = "6.0.2"
 kotlinx-coroutines = "1.11.0"
-kotlinx-wrappers = "2026.5.7"
-datastore = "1.2.0"
-kotlinx-serialization = "1.10.0"
+kotlinx-wrappers = "2026.7.1"
+kotlinx-serialization = "1.11.0"
 cryptography = "0.6.0"
 
 [libraries]

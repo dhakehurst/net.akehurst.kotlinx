@@ -25,8 +25,8 @@ plugins {
     alias(libs.plugins.exportPublic) apply false
     alias(libs.plugins.vanniktech.maven.publish) apply false
 }
-val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_3
-val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_3
+val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4
+val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4
 val jvmTargetVersion = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
 
 allprojects {
@@ -118,8 +118,24 @@ subprojects {
             macosArm64()
 
             applyDefaultHierarchyTemplate()
-        }
 
+            sourceSets {
+                commonTest {
+                    dependencies {
+                        api(kotlin("test"))
+                        api(kotlin("test-annotations-common"))
+                    }
+                }
+                jvmTest {
+                    dependencies {
+                        api(kotlin("test-junit5"))
+                    }
+                }
+            }
+        }
+        tasks.withType<Test>().configureEach {
+            useJUnitPlatform()
+        }
         val javadocJar: TaskProvider<Jar> by tasks.registering(Jar::class) {
             //dependsOn(dokkaHtml)
             archiveClassifier.set("javadoc")
@@ -127,10 +143,6 @@ subprojects {
         }
         tasks.named("publish").get().dependsOn("javadocJar")
 
-        dependencies {
-            "commonTestImplementation"(kotlin("test"))
-            "commonTestImplementation"(kotlin("test-annotations-common"))
-        }
 
         configure<SigningExtension> {
             useGpgCmd()

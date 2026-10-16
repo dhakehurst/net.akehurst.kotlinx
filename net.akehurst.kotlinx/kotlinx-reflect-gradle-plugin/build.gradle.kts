@@ -61,6 +61,7 @@ dependencies {
     kapt("com.google.auto.service:auto-service:1.1.1")
 
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable")
+    compileOnly(kotlin("compiler-embeddable"))
     implementation(kotlin("gradle-plugin-api"))
     implementation(project(":kotlinx-reflect"))
     implementation(project(":kotlinx-utils"))

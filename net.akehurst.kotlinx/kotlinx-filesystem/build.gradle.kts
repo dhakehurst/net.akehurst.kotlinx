@@ -23,6 +23,12 @@ kotlin {
                 implementation(libs.kotlinx.wrappers.browser)
             }
         }
+
+        commonTest {
+            dependencies {
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
     }
 
 }

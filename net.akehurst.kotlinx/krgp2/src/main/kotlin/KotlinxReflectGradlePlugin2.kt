@@ -62,11 +62,11 @@ open class KotlinxReflectGradlePlugin2 : KotlinCompilerPluginSupportPlugin {
         version = KotlinxReflectPluginInfo.PROJECT_VERSION
     )
 
-    override fun getPluginArtifactForNative(): SubpluginArtifact = SubpluginArtifact(
-        groupId = KotlinxReflectPluginInfo.PROJECT_GROUP,
-        artifactId = KotlinxReflectPluginInfo.PROJECT_NAME + "-native",
-        version = KotlinxReflectPluginInfo.PROJECT_VERSION
-    )
+//    override fun getPluginArtifactForNative(): SubpluginArtifact = SubpluginArtifact(
+//        groupId = KotlinxReflectPluginInfo.PROJECT_GROUP,
+//        artifactId = KotlinxReflectPluginInfo.PROJECT_NAME + "-native",
+//        version = KotlinxReflectPluginInfo.PROJECT_VERSION
+//    )
 
     override fun isApplicable(kotlinCompilation: KotlinCompilation<*>): Boolean = true
 
