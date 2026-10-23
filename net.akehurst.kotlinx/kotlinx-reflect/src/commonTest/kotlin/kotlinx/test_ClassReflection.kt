@@ -18,6 +18,7 @@ package net.akehurst.kotlinx.reflect.test
 
 import net.akehurst.kotlinx.reflect.KotlinxReflect
 import net.akehurst.kotlinx.reflect.reflect
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
@@ -50,6 +51,9 @@ open class CR_D : CR_B()
 enum class CR_Colour { RED, GREEN, BLUE }
 
 class test_ClassReflection {
+
+    @BeforeTest
+    fun before() = registerTestClasses()
 
     @Test
     fun A_isSupertypeOf_B() {

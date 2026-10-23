@@ -17,47 +17,167 @@
 package net.akehurst.kotlinx.reflect
 
 import kotlin.reflect.KClass
+import kotlin.reflect.KFunction
+import kotlin.reflect.KProperty1
 
 
-typealias EnumValuesFunction = ()->Array<Enum<*>>
+typealias EnumValuesFunction = () -> Array<Enum<*>>
+
+/** Creates an instance from the given constructor arguments. */
+typealias ConstructorInvoker = (args: List<Any?>) -> Any
+
+/** Calls a member function on [self] with the given arguments. */
+typealias FunctionInvoker = (self: Any, args: List<Any?>) -> Any?
+
+/** Calls a suspend member function on [self] with the given arguments. */
+typealias SuspendFunctionInvoker = suspend (self: Any, args: List<Any?>) -> Any?
+
+/**
+ * Everything registered for one class.
+ * Filled by the code that the kotlinx-reflect compiler plugin generates, or by hand.
+ */
+class RegisteredClass internal constructor(
+    val qualifiedName: String,
+    val kclass: KClass<*>
+) {
+    var isAbstract: Boolean = false; internal set
+    var isInterface: Boolean = false; internal set
+    var enumValuesFunction: EnumValuesFunction? = null; internal set
+    var objectInstance: Any? = null; internal set
+
+    internal val _supertypes = mutableListOf<KClass<*>>()
+    internal val _properties = linkedMapOf<String, KProperty1<*, *>>()
+    internal val _constructors = mutableMapOf<Int, ConstructorInvoker>()
+    internal val _functions = linkedMapOf<String, MutableList<RegisteredFunction>>()
+
+    /** Direct supertypes, as registered. */
+    val supertypes: List<KClass<*>> get() = _supertypes
+
+    /** Properties declared or overridden in this class, in registration order. */
+    val properties: Map<String, KProperty1<*, *>> get() = _properties
+
+    /** Constructors, keyed by number of parameters. */
+    val constructors: Map<Int, ConstructorInvoker> get() = _constructors
+
+    /** Member functions declared or overridden in this class, keyed by name. */
+    val functions: Map<String, List<RegisteredFunction>> get() = _functions
+
+    val isEnum: Boolean get() = null != enumValuesFunction
+    val isObject: Boolean get() = null != objectInstance
+}
+
+class RegisteredFunction internal constructor(
+    val name: String,
+    val arity: Int,
+    val reference: KFunction<*>?,
+    val invoker: FunctionInvoker?,
+    val suspendInvoker: SuspendFunctionInvoker?
+) {
+    val isSuspend: Boolean get() = null != suspendInvoker
+}
 
 object KotlinxReflect {
 
-    private var _registeredClasses = mutableMapOf<String, KClass<*>>()
-    private var _registeredClassesReverse = mutableMapOf<KClass<*>,String>()
-    private var _enumValuesFunction = mutableMapOf<String,EnumValuesFunction>()
-    private var _objectInstance = mutableMapOf<String,Any>()
+    private val _registeredClasses = mutableMapOf<String, RegisteredClass>()
+    private val _registeredClassesReverse = mutableMapOf<KClass<*>, RegisteredClass>()
 
-    val registeredClasses:Map<String, KClass<*>> = _registeredClasses
+    /**
+     * When true, every platform uses only the registered information, including JVM.
+     * Use it to make JVM behave exactly like JS, Wasm and Native when debugging.
+     * On JVM the default comes from the system property 'kotlinx.reflect.forceRegistry'.
+     * On other platforms the registry is always used, whatever this is set to.
+     */
+    var forceRegistry: Boolean = defaultForceRegistry()
 
-    fun registerClass(qualifiedName: String, cls: KClass<*>, enumValuesFunction: EnumValuesFunction? = null, objectInstance:Any?=null) {
-        _registeredClasses[qualifiedName] = cls
-        _registeredClassesReverse[cls]=qualifiedName
-        if (null!=enumValuesFunction) {
-            _enumValuesFunction[qualifiedName] = enumValuesFunction
+    val registeredClasses: Map<String, KClass<*>> get() = _registeredClasses.mapValues { it.value.kclass }
+
+    /**
+     * Registers a class. Calling it again for the same class keeps what was registered before,
+     * and only replaces values that are given (non-null) this time.
+     */
+    fun registerClass(qualifiedName: String, cls: KClass<*>, enumValuesFunction: EnumValuesFunction? = null, objectInstance: Any? = null) {
+        val existing = _registeredClassesReverse[cls]
+        val rc = when {
+            null == existing -> RegisteredClass(qualifiedName, cls)
+            existing.qualifiedName == qualifiedName -> existing
+            else -> error("Class '$cls' is already registered as '${existing.qualifiedName}', cannot register it as '$qualifiedName'")
         }
-        if(null!=objectInstance) {
-            _objectInstance[qualifiedName] = objectInstance
-        }
+        if (null != enumValuesFunction) rc.enumValuesFunction = enumValuesFunction
+        if (null != objectInstance) rc.objectInstance = objectInstance
+        _registeredClasses[qualifiedName] = rc
+        _registeredClassesReverse[cls] = rc
     }
 
+    /** Registers the class modifiers and its direct supertypes. */
+    fun registerClassInfo(cls: KClass<*>, isAbstract: Boolean, isInterface: Boolean, supertypes: List<KClass<*>>) {
+        val rc = registered(cls)
+        rc.isAbstract = isAbstract
+        rc.isInterface = isInterface
+        rc._supertypes.clear()
+        rc._supertypes.addAll(supertypes)
+    }
+
+    /** Registers a property declared (or overridden) in [cls], e.g. `registerProperty(Foo::class, Foo::bar)`. */
+    fun registerProperty(cls: KClass<*>, property: KProperty1<*, *>) {
+        registered(cls)._properties[property.name] = property
+    }
+
+    /** Registers a constructor of [cls] that takes [arity] parameters. */
+    fun registerConstructor(cls: KClass<*>, arity: Int, invoker: ConstructorInvoker) {
+        registered(cls)._constructors[arity] = invoker
+    }
+
+    /** Registers a member function of [cls] that takes [arity] parameters. */
+    fun registerFunction(cls: KClass<*>, name: String, arity: Int, invoker: FunctionInvoker, reference: KFunction<*>? = null) {
+        addFunction(cls, RegisteredFunction(name, arity, reference, invoker, null))
+    }
+
+    /** Registers a suspend member function of [cls] that takes [arity] parameters. */
+    fun registerSuspendFunction(cls: KClass<*>, name: String, arity: Int, invoker: SuspendFunctionInvoker, reference: KFunction<*>? = null) {
+        addFunction(cls, RegisteredFunction(name, arity, reference, null, invoker))
+    }
+
+    /** Whether [function] is a suspend function, if it was registered (with its reference); otherwise null. */
+    fun isSuspend(function: KFunction<*>): Boolean? =
+        _registeredClasses.values.firstNotNullOfOrNull { rc ->
+            rc.functions[function.name]?.firstOrNull { it.reference == function }?.isSuspend
+        }
+
+    /** Everything registered for [cls], or null if it is not registered. */
+    fun registeredClass(cls: KClass<*>): RegisteredClass? = _registeredClassesReverse[cls]
+
     fun classForName(qualifiedName: String): KClass<*> {
-        return registeredClasses[qualifiedName]
-            ?:error("Cannot find class $qualifiedName, is the class registered with KotlinxReflect and did you remember to call 'KotlinxReflectForModule.registerUsedClasses()'?")
+        return _registeredClasses[qualifiedName]?.kclass
+            ?: error("Cannot find class $qualifiedName, is the class registered with KotlinxReflect and did you remember to call 'KotlinxReflectForModule.registerUsedClasses()'?")
     }
 
     fun qualifiedNameForClass(kclass: KClass<*>): String {
-        return _registeredClassesReverse[kclass]
+        return _registeredClassesReverse[kclass]?.qualifiedName
             ?: error("Cannot get qualifiedName of '${kclass}' is it registered with KotlinxReflect and did you remember to call 'KotlinxReflectForModule.registerUsedClasses()'?")
     }
 
-    fun <E:Enum<E>> enumValues(qualifiedName: String): List<E> = _enumValuesFunction[qualifiedName]?.invoke()?.asList() as List<E>? ?: emptyList()
+    @Suppress("UNCHECKED_CAST")
+    fun <E : Enum<E>> enumValues(qualifiedName: String): List<E> =
+        _registeredClasses[qualifiedName]?.enumValuesFunction?.invoke()?.asList() as List<E>? ?: emptyList()
 
-    fun <T: Any> objectInstance(qualifiedName: String) : T?  = _objectInstance[qualifiedName] as T?
+    @Suppress("UNCHECKED_CAST")
+    fun <T : Any> objectInstance(qualifiedName: String): T? = _registeredClasses[qualifiedName]?.objectInstance as T?
 
     /**
      * for debugging
      */
-    val registeredClassesToString : String get() = _registeredClasses.keys.joinToString(separator = "\n") { it }
+    val registeredClassesToString: String get() = _registeredClasses.keys.joinToString(separator = "\n") { it }
 
+    private fun registered(cls: KClass<*>): RegisteredClass =
+        _registeredClassesReverse[cls]
+            ?: error("Class '$cls' must be registered with 'KotlinxReflect.registerClass' before its details are registered")
+
+    private fun addFunction(cls: KClass<*>, fn: RegisteredFunction) {
+        val list = registered(cls)._functions.getOrPut(fn.name) { mutableListOf() }
+        list.removeAll { it.arity == fn.arity }
+        list.add(fn)
+    }
 }
+
+/** JVM reads the 'kotlinx.reflect.forceRegistry' system property; other platforms always use the registry. */
+internal expect fun defaultForceRegistry(): Boolean

@@ -19,6 +19,7 @@ package net.akehurst.kotlinx.reflect.test
 import net.akehurst.kotlinx.reflect.EnumValuesFunction
 import net.akehurst.kotlinx.reflect.KotlinxReflect
 import net.akehurst.kotlinx.reflect.reflect
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -45,6 +46,9 @@ enum class KR_Colour { RED, GREEN, BLUE }
 enum class KR_Colour2 { PINK, YELLOW, CYAN }
 
 class test_KotlinxReflect {
+
+    @BeforeTest
+    fun before() = registerTestClasses()
 
 
     @Test
