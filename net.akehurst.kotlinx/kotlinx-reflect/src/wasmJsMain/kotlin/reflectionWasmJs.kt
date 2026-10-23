@@ -27,7 +27,10 @@ actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler: A
     TODO("wasmJs proxyFor")
 }
 
-internal actual fun defaultForceRegistry(): Boolean = true
+internal actual fun defaultForceRegistry(): Boolean = false
+
+// Wasm (JS) is single-threaded
+internal actual fun withRegistryLock(block: () -> Unit) = block()
 
 // Wasm uses the KotlinxReflect registry
 internal actual val platformBackend: ReflectionBackend? = null

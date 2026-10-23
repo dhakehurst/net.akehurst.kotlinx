@@ -14,11 +14,16 @@
  * limitations under the License.
  */
 
+@file:JvmMultifileClass
+@file:JvmName("ReflectionKt")
+
 package net.akehurst.kotlinx.reflect
 
 import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
+import kotlin.jvm.JvmMultifileClass
+import kotlin.jvm.JvmName
 
 expect fun KFunction<*>.isSuspend(): Boolean
 
@@ -43,7 +48,7 @@ class ClassReflection<T : Any>(val kclass: KClass<T>) {
 
     val isEnum: Boolean get() = backend.isEnum(kclass)
 
-    val isObject: Boolean get() = null != backend.objectInstance(kclass)
+    val isObject: Boolean get() = backend.isObject(kclass)
 
     val allPropertyNames: List<String> get() = backend.propertyNames(kclass)
 
@@ -53,9 +58,8 @@ class ClassReflection<T : Any>(val kclass: KClass<T>) {
     @Suppress("UNCHECKED_CAST")
     fun construct(vararg constructorArgs: Any?): T {
         val b = backend
-        val obj = b.objectInstance(kclass)
         return when {
-            null != obj -> obj as T
+            b.isObject(kclass) -> (b.objectInstance(kclass) ?: ReflectErrors.objectInstanceNotFound(kclass)) as T
             else -> b.construct(kclass, constructorArgs.asList()) as T
         }
     }

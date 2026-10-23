@@ -22,6 +22,7 @@ import net.akehurst.kotlinx.reflect.reflect
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 
 open class KR_A {
@@ -79,6 +80,15 @@ class test_KotlinxReflect {
         KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.test.KR_Colour",KR_Colour::class)
         val actual = KR_Colour::class.reflect().enumValueOf("RED")
         assertEquals(KR_Colour.RED, actual)
+    }
+
+    @Test
+    fun registerModule_runsOnce_andRetriesAfterFailure() {
+        var runs = 0
+        assertFailsWith<IllegalStateException> { KotlinxReflect.registerModule("test.failing") { runs++; error("boom") } }
+        KotlinxReflect.registerModule("test.failing") { runs++ }
+        KotlinxReflect.registerModule("test.failing") { runs++ }
+        assertEquals(2, runs)
     }
 
 }

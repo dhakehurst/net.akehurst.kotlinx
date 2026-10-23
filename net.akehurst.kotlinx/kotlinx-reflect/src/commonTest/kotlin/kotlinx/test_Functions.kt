@@ -30,6 +30,12 @@ class FN_A(override val name: String) : FN_Abstract() {
     suspend fun later(x: Int) = x * 2
 }
 
+// a Kotlin function named like a getter is not a property
+class FN_Getter {
+    val a = 1
+    fun getTotal() = 5
+}
+
 class test_Functions {
 
     @BeforeTest
@@ -108,6 +114,13 @@ class test_Functions {
     fun isSupertypeOf_false() {
         assertEquals(false, FN_A::class.reflect().isSupertypeOf(FN_Abstract::class))
         assertEquals(false, CR_C::class.reflect().isSupertypeOf(CR_D::class))
+    }
+
+    @Test
+    fun kotlinGetFunction_isNotAProperty() {
+        assertEquals(listOf("a"), FN_Getter().reflect().allPropertyNames)
+        assertEquals(5, FN_Getter().reflect().call("getTotal"))
+        assertFailsWith<IllegalStateException> { FN_Getter().reflect().getProperty("total") }
     }
 
     @Test

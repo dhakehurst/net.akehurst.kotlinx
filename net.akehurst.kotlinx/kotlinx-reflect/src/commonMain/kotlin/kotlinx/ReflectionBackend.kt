@@ -29,6 +29,11 @@ internal interface ReflectionBackend {
     fun isAbstract(kclass: KClass<*>): Boolean
     fun isInterface(kclass: KClass<*>): Boolean
     fun isEnum(kclass: KClass<*>): Boolean
+
+    /** True for an `object` declaration, even when its instance is not available */
+    fun isObject(kclass: KClass<*>): Boolean
+
+    /** The instance of an `object` declaration, or null if it is not one or its instance is not available */
     fun objectInstance(kclass: KClass<*>): Any?
     fun enumValues(kclass: KClass<*>): List<Enum<*>>
     fun directSupertypes(kclass: KClass<*>): List<KClass<*>>
@@ -62,6 +67,9 @@ internal object ReflectErrors {
     fun propertyNotMutable(kclass: KClass<*>, propertyName: String): Nothing =
         error("Property '$propertyName' on class '${kclass.simpleName}' is not mutable")
 
+    fun objectInstanceNotFound(kclass: KClass<*>): Nothing =
+        error("Object '${kclass.simpleName}' is not registered with KotlinxReflect, so its instance is not available")
+
     fun constructorNotFound(kclass: KClass<*>, arity: Int): Nothing =
         error("No constructor with $arity parameter(s) found for class '${kclass.simpleName}'")
 
@@ -89,8 +97,21 @@ internal object RegistryBackend : ReflectionBackend {
     fun registeredFunction(kclass: KClass<*>, methodName: String, arity: Int): RegisteredFunction? =
         hierarchy(kclass).firstNotNullOfOrNull { rc -> rc.functions[methodName]?.firstOrNull { it.arity == arity } }
 
+    // hierarchies, rebuilt when anything new is registered; replaced as a whole, so a concurrent reader sees a complete map
+    private var hierarchyCache: Map<KClass<*>, List<RegisteredClass>> = emptyMap()
+    private var hierarchyCacheVersion = -1
+
     /** The class followed by all its registered supertypes, nearest first, each once. */
     private fun hierarchy(kclass: KClass<*>): List<RegisteredClass> {
+        val version = KotlinxReflect.registrationVersion
+        if (version != hierarchyCacheVersion) {
+            hierarchyCache = emptyMap()
+            hierarchyCacheVersion = version
+        }
+        return hierarchyCache[kclass] ?: computeHierarchy(kclass).also { hierarchyCache = hierarchyCache + (kclass to it) }
+    }
+
+    private fun computeHierarchy(kclass: KClass<*>): List<RegisteredClass> {
         val result = mutableListOf<RegisteredClass>()
         val seen = mutableSetOf<KClass<*>>()
         var level = listOf(kclass)
@@ -124,6 +145,7 @@ internal object RegistryBackend : ReflectionBackend {
     override fun isAbstract(kclass: KClass<*>): Boolean = info(kclass).isAbstract
     override fun isInterface(kclass: KClass<*>): Boolean = info(kclass).isInterface
     override fun isEnum(kclass: KClass<*>): Boolean = info(kclass).isEnum
+    override fun isObject(kclass: KClass<*>): Boolean = info(kclass).isObject
     override fun objectInstance(kclass: KClass<*>): Any? = info(kclass).objectInstance
     override fun enumValues(kclass: KClass<*>): List<Enum<*>> = info(kclass).enumValuesFunction?.invoke()?.asList() ?: emptyList()
     // a class that is not registered (e.g. a supertype from another module) is treated as having no supertypes

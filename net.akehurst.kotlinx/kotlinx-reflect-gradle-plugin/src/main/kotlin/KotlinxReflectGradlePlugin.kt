@@ -67,6 +67,8 @@ class KotlinxReflectGradlePlugin : Plugin<Project> {
         const val ACTUAL_FUNCTION_NAME = "kotlinxReflectRegisterUsedClasses"
 
         fun moduleSafeName(project: Project) = project.name.replace(Regex("[^a-zA-Z0-9]"), "_")
+
+        private fun String.capitalised() = replaceFirstChar { it.uppercaseChar() }
     }
 
     override fun apply(project: Project) {
@@ -109,32 +111,41 @@ class KotlinxReflectGradlePlugin : Plugin<Project> {
             ss.kotlin.srcDir(generateTestRegistry)
         }
 
-        // the processor: once for commonMain, once per target for tests
+        // The processor runs once for commonMain, and once for every compilation that includes commonTest
+        // (each of those needs the 'actual fun' for the expect fun in commonTest).
+        // Which compilations those are is only known once the build is configured, so it is worked out lazily.
+        fun testCompilations() = kotlin.targets
+            .filter { it.platformType != KotlinPlatformType.common }
+            .flatMap { it.compilations }
+            .filter { c -> c.allKotlinSourceSets.any { it.name == "commonTest" } }
+
+        // KSP names its configurations after the source set, e.g. 'kspJvmTest', 'kspAndroidUnitTestDebug'
+        fun isTestKspConfiguration(name: String) = testCompilations().any { name == "ksp" + it.defaultSourceSet.name.capitalised() }
+
+        // KSP names its tasks after the compilation and target, e.g. 'kspTestKotlinJvm', 'kspDebugUnitTestKotlinAndroid'
+        fun isTestKspTask(name: String) = testCompilations().any { c ->
+            val compilation = if (c.name == "main") "" else c.name.capitalised()
+            name == "ksp${compilation}Kotlin${c.target.name.capitalised()}"
+        }
+
         project.dependencies.add("kspCommonMainMetadata", processor)
-        kotlin.targets.configureEach { target ->
-            if (target.platformType != KotlinPlatformType.common) {
-                val configurationName = "ksp${target.name.replaceFirstChar { it.uppercaseChar() }}Test"
-                project.configurations.matching { it.name == configurationName }.configureEach { cfg ->
-                    cfg.dependencies.add(project.dependencies.create(processor))
-                }
-            }
+        project.configurations.matching { it.name.startsWith("ksp") && it.name != "kspCommonMainMetadata" }.configureEach { cfg ->
+            // evaluated when the dependencies are first read, after the build is configured
+            cfg.dependencies.addAllLater(project.provider {
+                if (isTestKspConfiguration(cfg.name)) listOf(project.dependencies.create(processor)) else emptyList()
+            })
         }
 
         // options are set per KSP task, because main and test need different values
         val mainGlobs = extension.forReflectionMain.map { it.distinct().joinToString(",") }
         val testGlobs = extension.forReflectionMain.zip(extension.forReflectionTest) { m, t -> (m + t).distinct().joinToString(",") }
         project.tasks.withType(KspAATask::class.java).configureEach { task ->
+            val isTest = project.provider { isTestKspTask(task.name) }
             val options = task.kspConfig.processorOptions
-            if (task.name.contains("Test")) {
-                options.put(OPTION_MODE, "actual")
-                options.put(OPTION_FOR_REFLECTION, testGlobs)
-                options.put(OPTION_PACKAGE, testPackage)
-                task.dependsOn(generateTestRegistry)
-            } else {
-                options.put(OPTION_MODE, "object")
-                options.put(OPTION_FOR_REFLECTION, mainGlobs)
-                options.put(OPTION_PACKAGE, mainPackage)
-            }
+            options.put(OPTION_MODE, isTest.map { if (it) "actual" else "object" })
+            options.put(OPTION_FOR_REFLECTION, isTest.flatMap { if (it) testGlobs else mainGlobs })
+            options.put(OPTION_PACKAGE, isTest.map { if (it) testPackage else mainPackage })
+            task.dependsOn(isTest.map { if (it) listOf(generateTestRegistry) else emptyList() })
         }
 
         // everything that reads commonMain sources needs the generated code first

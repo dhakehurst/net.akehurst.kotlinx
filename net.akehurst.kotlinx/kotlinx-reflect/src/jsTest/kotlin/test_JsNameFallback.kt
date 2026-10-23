@@ -42,12 +42,44 @@ class JS_C {
 @JsExport
 enum class JS_Colour { RED, GREEN }
 
+// Not registered: an object is recognised, but its instance is not available
+@JsExport
+object JS_Object {
+    val x = 1
+}
+
+// Registered with only some of its properties: only those are listed
+@JsExport
+class JS_D {
+    val listed = 1
+    internal val notListed = 2
+}
+
 class test_JsNameFallback {
 
     @BeforeTest
     fun before() {
         KotlinxReflect.forceRegistry = false
         KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.jstest.JS_C", JS_C::class)
+        KotlinxReflect.registerClass("net.akehurst.kotlinx.reflect.jstest.JS_D", JS_D::class)
+        KotlinxReflect.registerProperty(JS_D::class, JS_D::listed)
+    }
+
+    @Test
+    fun object_unregistered_isRecognised_butNotConstructed() {
+        assertEquals(true, JS_Object::class.reflect().isObject)
+        val e = assertFailsWith<IllegalStateException> { JS_Object::class.reflect().construct() }
+        assertEquals("Object 'JS_Object' is not registered with KotlinxReflect, so its instance is not available", e.message)
+    }
+
+    @Test
+    fun enum_unregistered_doesNotListStdlibProperties() {
+        assertEquals(emptyList(), JS_Colour::class.reflect().allPropertyNames)
+    }
+
+    @Test
+    fun registeredClass_listsOnlyRegisteredProperties() {
+        assertEquals(listOf("listed"), JS_D().reflect().allPropertyNames)
     }
 
     @AfterTest

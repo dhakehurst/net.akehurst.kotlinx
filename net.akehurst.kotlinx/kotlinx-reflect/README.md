@@ -65,8 +65,11 @@ KotlinxReflectForModule.registerUsedClasses()
 
 The plugin generates `KotlinxReflectForModule` in the package `<module>_commonMain`, where
 `<module>` is the Gradle project name with every character other than a letter or digit replaced by
-`_`. For example, project `my-app` gets `my_app_commonMain.KotlinxReflectForModule`. Calling
-`registerUsedClasses()` more than once is harmless.
+`_`. For example, project `my-app` gets `my_app_commonMain.KotlinxReflectForModule`.
+
+`registerUsedClasses()` can be called more than once, and from several threads: the registrations
+run once, and other callers wait until they are complete. If a registration fails, the next call
+tries again.
 
 Tests have their own registry, `<module>_commonTest.KotlinxReflectForModule`. It registers the
 classes in `forReflectionMain` and `forReflectionTest`:
@@ -309,7 +312,8 @@ example.
   platforms. Java classes keep kotlin-reflect's order.
 - Properties inherited from `kotlin.*` and `java.*` types (such as `Enum.name`) aren't listed,
   matching the registry.
-- Java-style `getX()` / `setX(...)` methods are treated as a property `x`.
+- In Java classes, `getX()` / `setX(...)` methods are treated as a property `x`. In Kotlin classes
+  they are ordinary functions, as on other platforms.
 - Functions that take inline (value) classes are supported.
 
 ### JS
@@ -318,13 +322,18 @@ Anything registered is used first. Anything not registered (a class, property, f
 constructor) falls back to JavaScript:
 
 - **Properties** are found through the accessor methods Kotlin/JS generates for every property. This
-  also works for classes that aren't exported. `val` and `var` are told apart.
+  also works for classes that aren't exported. `val` and `var` are told apart. Properties inherited
+  from `Enum` and `Throwable` (such as `name` and `message`) aren't listed, as on other platforms.
+  For a class with registered properties, only those are listed. Without them, the fallback may
+  also list `internal` properties, which JavaScript can't tell apart.
 - **Functions** are called by name. That needs unmangled names, so export the class with the
   **exportPublic** plugin (`net.akehurst.kotlin.gradle.plugin.exportPublic`) or `@JsExport`.
 - **Constructors:** if a class has registered constructors, only those are used. Otherwise
   `Reflect.construct` is called.
 - **Supertypes:** only the superclass chain is visible. Interfaces are not.
 - **Enums** are detected automatically.
+- **Objects** are detected automatically, but their instance is only available when registered;
+  `construct()` on an unregistered `object` fails rather than creating a second instance.
 - **Abstract classes:** the fallback guesses `isAbstract` from the class name ending in `Abstract`.
 - **Not available through the fallback:** `suspend` functions, `allMemberFunctions` and
   `qualifiedName` need registration.

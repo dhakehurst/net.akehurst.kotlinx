@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+// Same JVM class as the common reflection.kt, as in versions up to 2.3.x, so already-compiled callers keep working
+@file:JvmMultifileClass
+@file:JvmName("ReflectionKt")
+
 package net.akehurst.kotlinx.reflect
 
 import java.lang.reflect.InvocationHandler
@@ -69,11 +73,15 @@ actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler: A
 
 internal actual fun defaultForceRegistry(): Boolean = System.getProperty("kotlinx.reflect.forceRegistry")?.toBoolean() ?: false
 
+private val registryLock = Any()
+
+internal actual fun withRegistryLock(block: () -> Unit) = synchronized(registryLock) { block() }
+
 internal actual val platformBackend: ReflectionBackend? = KotlinReflectBackend
 
 /**
  * Uses kotlin-reflect, so it also works for classes that are not registered (e.g. Java classes).
- * Java-style getX/setX methods are treated as properties.
+ * For Java classes (those without Kotlin metadata), getX/setX methods are treated as properties.
  */
 internal object KotlinReflectBackend : ReflectionBackend {
 
@@ -86,11 +94,16 @@ internal object KotlinReflectBackend : ReflectionBackend {
     /** A 'var' whose setter can be called from outside the class. */
     private fun isMutable(p: KProperty1<*, *>): Boolean = p is KMutableProperty1<*, *> && p.setter.visibility == KVisibility.PUBLIC
 
+    /** A class compiled from Java (no Kotlin metadata); only these have getX/setX methods treated as properties. */
+    private fun isJavaClass(kclass: KClass<*>): Boolean = !kclass.java.isAnnotationPresent(Metadata::class.java)
+
     private fun javaGetter(kclass: KClass<*>, propertyName: String): KFunction<*>? =
-        kclass.memberFunctions.firstOrNull { it.name == getterName(propertyName) && it.valueParameters.isEmpty() }
+        if (!isJavaClass(kclass)) null
+        else kclass.memberFunctions.firstOrNull { it.name == getterName(propertyName) && it.valueParameters.isEmpty() }
 
     private fun javaSetter(kclass: KClass<*>, propertyName: String): KFunction<*>? =
-        kclass.memberFunctions.firstOrNull { it.name == setterName(propertyName) && it.valueParameters.size == 1 }
+        if (!isJavaClass(kclass)) null
+        else kclass.memberFunctions.firstOrNull { it.name == setterName(propertyName) && it.valueParameters.size == 1 }
 
     /** Rethrows the exception thrown by the called code, as the registry backend would. */
     private inline fun <R> unwrapped(block: () -> R): R = try {
@@ -104,6 +117,7 @@ internal object KotlinReflectBackend : ReflectionBackend {
     override fun isAbstract(kclass: KClass<*>): Boolean = kclass.isAbstract || kclass.isSealed
     override fun isInterface(kclass: KClass<*>): Boolean = kclass.java.isInterface
     override fun isEnum(kclass: KClass<*>): Boolean = kclass.java.isEnum
+    override fun isObject(kclass: KClass<*>): Boolean = null != kclass.objectInstance
     override fun objectInstance(kclass: KClass<*>): Any? = kclass.objectInstance
 
     @Suppress("UNCHECKED_CAST")
@@ -157,7 +171,7 @@ internal object KotlinReflectBackend : ReflectionBackend {
             val publicProps = k.declaredMemberProperties.filter { it.visibility == KVisibility.PUBLIC }.map { it.name }
                 .sortedBy { order.indexOf(it).let { i -> if (i < 0) Int.MAX_VALUE else i } }
             // get methods, for java defined classes/properties
-            val methProps = k.declaredMemberFunctions
+            val methProps = if (!isJavaClass(k)) emptyList() else k.declaredMemberFunctions
                 .filter { it.name.startsWith("get") && it.name.length > 3 && it.valueParameters.isEmpty() && it.visibility == KVisibility.PUBLIC }
                 .map { it.name.substring(3).replaceFirstChar { c -> c.lowercaseChar() } }
             publicProps + methProps

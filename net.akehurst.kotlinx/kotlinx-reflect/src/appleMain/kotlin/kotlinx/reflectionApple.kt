@@ -16,6 +16,8 @@
 
 package net.akehurst.kotlinx.reflect
 
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
@@ -27,7 +29,23 @@ actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler: A
     TODO("Native proxyFor")
 }
 
-internal actual fun defaultForceRegistry(): Boolean = true
+internal actual fun defaultForceRegistry(): Boolean = false
+
+@OptIn(ExperimentalAtomicApi::class)
+private val registryLock = AtomicInt(0)
+
+// a simple spin lock; registration is short and rarely contended
+@OptIn(ExperimentalAtomicApi::class)
+internal actual fun withRegistryLock(block: () -> Unit) {
+    while (!registryLock.compareAndSet(0, 1)) {
+        // wait for the other thread to finish registering
+    }
+    try {
+        block()
+    } finally {
+        registryLock.store(0)
+    }
+}
 
 // Native uses the KotlinxReflect registry
 internal actual val platformBackend: ReflectionBackend? = null

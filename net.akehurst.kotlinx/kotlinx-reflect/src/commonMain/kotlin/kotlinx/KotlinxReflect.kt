@@ -96,14 +96,35 @@ object KotlinxReflect {
 
     private val _registeredClasses = mutableMapOf<String, RegisteredClass>()
     private val _registeredClassesReverse = mutableMapOf<KClass<*>, RegisteredClass>()
+    private val _registeredModules = mutableSetOf<String>()
+
+    /** Incremented by every registration, so that lookups built from the registry can be cached. */
+    internal var registrationVersion: Int = 0
+        private set
 
     /**
-     * When true, every platform uses only the registered information, including JVM.
-     * Use it to make JVM behave exactly like JS, Wasm and Native when debugging.
-     * On JVM the default comes from the system property 'kotlinx.reflect.forceRegistry'.
-     * On other platforms the registry is always used, whatever this is set to.
+     * When true, only the registered information is used, on every platform.
+     * Without it, JVM uses kotlin-reflect and JS falls back to JavaScript names for anything not registered;
+     * setting it makes them behave exactly like Wasm and Native, which is useful when debugging.
+     * On JVM the default comes from the system property 'kotlinx.reflect.forceRegistry'; elsewhere it is false.
+     * Wasm and Native always use only the registry, whatever this is set to.
      */
     var forceRegistry: Boolean = defaultForceRegistry()
+
+    /**
+     * Runs [registration] once for the module identified by [moduleId], under a lock,
+     * so that concurrent callers wait until the registration is complete.
+     * The module is only marked as registered when [registration] completes, so after a failure the next call tries again.
+     * Used by the generated `KotlinxReflectForModule.registerUsedClasses()`.
+     */
+    fun registerModule(moduleId: String, registration: () -> Unit) {
+        withRegistryLock {
+            if (moduleId !in _registeredModules) {
+                registration()
+                _registeredModules.add(moduleId)
+            }
+        }
+    }
 
     val registeredClasses: Map<String, KClass<*>> get() = _registeredClasses.mapValues { it.value.kclass }
 
@@ -122,6 +143,7 @@ object KotlinxReflect {
         if (null != objectInstance) rc.objectInstance = objectInstance
         _registeredClasses[qualifiedName] = rc
         _registeredClassesReverse[cls] = rc
+        registrationVersion++
     }
 
     /** Registers the class modifiers and its direct supertypes. */
@@ -131,6 +153,7 @@ object KotlinxReflect {
         rc.isInterface = isInterface
         rc._supertypes.clear()
         rc._supertypes.addAll(supertypes)
+        registrationVersion++
     }
 
     /** Registers a property declared (or overridden) in [cls], e.g. `registerProperty(Foo::class, Foo::bar)`. */
@@ -148,11 +171,13 @@ object KotlinxReflect {
      */
     fun registerProperty(cls: KClass<*>, name: String, getter: PropertyGetter, setter: PropertySetter? = null) {
         registered(cls)._properties[name] = RegisteredProperty(name, getter, setter)
+        registrationVersion++
     }
 
     /** Registers a constructor of [cls] that takes [arity] parameters. */
     fun registerConstructor(cls: KClass<*>, arity: Int, invoker: ConstructorInvoker) {
         registered(cls)._constructors[arity] = invoker
+        registrationVersion++
     }
 
     /** Registers a member function of [cls] that takes [arity] parameters. */
@@ -204,8 +229,12 @@ object KotlinxReflect {
         val list = registered(cls)._functions.getOrPut(fn.name) { mutableListOf() }
         list.removeAll { it.arity == fn.arity }
         list.add(fn)
+        registrationVersion++
     }
 }
 
-/** JVM reads the 'kotlinx.reflect.forceRegistry' system property; other platforms always use the registry. */
+/** JVM reads the 'kotlinx.reflect.forceRegistry' system property; other platforms default to false. */
 internal expect fun defaultForceRegistry(): Boolean
+
+/** Runs [block] holding the registry lock: a real lock on JVM and Native, nothing on single-threaded JS and Wasm. */
+internal expect fun withRegistryLock(block: () -> Unit)

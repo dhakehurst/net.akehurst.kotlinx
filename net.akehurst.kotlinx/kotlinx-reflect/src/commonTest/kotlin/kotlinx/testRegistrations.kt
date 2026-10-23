@@ -78,6 +78,9 @@ internal fun registerTestClasses() {
     cls("FN_Abstract", FN_Abstract::class, isAbstract = true)
     kr.registerProperty(FN_Abstract::class, FN_Abstract::name)
     kr.registerFunction(FN_Abstract::class, "greet", 1, { self, args -> (self as FN_Abstract).greet(args[0] as String) }, FN_Abstract::greet)
+    cls("FN_Getter", FN_Getter::class)
+    kr.registerProperty(FN_Getter::class, FN_Getter::a)
+    kr.registerFunction(FN_Getter::class, "getTotal", 0, { self, _ -> (self as FN_Getter).getTotal() })
     cls("FN_A", FN_A::class, FN_Abstract::class)
     kr.registerProperty(FN_A::class, FN_A::name)
     kr.registerConstructor(FN_A::class, 1) { args -> FN_A(args[0] as String) }

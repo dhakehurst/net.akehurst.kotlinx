@@ -30,6 +30,9 @@ actual fun <T : Any> proxyFor(forInterface: KClass<*>, invokeMethod: (handler: A
 // JS uses the registry first and falls back to JavaScript names; set forceRegistry to use only the registry
 internal actual fun defaultForceRegistry(): Boolean = false
 
+// JS is single-threaded
+internal actual fun withRegistryLock(block: () -> Unit) = block()
+
 internal actual val platformBackend: ReflectionBackend? = JsNameFallbackBackend
 
 /**
@@ -55,6 +58,8 @@ internal object JsNameFallbackBackend : ReflectionBackend {
     override fun isEnum(kclass: KClass<*>): Boolean = registered(kclass)?.isEnum?.takeIf { it }
         ?: jsIsEnum(kclass.js, Enum::class.js)
 
+    // an unregistered object is recognised from its metadata, but its instance is not available
+    override fun isObject(kclass: KClass<*>): Boolean = registered(kclass)?.isObject?.takeIf { it } ?: jsIsObject(kclass.js)
     override fun objectInstance(kclass: KClass<*>): Any? = registered(kclass)?.objectInstance
 
     override fun enumValues(kclass: KClass<*>): List<Enum<*>> = when {
@@ -70,9 +75,10 @@ internal object JsNameFallbackBackend : ReflectionBackend {
         }
     }
 
+    // registered properties are complete (and exclude non-public ones), so JS names are only used when none are registered
     override fun propertyNames(kclass: KClass<*>): List<String> {
         val r = if (null != registered(kclass)) reg.propertyNames(kclass) else emptyList()
-        return (r + jsAccessorNames(kclass.js).asList()).distinct()
+        return r.ifEmpty { jsAccessorNames(kclass.js, stdlibBaseClasses).asList() }
     }
 
     override fun memberFunctions(kclass: KClass<*>): List<KFunction<*>> =
@@ -119,6 +125,12 @@ internal object JsNameFallbackBackend : ReflectionBackend {
 
 // --- JavaScript helpers; parameters are referenced by name inside js(...) ---
 
+/** Kotlin stdlib base classes whose properties (e.g. Enum.name, Throwable.message) are not listed, as on other platforms. */
+private val stdlibBaseClasses: Array<JsClass<*>> = arrayOf(Enum::class.js, Throwable::class.js)
+
+private fun jsIsObject(cls: JsClass<*>): Boolean =
+    js("(cls.\$metadata\$ !== undefined && cls.\$metadata\$ !== null && cls.\$metadata\$.kind === 'object')") as Boolean
+
 private fun jsIsEnum(cls: JsClass<*>, enumCls: JsClass<*>): Boolean =
     js("cls.prototype instanceof enumCls") as Boolean
 
@@ -155,28 +167,45 @@ private fun jsAccessorMethod(cls: JsClass<*>, kind: String, propertyName: String
     """
 ).unsafeCast<String?>()
 
-/** Names of properties on the class prototype chain, supertypes first. */
-private fun jsAccessorNames(cls: JsClass<*>): Array<String> = js(
+/**
+ * Names of properties on the class prototype chain, supertypes first.
+ * The walk stops at the [stop] classes; when the class inherits from one of them, that class's own property names
+ * (e.g. an exported enum's 'name' and 'ordinal') are left out too.
+ */
+private fun jsAccessorNames(cls: JsClass<*>, stop: Array<JsClass<*>>): Array<String> = js(
     """
     (function(){
-        var levels = [];
-        var proto = cls.prototype;
-        while (proto && proto !== Object.prototype) {
+        function namesOn(p) {
             var names = [];
-            Object.getOwnPropertyNames(proto).forEach(function(n) {
+            Object.getOwnPropertyNames(p).forEach(function(n) {
                 var m = /^get_(.+)_[a-z0-9]+_k\$$/.exec(n);
                 if (m) {
                     names.push(m[1]);
                 } else if (n !== 'constructor') {
-                    var d = Object.getOwnPropertyDescriptor(proto, n);
+                    var d = Object.getOwnPropertyDescriptor(p, n);
                     if (d && typeof d.get === 'function') names.push(n);
                 }
             });
-            levels.unshift(names);
+            return names;
+        }
+        var stopProtos = stop.map(function(c) { return c.prototype; });
+        var levels = [];
+        var excluded = [];
+        var proto = cls.prototype;
+        while (proto && proto !== Object.prototype) {
+            if (stopProtos.indexOf(proto) !== -1) {
+                for (var sp = proto; sp && sp !== Object.prototype; sp = Object.getPrototypeOf(sp)) {
+                    excluded = excluded.concat(namesOn(sp));
+                }
+                break;
+            }
+            levels.unshift(namesOn(proto));
             proto = Object.getPrototypeOf(proto);
         }
         var result = [];
-        levels.forEach(function(l){ l.forEach(function(n){ if (result.indexOf(n) === -1) result.push(n); }); });
+        levels.forEach(function(l){ l.forEach(function(n){
+            if (result.indexOf(n) === -1 && excluded.indexOf(n) === -1) result.push(n);
+        }); });
         return result;
     })()
     """
