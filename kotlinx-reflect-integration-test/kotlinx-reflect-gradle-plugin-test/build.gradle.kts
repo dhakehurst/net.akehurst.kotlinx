@@ -8,8 +8,8 @@ dependencies {
 }
 
 kotlinxReflect {
-    // classes from a dependency that applies no plugin (a "third-party" library)
-    forReflectionMain.set(listOf("net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.*"))
+    // classes from a dependency that applies no plugin (a "third-party" library), and this module's own classes
+    forReflectionMain.set(listOf("net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.*", "net.akehurst.kotlinx.reflect.gradle.plugin.test.own.**"))
     // classes that only exist in commonTest
     forReflectionTest.set(listOf("net.akehurst.kotlinx.reflect.gradle.plugin.test.testonly.*"))
 }

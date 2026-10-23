@@ -71,8 +71,10 @@ The plugin generates `KotlinxReflectForModule` in the package `<module>_commonMa
 run once, and other callers wait until they are complete. If a registration fails, the next call
 tries again.
 
-Tests have their own registry, `<module>_commonTest.KotlinxReflectForModule`. It registers the
-classes in `forReflectionMain` and `forReflectionTest`:
+Tests have their own registry, `<module>_commonTest.KotlinxReflectForModule`. It first calls the
+`commonMain` registry, so tests see the main classes exactly as the main code does. Then it
+registers the classes declared in `commonTest` that match `forReflectionMain` or
+`forReflectionTest`, and the other classes that match `forReflectionTest`:
 
 ```kotlin
 import my_module_commonTest.KotlinxReflectForModule
@@ -80,6 +82,10 @@ import my_module_commonTest.KotlinxReflectForModule
 @BeforeTest
 fun setup() = KotlinxReflectForModule.registerUsedClasses()
 ```
+
+Put classes from `commonMain` in `forReflectionMain`. The test compilation sees `commonMain` as a
+library, so a `commonMain` class listed only in `forReflectionTest` is treated like a class from a
+dependency: only its public members are registered, and `**` doesn't reach its sub-packages.
 
 ## Choosing classes: globs
 
@@ -148,11 +154,21 @@ arguments.
 - functions and constructors whose type parameters have several bounds, or a bound that refers to
   the type parameter itself (e.g. `C : Comparable<C>`). The class's other members are still
   registered.
-- members deprecated with level `ERROR` or `HIDDEN`
+- classes and members deprecated with level `ERROR` or `HIDDEN`, and members whose parameter or
+  property types are such classes
 - enum entries that have their own body (they are anonymous subclasses)
+- declarations that need an opt-in whose marker annotation isn't accessible (e.g. it is `internal`
+  to a library)
+
+**Opt-in.** Classes and members that need an opt-in (`@RequiresOptIn`) are registered. The
+generated code opts in to their markers with `@file:OptIn`.
+
+**Inner classes** are registered, but not their constructors, which need an instance of the outer
+class.
 
 **Overloads.** Functions and constructors are matched by name and number of arguments. When two
-overloads have the same number of parameters, only the first is registered.
+overloads have the same number of parameters, only the first is registered. A function that has
+overloads, including inherited ones, is registered without its `KFunction` reference.
 
 Skipped declarations are logged at info level (`--info`).
 
@@ -174,8 +190,9 @@ class is used, all platforms give the same answers and the same error messages.
 **What the plugin generates:**
 - **For `commonMain`:** KSP runs once on the common code and generates `KotlinxReflectForModule`.
 - **For tests:** Kotlin doesn't compile `commonTest` as a separate step, so the plugin writes a
-  small fixed `KotlinxReflectForModule` into `commonTest`. KSP then runs once per test target to
-  generate the registrations it calls.
+  small fixed `KotlinxReflectForModule` into `commonTest`. It calls the `commonMain` registry, then
+  the registrations that KSP generates once per test target for the classes the `commonMain`
+  registry doesn't have.
 
 ## API
 
