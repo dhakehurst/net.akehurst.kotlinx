@@ -18,8 +18,6 @@ package net.akehurst.kotlinx.reflect
 
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
-import kotlin.reflect.KMutableProperty1
-import kotlin.reflect.KProperty1
 
 /**
  * The platform-specific part of reflection.
@@ -84,7 +82,7 @@ internal object RegistryBackend : ReflectionBackend {
         KotlinxReflect.registeredClass(kclass) ?: ReflectErrors.notRegistered(kclass)
 
     /** The registered property with this name, from the class or its registered supertypes; null if none (never throws). */
-    fun registeredProperty(kclass: KClass<*>, propertyName: String): KProperty1<*, *>? =
+    fun registeredProperty(kclass: KClass<*>, propertyName: String): RegisteredProperty? =
         hierarchy(kclass).firstNotNullOfOrNull { it.properties[propertyName] }
 
     /** The registered function with this name and arity, from the class or its registered supertypes; null if none (never throws). */
@@ -112,7 +110,7 @@ internal object RegistryBackend : ReflectionBackend {
         return result
     }
 
-    private fun findProperty(kclass: KClass<*>, propertyName: String): KProperty1<*, *>? {
+    private fun findProperty(kclass: KClass<*>, propertyName: String): RegisteredProperty? {
         info(kclass) // fail clearly if the class itself is not registered
         return registeredProperty(kclass, propertyName)
     }
@@ -143,21 +141,17 @@ internal object RegistryBackend : ReflectionBackend {
     }
 
     override fun isPropertyMutable(kclass: KClass<*>, propertyName: String): Boolean? =
-        findProperty(kclass, propertyName)?.let { it is KMutableProperty1<*, *> }
+        findProperty(kclass, propertyName)?.isMutable
 
-    @Suppress("UNCHECKED_CAST")
     override fun getProperty(kclass: KClass<*>, self: Any, propertyName: String): Any? {
         val prop = findProperty(kclass, propertyName) ?: ReflectErrors.propertyNotFound(kclass, propertyName)
-        return (prop as KProperty1<Any, Any?>).get(self)
+        return prop.getter.invoke(self)
     }
 
-    @Suppress("UNCHECKED_CAST")
     override fun setProperty(kclass: KClass<*>, self: Any, propertyName: String, value: Any?) {
         val prop = findProperty(kclass, propertyName) ?: ReflectErrors.propertyNotFound(kclass, propertyName)
-        when (prop) {
-            is KMutableProperty1<*, *> -> (prop as KMutableProperty1<Any, Any?>).set(self, value)
-            else -> ReflectErrors.propertyNotMutable(kclass, propertyName)
-        }
+        val setter = prop.setter ?: ReflectErrors.propertyNotMutable(kclass, propertyName)
+        setter.invoke(self, value)
     }
 
     override fun construct(kclass: KClass<*>, args: List<Any?>): Any {

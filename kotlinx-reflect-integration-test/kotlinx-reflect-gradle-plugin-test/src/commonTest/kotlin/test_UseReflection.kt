@@ -1,6 +1,6 @@
 import net.akehurst.kotlinx.reflect.KotlinxReflect
 import net.akehurst.kotlinx.reflect.gradle.plugin.test.UseReflection
-import net.akehurst.kotlinx.reflect.gradle.plugin.test.generated.KotlinxReflectForModule
+import kotlinx_reflect_gradle_plugin_test_commonMain.KotlinxReflectForModule
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

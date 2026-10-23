@@ -17,11 +17,9 @@ class CCCC(val name: String, var count: Int = 0) {
         return count
     }
 }
-/* TODO: enums not working, not sure why !!
 enum class EEEE {
     red, blue, yellow, green
 }
-*/
 sealed class SSSS {
     object red:SSSS()
     object blue:SSSS()

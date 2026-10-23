@@ -83,6 +83,9 @@ internal object KotlinReflectBackend : ReflectionBackend {
     private fun memberProperty(kclass: KClass<*>, propertyName: String): KProperty1<*, *>? =
         kclass.memberProperties.firstOrNull { it.name == propertyName }
 
+    /** A 'var' whose setter can be called from outside the class. */
+    private fun isMutable(p: KProperty1<*, *>): Boolean = p is KMutableProperty1<*, *> && p.setter.visibility == KVisibility.PUBLIC
+
     private fun javaGetter(kclass: KClass<*>, propertyName: String): KFunction<*>? =
         kclass.memberFunctions.firstOrNull { it.name == getterName(propertyName) && it.valueParameters.isEmpty() }
 
@@ -97,7 +100,8 @@ internal object KotlinReflectBackend : ReflectionBackend {
     }
 
     override fun qualifiedName(kclass: KClass<*>): String = kclass.qualifiedName ?: error("Class '$kclass' has no qualified name (it is local or anonymous)")
-    override fun isAbstract(kclass: KClass<*>): Boolean = kclass.isAbstract
+    // a sealed class cannot be instantiated either, so it counts as abstract (as in the registry)
+    override fun isAbstract(kclass: KClass<*>): Boolean = kclass.isAbstract || kclass.isSealed
     override fun isInterface(kclass: KClass<*>): Boolean = kclass.java.isInterface
     override fun isEnum(kclass: KClass<*>): Boolean = kclass.java.isEnum
     override fun objectInstance(kclass: KClass<*>): Any? = kclass.objectInstance
@@ -126,10 +130,32 @@ internal object KotlinReflectBackend : ReflectionBackend {
         return result
     }
 
+    // properties inherited from the platform's own types (e.g. Enum.name) are not listed; the registry does not have them either
+    private fun isPlatformType(k: KClass<*>): Boolean = k.qualifiedName?.let { it.startsWith("kotlin.") || it.startsWith("java.") } ?: false
+
+    private val declarationOrderCache = java.util.concurrent.ConcurrentHashMap<KClass<*>, List<String>>()
+
+    /**
+     * Property names in declaration order, read from the class's Kotlin metadata
+     * (kotlin-reflect lists them alphabetically; the registry keeps declaration order).
+     * Empty for classes without Kotlin metadata, e.g. Java classes.
+     */
+    private fun declarationOrder(k: KClass<*>): List<String> = declarationOrderCache.getOrPut(k) {
+        try {
+            val md = k.java.getAnnotation(Metadata::class.java)
+            val km = md?.let { kotlin.metadata.jvm.KotlinClassMetadata.readLenient(it) as? kotlin.metadata.jvm.KotlinClassMetadata.Class }
+            km?.kmClass?.properties?.map { it.name } ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     override fun propertyNames(kclass: KClass<*>): List<String> {
         // supertypes first, so inherited properties come before the ones a subclass adds
-        return hierarchy(kclass).reversed().flatMap { k ->
+        return hierarchy(kclass).filter { it == kclass || !isPlatformType(it) }.reversed().flatMap { k ->
+            val order = declarationOrder(k)
             val publicProps = k.declaredMemberProperties.filter { it.visibility == KVisibility.PUBLIC }.map { it.name }
+                .sortedBy { order.indexOf(it).let { i -> if (i < 0) Int.MAX_VALUE else i } }
             // get methods, for java defined classes/properties
             val methProps = k.declaredMemberFunctions
                 .filter { it.name.startsWith("get") && it.name.length > 3 && it.valueParameters.isEmpty() && it.visibility == KVisibility.PUBLIC }
@@ -144,7 +170,7 @@ internal object KotlinReflectBackend : ReflectionBackend {
     override fun isPropertyMutable(kclass: KClass<*>, propertyName: String): Boolean? {
         val mprop = memberProperty(kclass, propertyName)
         return when {
-            null != mprop -> mprop is KMutableProperty1<*, *>
+            null != mprop -> isMutable(mprop)
             null != javaSetter(kclass, propertyName) -> true
             null != javaGetter(kclass, propertyName) -> false
             else -> null
@@ -178,7 +204,7 @@ internal object KotlinReflectBackend : ReflectionBackend {
         unwrapped {
             val mprop = memberProperty(kclass, propertyName)
             if (null != mprop) {
-                if (mprop !is KMutableProperty1<*, *>) ReflectErrors.propertyNotMutable(kclass, propertyName)
+                if (!isMutable(mprop)) ReflectErrors.propertyNotMutable(kclass, propertyName)
                 val prop = mprop as KMutableProperty1<Any, Any?>
                 prop.setter.isAccessible = true
                 prop.setter.call(self, value)

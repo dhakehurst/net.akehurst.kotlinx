@@ -1,35 +1,21 @@
 plugins {
-    id("com.google.devtools.ksp")
+    id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") version ("2.4.0-SNAPSHOT")
 }
 
 dependencies {
-    commonMainImplementation("net.akehurst.kotlinx:kotlinx-reflect:2.4.0-SNAPSHOT")
+    // the plugin adds net.akehurst.kotlinx:kotlinx-reflect itself
     commonMainImplementation(project(":kotlinx-reflect-gradle-plugin-test-moduleForReflection"))
-
-    // Prototype: generate the registrations as source in commonMain, using KSP
-    add("kspCommonMainMetadata", project(":kotlinx-reflect-ksp-processor"))
 }
 
-ksp {
-    // classes from the dependency to register; the dependency itself applies no plugin
-    arg("kotlinxReflect.forReflection", "net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.*")
-    arg("kotlinxReflect.package", "net.akehurst.kotlinx.reflect.gradle.plugin.test.generated")
+kotlinxReflect {
+    // classes from a dependency that applies no plugin (a "third-party" library)
+    forReflectionMain.set(listOf("net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.*"))
+    // classes that only exist in commonTest
+    forReflectionTest.set(listOf("net.akehurst.kotlinx.reflect.gradle.plugin.test.testonly.*"))
 }
 
 kotlin {
     js("js") {
         //binaries.library()
     }
-    sourceSets.commonMain {
-        kotlin.srcDir(layout.buildDirectory.dir("generated/ksp/metadata/commonMain/kotlin"))
-    }
-}
-
-// every compilation uses the code generated for commonMain
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().configureEach {
-    if (name != "kspCommonMainKotlinMetadata") dependsOn("kspCommonMainKotlinMetadata")
-}
-// the per-target KSP tasks also read commonMain sources, including the generated folder
-tasks.matching { it.name.startsWith("ksp") && it.name != "kspCommonMainKotlinMetadata" }.configureEach {
-    dependsOn("kspCommonMainKotlinMetadata")
 }

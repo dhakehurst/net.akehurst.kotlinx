@@ -55,18 +55,25 @@ allprojects {
 
 fun getProjectProperty(s: String) = project.findProperty(s) as String?
 
+// Gradle plugins, configured and published by their own build files
+val gradlePluginModules = setOf("kotlinx-reflect-gradle-plugin")
+// JVM-only libraries: published like the others, but not multiplatform (they apply kotlin("jvm") themselves)
+val jvmLibraryModules = setOf("kotlinx-reflect-ksp")
+
 subprojects {
 
     //apply(plugin = "maven-publish")
     apply(plugin = "org.jetbrains.dokka")
     apply(plugin = "com.github.gmazzo.buildconfig")
 
-    if (name != "kotlinx-reflect-gradle-plugin" && name != "krgp2") {
+    if (name !in gradlePluginModules) {
         apply(plugin = "com.vanniktech.maven.publish")
         apply(plugin = "signing")
-        apply(plugin = "org.jetbrains.kotlin.multiplatform")
-        apply(plugin = "org.jetbrains.kotlin.plugin.js-plain-objects")
-        apply(plugin = "net.akehurst.kotlin.gradle.plugin.exportPublic")
+        if (name !in jvmLibraryModules) {
+            apply(plugin = "org.jetbrains.kotlin.multiplatform")
+            apply(plugin = "org.jetbrains.kotlin.plugin.js-plain-objects")
+            apply(plugin = "net.akehurst.kotlin.gradle.plugin.exportPublic")
+        }
 
         configure<BuildConfigExtension> {
             val now = java.time.Instant.now()
@@ -80,7 +87,7 @@ subprojects {
             buildConfigField("String", "buildTime", "\"${fBuildTime()}\"")
         }
 
-        configure<KotlinMultiplatformExtension> {
+        if (name !in jvmLibraryModules) configure<KotlinMultiplatformExtension> {
             jvm {
                 val main by compilations.getting {
                     compileTaskProvider.configure {

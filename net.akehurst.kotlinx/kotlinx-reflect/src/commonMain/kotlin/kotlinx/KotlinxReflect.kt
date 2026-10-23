@@ -18,6 +18,7 @@ package net.akehurst.kotlinx.reflect
 
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
+import kotlin.reflect.KMutableProperty1
 import kotlin.reflect.KProperty1
 
 
@@ -32,9 +33,15 @@ typealias FunctionInvoker = (self: Any, args: List<Any?>) -> Any?
 /** Calls a suspend member function on [self] with the given arguments. */
 typealias SuspendFunctionInvoker = suspend (self: Any, args: List<Any?>) -> Any?
 
+/** Reads a property of [self]. */
+typealias PropertyGetter = (self: Any) -> Any?
+
+/** Writes a property of [self]. */
+typealias PropertySetter = (self: Any, value: Any?) -> Unit
+
 /**
  * Everything registered for one class.
- * Filled by the code that the kotlinx-reflect compiler plugin generates, or by hand.
+ * Filled by the code that the kotlinx-reflect Gradle plugin generates (using KSP), or by hand.
  */
 class RegisteredClass internal constructor(
     val qualifiedName: String,
@@ -46,7 +53,7 @@ class RegisteredClass internal constructor(
     var objectInstance: Any? = null; internal set
 
     internal val _supertypes = mutableListOf<KClass<*>>()
-    internal val _properties = linkedMapOf<String, KProperty1<*, *>>()
+    internal val _properties = linkedMapOf<String, RegisteredProperty>()
     internal val _constructors = mutableMapOf<Int, ConstructorInvoker>()
     internal val _functions = linkedMapOf<String, MutableList<RegisteredFunction>>()
 
@@ -54,7 +61,7 @@ class RegisteredClass internal constructor(
     val supertypes: List<KClass<*>> get() = _supertypes
 
     /** Properties declared or overridden in this class, in registration order. */
-    val properties: Map<String, KProperty1<*, *>> get() = _properties
+    val properties: Map<String, RegisteredProperty> get() = _properties
 
     /** Constructors, keyed by number of parameters. */
     val constructors: Map<Int, ConstructorInvoker> get() = _constructors
@@ -64,6 +71,15 @@ class RegisteredClass internal constructor(
 
     val isEnum: Boolean get() = null != enumValuesFunction
     val isObject: Boolean get() = null != objectInstance
+}
+
+class RegisteredProperty internal constructor(
+    val name: String,
+    val getter: PropertyGetter,
+    /** null if the property is not mutable (or its setter is not accessible) */
+    val setter: PropertySetter?
+) {
+    val isMutable: Boolean get() = null != setter
 }
 
 class RegisteredFunction internal constructor(
@@ -118,8 +134,20 @@ object KotlinxReflect {
     }
 
     /** Registers a property declared (or overridden) in [cls], e.g. `registerProperty(Foo::class, Foo::bar)`. */
+    @Suppress("UNCHECKED_CAST")
     fun registerProperty(cls: KClass<*>, property: KProperty1<*, *>) {
-        registered(cls)._properties[property.name] = property
+        val p = property as KProperty1<Any, Any?>
+        val setter: PropertySetter? = (property as? KMutableProperty1<Any, Any?>)?.let { mp -> { self, value -> mp.set(self, value) } }
+        registerProperty(cls, property.name, { self -> p.get(self) }, setter)
+    }
+
+    /**
+     * Registers a property declared (or overridden) in [cls], with functions to read and (if mutable) write it.
+     * This form also works for `object` declarations and generic classes, e.g.
+     * `registerProperty(Foo::class, "bar", { self -> (self as Foo).bar }, { self, v -> (self as Foo).bar = v as String })`.
+     */
+    fun registerProperty(cls: KClass<*>, name: String, getter: PropertyGetter, setter: PropertySetter? = null) {
+        registered(cls)._properties[name] = RegisteredProperty(name, getter, setter)
     }
 
     /** Registers a constructor of [cls] that takes [arity] parameters. */

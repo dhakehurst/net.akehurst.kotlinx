@@ -22,15 +22,10 @@ import java.io.File
 
 plugins {
     kotlin("multiplatform") version ("2.4.0") apply false
-    kotlin("jvm") version ("2.4.0") apply false
-    id("com.google.devtools.ksp") version ("2.3.12") apply false
 }
 val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4
 val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4
 val jvmTargetVersion = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8
-
-// JVM-only modules (e.g. the KSP processor) are not multiplatform
-val jvmOnlyProjects = setOf("kotlinx-reflect-ksp-processor")
 
 allprojects {
 
@@ -55,7 +50,7 @@ allprojects {
 
 }
 
-configure(subprojects.filter { it.name !in jvmOnlyProjects }) {
+subprojects {
 
     apply(plugin = "org.jetbrains.kotlin.multiplatform")
 
