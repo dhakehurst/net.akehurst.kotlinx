@@ -1,20 +1,19 @@
 plugins {
- //   id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") version ("2.2.21-SNAPSHOT")
+    id("net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin") version ("2.4.0-SNAPSHOT")
 }
 
 dependencies {
-    commonMainImplementation("net.akehurst.kotlinx:kotlinx-reflect:2.2.21")
+    // the plugin adds net.akehurst.kotlinx:kotlinx-reflect itself
     commonMainImplementation(project(":kotlinx-reflect-gradle-plugin-test-moduleForReflection"))
 }
-/*
+
 kotlinxReflect {
-    forReflectionMain.set(
-        listOf(
-            "net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.*"
-        )
-    )
+    // classes from a dependency that applies no plugin (a "third-party" library), and this module's own classes
+    forReflectionMain.set(listOf("net.akehurst.kotlinx.reflect.gradle.plugin.test.moduleForReflection.*", "net.akehurst.kotlinx.reflect.gradle.plugin.test.own.**"))
+    // classes that only exist in commonTest
+    forReflectionTest.set(listOf("net.akehurst.kotlinx.reflect.gradle.plugin.test.testonly.*"))
 }
-*/
+
 kotlin {
     js("js") {
         //binaries.library()

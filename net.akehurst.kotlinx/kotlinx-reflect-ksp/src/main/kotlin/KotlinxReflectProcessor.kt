@@ -1,0 +1,607 @@
+/**
+ * Copyright (C) 2026 Dr. David H. Akehurst (http://dr.david.h.akehurst.net)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package net.akehurst.kotlinx.reflect.ksp
+
+import com.google.devtools.ksp.*
+import com.google.devtools.ksp.processing.*
+import com.google.devtools.ksp.symbol.*
+
+/**
+ * Generates code that registers classes with `net.akehurst.kotlinx.reflect.KotlinxReflect`.
+ *
+ * Options (passed with `ksp { arg(...) }`, normally set by the kotlinx-reflect Gradle plugin):
+ *  - `kotlinxReflect.forReflection`: comma separated globs of classes to register, e.g. `com.example.model.*`.
+ *    Classes from dependencies are found by package, so for them '**' only reaches the glob's own package.
+ *  - `kotlinxReflect.package`: package of the generated code.
+ *  - `kotlinxReflect.mode`:
+ *     - `object` (default): generates `object KotlinxReflectForModule` with `registerUsedClasses()`.
+ *       Used for commonMain (KSP's common metadata compilation).
+ *     - `actual`: generates `internal actual fun kotlinxReflectRegisterUsedClasses()`.
+ *       Used for test compilations, which KSP runs once per target; the matching `expect fun`
+ *       and the `KotlinxReflectForModule` object that calls it are written into commonTest by the Gradle plugin.
+ *  - `kotlinxReflect.registeredByMain` (mode `actual` only): the commonMain globs. Classes that match them and are not
+ *    in the test sources are left out, because the commonMain registry (which the test registry calls first) has them.
+ *    A test compilation sees the main sources as a library, so it would register less of them (no `internal` members).
+ */
+class KotlinxReflectProcessorProvider : SymbolProcessorProvider {
+    override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor =
+        KotlinxReflectProcessor(environment.codeGenerator, environment.logger, environment.options)
+}
+
+class KotlinxReflectProcessor(
+    private val codeGenerator: CodeGenerator,
+    private val logger: KSPLogger,
+    private val options: Map<String, String>
+) : SymbolProcessor {
+
+    companion object {
+        const val OPTION_FOR_REFLECTION = "kotlinxReflect.forReflection"
+        const val OPTION_PACKAGE = "kotlinxReflect.package"
+        const val OPTION_MODE = "kotlinxReflect.mode"
+        const val OPTION_REGISTERED_BY_MAIN = "kotlinxReflect.registeredByMain"
+        const val MODE_OBJECT = "object"
+        const val MODE_ACTUAL = "actual"
+        const val OBJECT_NAME = "KotlinxReflectForModule"
+        const val ACTUAL_FUNCTION_NAME = "kotlinxReflectRegisterUsedClasses"
+    }
+
+    private fun globList(option: String) = options[option]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+
+    private val globs = globList(OPTION_FOR_REFLECTION)
+    private val registeredByMain = globList(OPTION_REGISTERED_BY_MAIN).map { globToRegex(it) }
+    private val generatedPackage = options[OPTION_PACKAGE] ?: "kotlinxreflect.generated"
+    private val mode = options[OPTION_MODE] ?: MODE_OBJECT
+    private var generated = false
+
+    /** Opt-in markers used by the generated code, written as a file-level `@OptIn`. */
+    private val optIns = sortedSetOf<String>()
+
+    override fun process(resolver: Resolver): List<KSAnnotated> {
+        if (generated) return emptyList()
+        generated = true
+
+        val classes = findClasses(resolver)
+        logger.info("KotlinxReflect: registering ${classes.size} classes: ${classes.map { it.qualifiedName?.asString() }}")
+
+        val body = when (mode) {
+            MODE_ACTUAL -> generateActualFunction(classes)
+            MODE_OBJECT -> generateObject(classes)
+            else -> {
+                logger.error("KotlinxReflect: unknown $OPTION_MODE '$mode', expected '$MODE_OBJECT' or '$MODE_ACTUAL'")
+                return emptyList()
+            }
+        }
+        val fileName = if (mode == MODE_ACTUAL) "${OBJECT_NAME}Actual" else OBJECT_NAME
+        codeGenerator.createNewFile(Dependencies(aggregating = true), generatedPackage, fileName).use {
+            it.write((header() + body).toByteArray())
+        }
+        return emptyList()
+    }
+
+    // ---- generated file layout ----
+
+    // The templates use trimMargin, not trimIndent: trimMargin only changes lines that start with '|', so interpolated
+    // blocks of several lines (already indented with 'indented') are left as they are.
+
+    /** Written after the body is generated, so that it can opt in to every marker the body uses. */
+    private fun header(): String {
+        val optIn = if (optIns.isEmpty()) "" else "\n@file:OptIn(${optIns.joinToString(", ") { "$it::class" }})"
+        return """
+            |// Generated by the kotlinx-reflect KSP processor. Do not edit.
+            |@file:Suppress("UNCHECKED_CAST", "USELESS_CAST", "DEPRECATION", "UNUSED_ANONYMOUS_PARAMETER", "RemoveRedundantQualifierName", "RedundantSuppression")$optIn
+            |package $generatedPackage
+            |
+            |import net.akehurst.kotlinx.reflect.KotlinxReflect
+            |import net.akehurst.kotlinx.reflect.ParameterType
+            |
+            |""".trimMargin()
+    }
+
+    private fun generateObject(classes: List<KSClassDeclaration>): String = """
+        |object $OBJECT_NAME : net.akehurst.kotlinx.reflect.KotlinxReflectModuleRegistry {
+        |
+        |    /** Registers the classes with KotlinxReflect. Safe to call more than once, and from several threads. */
+        |    fun registerUsedClasses() = KotlinxReflect.registerModule("$generatedPackage.$OBJECT_NAME") {
+        |${registrationCalls(classes).indented(8)}
+        |    }
+        |
+        |    override fun registerClasses() = registerUsedClasses()
+        |${classFunctions(classes).indented(4)}
+        |}
+        |""".trimMargin()
+
+    private fun generateActualFunction(classes: List<KSClassDeclaration>): String = """
+        |internal actual fun $ACTUAL_FUNCTION_NAME() = KotlinxReflect.registerModule("$generatedPackage.$OBJECT_NAME") {
+        |${registrationCalls(classes).indented(4)}
+        |}
+        |${classFunctions(classes)}
+        |""".trimMargin()
+
+    /** One call per class, e.g. `register_a_b_C()`. */
+    private fun registrationCalls(classes: List<KSClassDeclaration>) = classes.joinToString("\n") { "${functionName(it)}()" }
+
+    /** The registration function of each class, each after a blank line. */
+    private fun classFunctions(classes: List<KSClassDeclaration>) = classes.joinToString("\n") { "\n" + generateClass(it) }
+
+    /** Indents every line that is not blank by [spaces] spaces. */
+    private fun String.indented(spaces: Int): String = lines().joinToString("\n") { if (it.isBlank()) "" else " ".repeat(spaces) + it }
+
+    // ---- finding classes ----
+
+    private fun globToRegex(glob: String): Regex {
+        val sb = StringBuilder()
+        var i = 0
+        while (i < glob.length) {
+            val c = glob[i]
+            when {
+                c == '*' && i + 1 < glob.length && glob[i + 1] == '*' -> {
+                    sb.append(".*"); i++
+                }
+
+                c == '*' -> sb.append("[^.]*")
+                c == '?' -> sb.append("[^.]")
+                else -> sb.append(Regex.escape(c.toString()))
+            }
+            i++
+        }
+        return Regex(sb.toString())
+    }
+
+    @OptIn(KspExperimental::class)
+    private fun findClasses(resolver: Resolver): List<KSClassDeclaration> {
+        val found = linkedMapOf<String, KSClassDeclaration>()
+        fun addWithNested(cls: KSClassDeclaration) {
+            if (!isRegistrable(cls)) return
+            val qn = cls.qualifiedName?.asString() ?: return
+            if (found.containsKey(qn)) return
+            found[qn] = cls
+            cls.declarations.filterIsInstance<KSClassDeclaration>().forEach { addWithNested(it) }
+        }
+
+        // in a test compilation, the main sources (and dependencies) are libraries; the commonMain registry has the ones its globs match
+        fun isRegisteredByMain(cls: KSClassDeclaration): Boolean =
+            cls.origin != Origin.KOTLIN && cls.origin != Origin.JAVA &&
+                    registeredByMain.any { it.matches(cls.qualifiedName?.asString() ?: "") }
+
+        fun addMatched(cls: KSClassDeclaration) {
+            if (isRegisteredByMain(cls)) {
+                logger.info("KotlinxReflect: '${cls.qualifiedName?.asString()}' is registered by the commonMain registry, not repeated for tests")
+            } else {
+                addWithNested(cls)
+            }
+        }
+
+        // classes in this module's own sources
+        val fromSources = resolver.getAllFiles().flatMap { it.declarations }.filterIsInstance<KSClassDeclaration>().toList()
+
+        for (glob in globs) {
+            val regex = globToRegex(glob)
+            if (!glob.contains('*') && !glob.contains('?')) {
+                val cls = resolver.getClassDeclarationByName(resolver.getKSNameFromString(glob))
+                if (null == cls) logger.warn("KotlinxReflect: class '$glob' not found") else addMatched(cls)
+            } else {
+                // KSP can list the classes of a named package (including dependencies), but not a dependency's sub-packages
+                val pkg = glob.substringBefore('*').substringBefore('?').substringBeforeLast('.')
+                val fromPackage = resolver.getDeclarationsFromPackage(pkg).filterIsInstance<KSClassDeclaration>()
+                val matches = (fromPackage + fromSources).filter { regex.matches(it.qualifiedName?.asString() ?: "") }.toList()
+                when {
+                    matches.isNotEmpty() -> matches.forEach { addMatched(it) }
+                    glob.contains("**") -> logger.warn(
+                        "KotlinxReflect: no classes found for '$glob'. " +
+                                "For classes in dependencies, '**' only reaches package '$pkg'; list each sub-package, e.g. '$pkg.sub.*'"
+                    )
+                    else -> logger.warn("KotlinxReflect: no classes found for '$glob'")
+                }
+            }
+        }
+        return found.values.toList()
+    }
+
+    // ---- what can be registered ----
+
+    /** Thrown when a member cannot be called from generated code; the member is skipped (and logged). */
+    private class Unsupported(message: String) : Exception(message)
+
+    /**
+     * Whether the generated code (which is in the reflecting module) can access the declaration:
+     * public ones always, internal ones only when declared in this module's own sources.
+     */
+    private fun isAccessible(d: KSDeclaration): Boolean = try {
+        when {
+            d.isPublic() -> true
+            d.isInternal() -> d.origin == Origin.KOTLIN
+            else -> false
+        }
+    } catch (e: Exception) {
+        // KSP cannot answer for some synthetic library declarations
+        logger.info("KotlinxReflect: cannot tell the visibility of '${d.qualifiedName?.asString() ?: d.simpleName.asString()}', skipping it: $e")
+        false
+    }
+
+    private fun isRegistrable(cls: KSClassDeclaration): Boolean =
+        cls.classKind != ClassKind.ENUM_ENTRY && cls.classKind != ClassKind.ANNOTATION_CLASS &&
+                isAccessible(cls) && !cls.isLocal() && isCallable(cls) && optInMarkers(cls).all { isAccessible(it) } &&
+                (cls.parentDeclaration as? KSClassDeclaration)?.let { isRegistrable(it) } ?: true
+
+    /** @Deprecated with level ERROR or HIDDEN cannot be used. */
+    private fun isCallable(d: KSAnnotated): Boolean = d.annotations.none { a ->
+        a.shortName.asString() == "Deprecated" &&
+                a.arguments.any { it.name?.asString() == "level" && it.value.toString().let { v -> v.endsWith("ERROR") || v.endsWith("HIDDEN") } }
+    }
+
+    /** The annotations on [d] that are opt-in markers (annotation classes marked with `@RequiresOptIn`). */
+    private fun optInMarkers(d: KSAnnotated): List<KSClassDeclaration> = d.annotations
+        .mapNotNull { it.annotationType.resolve().declaration as? KSClassDeclaration }
+        .filter { marker ->
+            marker.annotations.any { m ->
+                m.shortName.asString() == "RequiresOptIn" && m.annotationType.resolve().declaration.qualifiedName?.asString() == "kotlin.RequiresOptIn"
+            }
+        }
+        .toList()
+
+    /**
+     * Records that the generated code uses [d], so the file opts in to its markers (and those of the classes containing it).
+     * Throws [Unsupported] if a marker is not accessible, as the generated code then cannot opt in.
+     */
+    private fun useOptIns(d: KSAnnotated?) {
+        if (null == d) return
+        optInMarkers(d).forEach { marker ->
+            if (!isAccessible(marker)) throw Unsupported("it needs opt-in to '${marker.qualifiedName?.asString()}', which is not accessible")
+            optIns.add(marker.qualifiedName!!.asString())
+        }
+        ((d as? KSDeclaration)?.parentDeclaration as? KSClassDeclaration)?.let { useOptIns(it) }
+    }
+
+    /** Checks that a declaration used in a type or a class literal can be referenced from the generated code. */
+    private fun useDeclaration(d: KSDeclaration) {
+        if (!isCallable(d)) throw Unsupported("'${d.qualifiedName?.asString()}' is deprecated with level ERROR or HIDDEN")
+        useOptIns(d)
+    }
+
+    /** A setter that is private or protected, or internal to another module, cannot be called from generated code. */
+    private fun isSetterAccessible(p: KSPropertyDeclaration): Boolean {
+        val modifiers = p.setter?.modifiers ?: return true
+        return when {
+            Modifier.PRIVATE in modifiers || Modifier.PROTECTED in modifiers -> false
+            Modifier.INTERNAL in modifiers -> p.origin == Origin.KOTLIN
+            else -> true
+        }
+    }
+
+    private fun isAbstract(cls: KSClassDeclaration) =
+        cls.classKind == ClassKind.INTERFACE || Modifier.ABSTRACT in cls.modifiers || Modifier.SEALED in cls.modifiers
+
+    // ---- rendering types in generated source ----
+
+    /** How each type parameter in scope is written: its single bound (default 'Any?'), or null if it cannot be written. */
+    private fun substitutions(typeParameters: List<KSTypeParameter>, outer: Map<String, String?>): Map<String, String?> {
+        val result = outer.toMutableMap()
+        val names = typeParameters.map { it.name.asString() }.toSet() + outer.keys
+        typeParameters.forEach { tp ->
+            val bounds = tp.bounds.map { it.resolve() }.toList()
+            result[tp.name.asString()] = when {
+                bounds.isEmpty() -> "kotlin.Any?"
+                bounds.size > 1 -> null // 'where' with several bounds
+                mentionsTypeParameter(bounds[0], names) -> null // e.g. T : Comparable<T>
+                else -> try {
+                    renderType(bounds[0], emptyMap())
+                } catch (e: Unsupported) {
+                    null
+                }
+            }
+        }
+        return result
+    }
+
+    private fun mentionsTypeParameter(type: KSType, names: Set<String>): Boolean =
+        (type.declaration is KSTypeParameter && type.declaration.simpleName.asString() in names) ||
+                type.arguments.any { arg -> arg.type?.resolve()?.let { mentionsTypeParameter(it, names) } ?: false }
+
+    private fun nullable(rendered: String, nullable: Boolean) = when {
+        !nullable || rendered.endsWith("?") -> rendered
+        rendered.contains("->") -> "($rendered)?"
+        else -> "$rendered?"
+    }
+
+    /** The type as written in source, with type parameters replaced using [subst]. */
+    private fun renderType(type: KSType, subst: Map<String, String?>): String {
+        val decl = type.declaration
+        return when {
+            decl is KSTypeParameter -> {
+                val name = decl.name.asString()
+                val r = subst[name] ?: throw Unsupported("type parameter '$name' has a bound that cannot be written")
+                nullable(r, type.isMarkedNullable)
+            }
+
+            decl is KSTypeAlias -> {
+                useDeclaration(decl)
+                nullable(renderType(decl.type.resolve(), subst), type.isMarkedNullable)
+            }
+
+            type.isFunctionType || type.isSuspendFunctionType -> {
+                val args = type.arguments.map { renderTypeArgument(it, subst, inFunctionType = true) }
+                val fn = "(${args.dropLast(1).joinToString(", ")}) -> ${args.last()}"
+                val f = if (type.isSuspendFunctionType) "suspend $fn" else fn
+                if (type.isMarkedNullable) "($f)?" else "($f)"
+            }
+
+            decl is KSClassDeclaration -> nullable(renderClassType(decl, type.arguments, subst), type.isMarkedNullable)
+
+            else -> throw Unsupported("type '$type' cannot be written")
+        }
+    }
+
+    /** The class declaring an inner class, or null if [cls] is not inner. */
+    private fun outerOfInner(cls: KSClassDeclaration): KSClassDeclaration? =
+        if (Modifier.INNER in cls.modifiers) cls.parentDeclaration as? KSClassDeclaration else null
+
+    /**
+     * A class type with its type arguments. For an inner class of a generic class, the arguments are written on each class,
+     * e.g. `a.Outer<kotlin.String>.Inner`; KSP lists the inner class's own arguments first, then the outer class's.
+     */
+    private fun renderClassType(decl: KSClassDeclaration, arguments: List<KSTypeArgument>, subst: Map<String, String?>): String {
+        useDeclaration(decl)
+        val outer = outerOfInner(decl)
+        val own = arguments.take(decl.typeParameters.size)
+        val ownArgs = if (own.isEmpty()) "" else own.joinToString(", ", "<", ">") { renderTypeArgument(it, subst, false) }
+        return when {
+            null != outer && arguments.size > own.size -> renderClassType(outer, arguments.drop(own.size), subst) + "." + decl.simpleName.asString() + ownArgs
+            else -> (decl.qualifiedName?.asString() ?: throw Unsupported("type '${decl.simpleName.asString()}' has no qualified name")) + ownArgs
+        }
+    }
+
+    private fun renderTypeArgument(arg: KSTypeArgument, subst: Map<String, String?>, inFunctionType: Boolean): String {
+        val t = arg.type?.resolve() ?: return "*"
+        val r = renderType(t, subst)
+        return when (arg.variance) {
+            Variance.STAR -> "*"
+            Variance.COVARIANT -> if (inFunctionType) r else "out $r"
+            Variance.CONTRAVARIANT -> if (inFunctionType) r else "in $r"
+            Variance.INVARIANT -> r
+        }
+    }
+
+    /** How the type parameters of [cls] are written, including those of the classes around an inner class. */
+    private fun classSubstitutions(cls: KSClassDeclaration): Map<String, String?> =
+        substitutions(cls.typeParameters, outerOfInner(cls)?.let { classSubstitutions(it) } ?: emptyMap())
+
+    /**
+     * The class with its type parameters replaced by their bounds, or star projections if a bound cannot be written.
+     * An inner class of a generic class is written with the outer class's arguments too, e.g. `a.Outer<kotlin.Any?>.Inner`.
+     */
+    private fun selfType(cls: KSClassDeclaration, subst: Map<String, String?>): String {
+        val outer = outerOfInner(cls)
+        val prefix = if (null != outer && hasTypeParameters(outer)) selfType(outer, subst) + "." + cls.simpleName.asString() else cls.qualifiedName!!.asString()
+        if (cls.typeParameters.isEmpty()) return prefix
+        val args = cls.typeParameters.map { subst[it.name.asString()] }
+        return if (args.any { null == it }) prefix + args.joinToString(", ", "<", ">") { "*" } else prefix + args.joinToString(", ", "<", ">")
+    }
+
+    /** Whether [cls], or a class around it that an inner class needs arguments for, has type parameters. */
+    private fun hasTypeParameters(cls: KSClassDeclaration): Boolean =
+        cls.typeParameters.isNotEmpty() || (outerOfInner(cls)?.let { hasTypeParameters(it) } ?: false)
+
+    // ---- generating code for one class ----
+
+    private fun functionName(cls: KSClassDeclaration) = "register_" + cls.qualifiedName!!.asString().replace('.', '_')
+
+    private fun name(n: String) = "`$n`"
+
+    /** Argument expressions 'args[i] as T' for the first [arity] parameters. */
+    private fun argList(params: List<KSValueParameter>, arity: Int, subst: Map<String, String?>) =
+        (0 until arity).joinToString(", ") { i -> "args[$i] as ${renderType(params[i].type.resolve(), subst)}" }
+
+    /**
+     * `ParameterType(...)` for a parameter, used at runtime to choose between overloads; must match what
+     * `KotlinReflectBackend.parameterType` (JVM) works out: the erased class, with a type parameter replaced by its first bound,
+     * and no check (null class) for function types and arrays.
+     */
+    private fun parameterType(type: KSType, nullable: Boolean = type.isMarkedNullable): String {
+        val decl = type.declaration
+        return when {
+            decl is KSTypeParameter -> decl.bounds.firstOrNull()?.resolve()?.let { parameterType(it, nullable || it.isMarkedNullable) }
+                ?: "ParameterType(kotlin.Any::class, true)"
+
+            decl is KSTypeAlias -> decl.type.resolve().let { parameterType(it, nullable || it.isMarkedNullable) }
+            type.isFunctionType || type.isSuspendFunctionType -> "ParameterType(null, $nullable)"
+            decl is KSClassDeclaration && decl.qualifiedName?.asString() == "kotlin.Array" -> "ParameterType(null, $nullable)"
+            decl is KSClassDeclaration -> {
+                useDeclaration(decl)
+                "ParameterType(${decl.qualifiedName!!.asString()}::class, $nullable)"
+            }
+
+            else -> throw Unsupported("type '$type' cannot be checked at runtime")
+        }
+    }
+
+    /** The parameter types of the first [arity] parameters, e.g. `listOf(ParameterType(kotlin.Int::class, false))`. */
+    private fun parameterTypes(params: List<KSValueParameter>, arity: Int): String =
+        if (0 == arity) "emptyList()" else (0 until arity).joinToString(", ", "listOf(", ")") { i -> parameterType(params[i].type.resolve()) }
+
+    /** One way to call a constructor or function: with its first [arity] parameters (the others have default values). */
+    private class Overload(val key: String, val usesDefaults: Boolean, val line: String)
+
+    /**
+     * One registration per key (name, number and types of parameters). When two declarations can be called with the same key,
+     * e.g. `f(a: Int)` and `f(a: Int, b: Int = 0)` with one argument, the one that needs no default values wins, as in Kotlin.
+     */
+    private fun distinctOverloads(overloads: List<Overload>): List<String> =
+        overloads.groupBy { it.key }.values.map { group -> (group.firstOrNull { !it.usesDefaults } ?: group.first()).line }
+
+    /** The numbers of arguments a call can be made with, given parameters with default values. */
+    private fun arities(params: List<KSValueParameter>): IntRange {
+        val minArity = params.indexOfLast { !it.hasDefault } + 1
+        return minArity..params.size
+    }
+
+    /** Explicit type arguments for a call to a generic function, e.g. '<kotlin.Any?>'. */
+    private fun typeArgs(typeParameters: List<KSTypeParameter>, subst: Map<String, String?>): String =
+        if (typeParameters.isEmpty()) "" else typeParameters.joinToString(", ", "<", ">") {
+            subst[it.name.asString()] ?: throw Unsupported("type parameter '${it.name.asString()}' has a bound that cannot be written")
+        }
+
+    /** What the registration lines of one class need. */
+    private inner class Target(val cls: KSClassDeclaration) {
+        val qn = cls.qualifiedName!!.asString()
+        val ref = "$qn::class"
+        val subst = classSubstitutions(cls)
+        val self = selfType(cls, subst)
+    }
+
+    private fun skip(what: String, e: Unsupported) = logger.info("KotlinxReflect: $what is not registered: ${e.message}")
+
+    /** The registration function for one class. */
+    private fun generateClass(cls: KSClassDeclaration): String {
+        val t = Target(cls)
+        useOptIns(cls) // isRegistrable has checked that its markers are accessible
+        val body = listOf(classLine(t), classInfoLine(t)) + propertyLines(t) + constructorLines(t) + functionLines(t)
+        return """
+            |private fun ${functionName(cls)}() {
+            |${body.joinToString("\n").indented(4)}
+            |}""".trimMargin()
+    }
+
+    // ---- one line per registration ----
+
+    /** The class, with its enum values or `object` instance. */
+    private fun classLine(t: Target): String = when (t.cls.classKind) {
+        ClassKind.ENUM_CLASS -> "KotlinxReflect.registerClass(\"${t.qn}\", ${t.ref}, { ${t.qn}.values() as Array<Enum<*>> })"
+        ClassKind.OBJECT -> "KotlinxReflect.registerClass(\"${t.qn}\", ${t.ref}, null, ${t.qn})"
+        else -> "KotlinxReflect.registerClass(\"${t.qn}\", ${t.ref})"
+    }
+
+    /** Modifiers and direct supertypes. */
+    private fun classInfoLine(t: Target): String {
+        val supertypes = t.cls.superTypes
+            .mapNotNull { st ->
+                when (val d = st.resolve().declaration) {
+                    is KSTypeAlias -> d.type.resolve().declaration as? KSClassDeclaration
+                    else -> d as? KSClassDeclaration
+                }
+            }
+            .filter { isAccessible(it) }
+            .filter { st ->
+                try {
+                    useDeclaration(st); true
+                } catch (e: Unsupported) {
+                    skip("supertype '${st.qualifiedName?.asString()}' of '${t.qn}'", e); false
+                }
+            }
+            .map { "${it.qualifiedName!!.asString()}::class" }
+            .toList()
+            .let { if (it.contains("kotlin.Any::class")) it else it + "kotlin.Any::class" }
+        val isInterface = t.cls.classKind == ClassKind.INTERFACE
+        return "KotlinxReflect.registerClassInfo(${t.ref}, isAbstract = ${isAbstract(t.cls)}, isInterface = $isInterface, supertypes = listOf(${supertypes.joinToString(", ")}))"
+    }
+
+    private fun propertyLine(t: Target, pname: String, setterType: String?): String {
+        val getter = "{ self -> (self as ${t.self}).${name(pname)} }"
+        val setter = if (null == setterType) "null" else "{ self, value -> (self as ${t.self}).${name(pname)} = value as $setterType }"
+        return "KotlinxReflect.registerProperty(${t.ref}, \"$pname\", $getter, $setter)"
+    }
+
+    private fun constructorLine(t: Target, parameterTypes: String, typeArgs: String, args: String): String =
+        "KotlinxReflect.registerConstructor(${t.ref}, $parameterTypes) { args -> ${t.qn}$typeArgs($args) }"
+
+    private fun functionLine(t: Target, isSuspend: Boolean, fname: String, parameterTypes: String, typeArgs: String, args: String, reference: String?): String {
+        val register = if (isSuspend) "registerSuspendFunction" else "registerFunction"
+        val invoker = "{ self, args -> (self as ${t.self}).${name(fname)}$typeArgs($args) }"
+        return "KotlinxReflect.$register(${t.ref}, \"$fname\", $parameterTypes, $invoker, ${reference ?: "null"})"
+    }
+
+    // ---- the members of a class ----
+
+    /** Properties declared in the class, in declaration order. */
+    private fun propertyLines(t: Target): List<String> = t.cls.getDeclaredProperties()
+        .filter { isAccessible(it) && null == it.extensionReceiver && isCallable(it) }
+        .filterNot { t.cls.classKind == ClassKind.ENUM_CLASS && it.simpleName.asString() == "entries" }
+        .mapNotNull { p ->
+            val pname = p.simpleName.asString()
+            try {
+                useOptIns(p)
+                useOptIns(p.getter)
+                // a setter that needs an opt-in the generated code cannot make leaves the property read-only
+                val setterOptIns = p.setter?.let { s -> runCatching { useOptIns(s) }.isSuccess } ?: true
+                val hasSetter = p.isMutable && isSetterAccessible(p) && setterOptIns && !t.self.contains("*")
+                propertyLine(t, pname, if (hasSetter) renderType(p.type.resolve(), t.subst) else null)
+            } catch (e: Unsupported) {
+                skip("property '${t.qn}.$pname'", e)
+                null
+            }
+        }
+        .toList()
+
+    /** Constructors, one registration for each number and types of arguments they can be called with. */
+    private fun constructorLines(t: Target): List<String> {
+        val canConstruct = t.cls.classKind == ClassKind.CLASS && !isAbstract(t.cls) && Modifier.INNER !in t.cls.modifiers
+        if (!canConstruct) return emptyList()
+        val overloads = mutableListOf<Overload>()
+        t.cls.getConstructors().filter { isAccessible(it) && isCallable(it) }.forEach { ctor ->
+            val params = ctor.parameters
+            if (params.any { it.isVararg }) {
+                logger.info("KotlinxReflect: vararg constructor of '${t.qn}' is not registered")
+                return@forEach
+            }
+            try {
+                useOptIns(ctor)
+                val typeArgs = typeArgs(t.cls.typeParameters, t.subst)
+                for (arity in arities(params)) {
+                    val types = parameterTypes(params, arity)
+                    overloads.add(Overload(types, arity < params.size, constructorLine(t, types, typeArgs, argList(params, arity, t.subst))))
+                }
+            } catch (e: Unsupported) {
+                skip("constructor of '${t.qn}'", e)
+            }
+        }
+        return distinctOverloads(overloads)
+    }
+
+    /** Member functions declared in the class, one registration for each number and types of arguments they can be called with. */
+    private fun functionLines(t: Target): List<String> {
+        val functions = t.cls.getDeclaredFunctions()
+            .filter { isAccessible(it) && null == it.extensionReceiver && !it.isConstructor() && isCallable(it) }
+            .filterNot { t.cls.classKind == ClassKind.ENUM_CLASS && it.simpleName.asString() in setOf("values", "valueOf") }
+            .toList()
+        // overloads include inherited functions: 'Sub::foo' is ambiguous if Sub declares foo(x) and inherits foo()
+        val overloaded = t.cls.getAllFunctions().groupBy { it.simpleName.asString() }.filterValues { it.size > 1 }.keys +
+                functions.groupBy { it.simpleName.asString() }.filterValues { it.size > 1 }.keys
+        val overloads = mutableListOf<Overload>()
+        functions.forEach { fn ->
+            val fname = fn.simpleName.asString()
+            val params = fn.parameters
+            if (params.any { it.isVararg }) {
+                logger.info("KotlinxReflect: vararg function '${t.qn}.$fname' is not registered")
+                return@forEach
+            }
+            try {
+                useOptIns(fn)
+                val subst = substitutions(fn.typeParameters, t.subst)
+                val typeArgs = typeArgs(fn.typeParameters, subst)
+                // a reference is only unambiguous for a function that is not overloaded or generic
+                val reference = if (fname in overloaded || fn.typeParameters.isNotEmpty() || hasTypeParameters(t.cls)) null else "${t.self}::${name(fname)}"
+                val isSuspend = Modifier.SUSPEND in fn.modifiers
+                for (arity in arities(params)) {
+                    val types = parameterTypes(params, arity)
+                    overloads.add(Overload("$fname$types", arity < params.size, functionLine(t, isSuspend, fname, types, typeArgs, argList(params, arity, subst), reference)))
+                }
+            } catch (e: Unsupported) {
+                skip("function '${t.qn}.$fname'", e)
+            }
+        }
+        return distinctOverloads(overloads)
+    }
+}

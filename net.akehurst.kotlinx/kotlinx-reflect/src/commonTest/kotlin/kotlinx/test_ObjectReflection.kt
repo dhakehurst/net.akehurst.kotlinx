@@ -17,6 +17,7 @@
 package net.akehurst.kotlinx.reflect.test
 
 import net.akehurst.kotlinx.reflect.reflect
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -44,11 +45,21 @@ class OR_B : OR_A() {
 
 class test_ObjectReflection {
 
+    @BeforeTest
+    fun before() = registerTestClasses()
+
     @Test
     fun allPropertyNames() {
         val obj1 = OR_A()
         val actual = obj1.reflect().allPropertyNames
         assertEquals(listOf("prop1", "prop2", "prop3", "prop4", "prop5"), actual)
+    }
+
+    @Test
+    fun allPropertyNames_subclass() {
+        val obj1 = OR_B()
+        val actual = obj1.reflect().allPropertyNames
+        assertEquals(listOf("prop1", "prop2", "prop3", "prop4", "prop5", "prop6"), actual)
     }
 
     @Test

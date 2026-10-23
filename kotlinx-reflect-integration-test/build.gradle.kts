@@ -21,10 +21,10 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import java.io.File
 
 plugins {
-    kotlin("multiplatform") version ("2.2.21") apply false
+    kotlin("multiplatform") version ("2.4.0") apply false
 }
-val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
-val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2
+val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4
+val kotlin_apiVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4
 val jvmTargetVersion = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8
 
 allprojects {
@@ -44,7 +44,7 @@ allprojects {
     }
 
     group = rootProject.name
-    version = "2.2.21"
+    version = "2.4.0"
 
     project.layout.buildDirectory = File(rootProject.projectDir, ".gradle-build/${project.name}")
 

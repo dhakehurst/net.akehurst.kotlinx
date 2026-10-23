@@ -8,7 +8,6 @@ plugins {
     `maven-publish`
     id("com.gradle.plugin-publish") version "1.2.1"
     kotlin("jvm")
-    kotlin("kapt") // does not respect buildDir, fixed in kotlin 1.5.20
 }
 
 java {
@@ -25,12 +24,6 @@ project.tasks.withType<UsesKotlinJavaToolchain>().configureEach {
     kotlinJavaToolchain.toolchain.use(customLauncher)
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().configureEach {
-    compilerOptions {
-        freeCompilerArgs.add("-opt-in=org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi")
-    }
-}
-
 gradlePlugin {
     website.set("https://github.com/dhakehurst/net.akehurst.kotlinx/tree/master/net.akehurst.kotlinx/kotlinx-reflect-gradle-plugin")
     vcsUrl.set("https://github.com/dhakehurst/net.akehurst.kotlinx")
@@ -39,39 +32,26 @@ gradlePlugin {
             id = "net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin"
             implementationClass = "net.akehurst.kotlinx.reflect.gradle.plugin.KotlinxReflectGradlePlugin"
             displayName = project.name
-            description = "Kotlin compiler plugin to support net.akehurst.kotlinx reflection on multi-platform"
-            tags.set(listOf("reflection","kotlin", "javascript", "typescript", "kotlin-js", "kotlin-multiplatform"))
+            description = "Generates registrations (using KSP) so that net.akehurst.kotlinx:kotlinx-reflect works on all Kotlin multiplatform targets, including for classes in third-party libraries"
+            tags.set(listOf("reflection", "kotlin", "javascript", "wasm", "kotlin-js", "kotlin-multiplatform", "ksp"))
         }
     }
 }
 
-configure<BuildConfigExtension>  {
-    //val project = project(":kotlinx-gradle-plugin")
+configure<BuildConfigExtension> {
     packageName("${project.group}.reflect.gradle.plugin")
     className("KotlinPluginInfo")
     buildConfigField("String", "KOTLIN_PLUGIN_ID", "\"net.akehurst.kotlinx.kotlinx-reflect-gradle-plugin\"")
     buildConfigField("String", "PROJECT_GROUP", "\"${project.group}\"")
     buildConfigField("String", "PROJECT_NAME", "\"${project.name}\"")
     buildConfigField("String", "PROJECT_VERSION", "\"${project.version}\"")
+    // group of the kotlinx-reflect runtime and KSP processor libraries
+    buildConfigField("String", "LIBRARY_GROUP", "\"${rootProject.group}\"")
 }
 
 dependencies {
-    implementation(kotlin("gradle-plugin"))
-    compileOnly("com.google.auto.service:auto-service:1.1.1")
-    kapt("com.google.auto.service:auto-service:1.1.1")
-
-    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable")
-    compileOnly(kotlin("compiler-embeddable"))
-    implementation(kotlin("gradle-plugin-api"))
-    implementation(project(":kotlinx-reflect"))
-    implementation(project(":kotlinx-utils"))
-    implementation(kotlin("util-klib"))
-
-    testImplementation(project)
-    testImplementation(project(":kotlinx-reflect"))
-    testImplementation(project(":kotlinx-utils"))
-
-    testImplementation(kotlin("test"))
-    testImplementation(kotlin("test-annotations-common"))
+    // provided by the user's build
+    compileOnly(kotlin("gradle-plugin"))
+    // applied by this plugin
+    implementation(libs.ksp.gradlePlugin)
 }
-
