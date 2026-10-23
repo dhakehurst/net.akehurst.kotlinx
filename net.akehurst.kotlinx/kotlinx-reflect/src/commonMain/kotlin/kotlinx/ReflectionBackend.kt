@@ -81,6 +81,44 @@ internal object ReflectErrors {
 
     fun isSuspend(kclass: KClass<*>, methodName: String): Nothing =
         error("Method '$methodName' on class '${kclass.simpleName}' is a suspend function, use 'callSuspend' instead of 'call'")
+
+    // simple names, because qualified names are not available on JS
+    private fun describe(args: List<Any?>) = args.joinToString(", ", "(", ")") { a -> a?.let { it::class.simpleName } ?: "null" }
+
+    fun noMatchingConstructor(kclass: KClass<*>, args: List<Any?>): Nothing =
+        error("No constructor of class '${kclass.simpleName}' accepts arguments ${describe(args)}")
+
+    fun ambiguousConstructor(kclass: KClass<*>, args: List<Any?>): Nothing =
+        error("Several constructors of class '${kclass.simpleName}' accept arguments ${describe(args)}")
+
+    fun noMatchingMethod(kclass: KClass<*>, methodName: String, args: List<Any?>): Nothing =
+        error("No overload of method '$methodName' on class '${kclass.simpleName}' accepts arguments ${describe(args)}")
+
+    fun ambiguousMethod(kclass: KClass<*>, methodName: String, args: List<Any?>): Nothing =
+        error("Several overloads of method '$methodName' on class '${kclass.simpleName}' accept arguments ${describe(args)}")
+}
+
+/**
+ * Chooses between overloads (constructors, or functions with the same name) that take the same number of arguments.
+ * Every backend uses this, so all platforms choose the same overload.
+ *  - only one candidate: it is used, without checking the argument types (the usual case, so no runtime cost)
+ *  - several: the one whose parameter types accept the arguments; none, or more than one, is an error
+ * A candidate with unknown parameter types (null; registered by number of parameters only) accepts any arguments.
+ */
+internal object Overloads {
+
+    fun accepts(parameterTypes: List<ParameterType>?, args: List<Any?>): Boolean =
+        null == parameterTypes || parameterTypes.zip(args).all { (type, arg) -> type.accepts(arg) }
+
+    inline fun <T> select(candidates: List<T>, args: List<Any?>, parameterTypes: (T) -> List<ParameterType>?, none: () -> Nothing, several: () -> Nothing): T {
+        if (candidates.size == 1) return candidates[0]
+        val matching = candidates.filter { accepts(parameterTypes(it), args) }
+        return when (matching.size) {
+            1 -> matching[0]
+            0 -> none()
+            else -> several()
+        }
+    }
 }
 
 /** Uses only what is registered with [KotlinxReflect]. */
@@ -93,9 +131,12 @@ internal object RegistryBackend : ReflectionBackend {
     fun registeredProperty(kclass: KClass<*>, propertyName: String): RegisteredProperty? =
         hierarchy(kclass).firstNotNullOfOrNull { it.properties[propertyName] }
 
-    /** The registered function with this name and arity, from the class or its registered supertypes; null if none (never throws). */
-    fun registeredFunction(kclass: KClass<*>, methodName: String, arity: Int): RegisteredFunction? =
-        hierarchy(kclass).firstNotNullOfOrNull { rc -> rc.functions[methodName]?.firstOrNull { it.arity == arity } }
+    /**
+     * The registered functions with this name and arity, from the class and its registered supertypes; empty if none (never throws).
+     * An overload overridden in a subclass (same parameter types) is listed once, from the nearest class.
+     */
+    fun registeredFunctions(kclass: KClass<*>, methodName: String, arity: Int): List<RegisteredFunction> =
+        hierarchy(kclass).flatMap { rc -> rc.functions[methodName].orEmpty().filter { it.arity == arity } }.distinctBy { it.parameterTypes }
 
     // hierarchies, rebuilt when anything new is registered; replaced as a whole, so a concurrent reader sees a complete map
     private var hierarchyCache: Map<KClass<*>, List<RegisteredClass>> = emptyMap()
@@ -136,9 +177,10 @@ internal object RegistryBackend : ReflectionBackend {
         return registeredProperty(kclass, propertyName)
     }
 
-    private fun findFunction(kclass: KClass<*>, methodName: String, arity: Int): RegisteredFunction {
+    private fun findFunction(kclass: KClass<*>, methodName: String, args: List<Any?>): RegisteredFunction {
         info(kclass)
-        return registeredFunction(kclass, methodName, arity) ?: ReflectErrors.methodNotFound(kclass, methodName, arity)
+        val candidates = registeredFunctions(kclass, methodName, args.size).ifEmpty { ReflectErrors.methodNotFound(kclass, methodName, args.size) }
+        return Overloads.select(candidates, args, { it.parameterTypes }, { ReflectErrors.noMatchingMethod(kclass, methodName, args) }, { ReflectErrors.ambiguousMethod(kclass, methodName, args) })
     }
 
     override fun qualifiedName(kclass: KClass<*>): String = info(kclass).qualifiedName
@@ -177,18 +219,19 @@ internal object RegistryBackend : ReflectionBackend {
     }
 
     override fun construct(kclass: KClass<*>, args: List<Any?>): Any {
-        val ctor = info(kclass).constructors[args.size] ?: ReflectErrors.constructorNotFound(kclass, args.size)
-        return ctor.invoke(args)
+        val candidates = info(kclass).constructors.filter { it.arity == args.size }.ifEmpty { ReflectErrors.constructorNotFound(kclass, args.size) }
+        val ctor = Overloads.select(candidates, args, { it.parameterTypes }, { ReflectErrors.noMatchingConstructor(kclass, args) }, { ReflectErrors.ambiguousConstructor(kclass, args) })
+        return ctor.invoker.invoke(args)
     }
 
     override fun call(kclass: KClass<*>, self: Any, methodName: String, args: List<Any?>): Any? {
-        val fn = findFunction(kclass, methodName, args.size)
+        val fn = findFunction(kclass, methodName, args)
         val invoker = fn.invoker ?: ReflectErrors.isSuspend(kclass, methodName)
         return invoker.invoke(self, args)
     }
 
     override suspend fun callSuspend(kclass: KClass<*>, self: Any, methodName: String, args: List<Any?>): Any? {
-        val fn = findFunction(kclass, methodName, args.size)
+        val fn = findFunction(kclass, methodName, args)
         val invoker = fn.suspendInvoker ?: ReflectErrors.notSuspend(kclass, methodName)
         return invoker.invoke(self, args)
     }

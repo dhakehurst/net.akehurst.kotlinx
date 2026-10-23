@@ -18,6 +18,7 @@ package net.akehurst.kotlinx.reflect.test
 
 import net.akehurst.kotlinx.reflect.EnumValuesFunction
 import net.akehurst.kotlinx.reflect.KotlinxReflect
+import net.akehurst.kotlinx.reflect.ParameterType
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.startCoroutine
@@ -87,6 +88,23 @@ internal fun registerTestClasses() {
     kr.registerFunction(FN_A::class, "add", 2, { self, args -> (self as FN_A).add(args[0] as Int, args[1] as Int) }, FN_A::add)
     kr.registerFunction(FN_A::class, "fail", 0, { self, _ -> (self as FN_A).fail() }, FN_A::fail)
     kr.registerSuspendFunction(FN_A::class, "later", 1, { self, args -> (self as FN_A).later(args[0] as Int) }, FN_A::later)
+
+    // overloads with the same number of parameters need their parameter types
+    fun p(k: KClass<*>, nullable: Boolean = false) = ParameterType(k, nullable)
+    cls("OV_Base", OV_Base::class)
+    kr.registerFunction(OV_Base::class, "pick", listOf(p(String::class)), { self, args -> (self as OV_Base).pick(args[0] as String) })
+    cls("OV_Other", OV_Other::class)
+    kr.registerConstructor(OV_Other::class, listOf(p(Int::class))) { args -> OV_Other(args[0] as Int) }
+    cls("OV_A", OV_A::class, OV_Base::class)
+    kr.registerProperty(OV_A::class, OV_A::tag)
+    kr.registerConstructor(OV_A::class, listOf(p(String::class))) { args -> OV_A(args[0] as String) }
+    kr.registerConstructor(OV_A::class, listOf(p(Int::class))) { args -> OV_A(args[0] as Int) }
+    kr.registerConstructor(OV_A::class, listOf(p(OV_Other::class, nullable = true))) { args -> OV_A(args[0] as OV_Other?) }
+    @Suppress("UNCHECKED_CAST")
+    kr.registerFunction(OV_A::class, "pick", listOf(p(List::class)), { self, args -> (self as OV_A).pick(args[0] as List<String>) })
+    kr.registerFunction(OV_A::class, "pick", listOf(p(Int::class)), { self, args -> (self as OV_A).pick(args[0] as Int) })
+    kr.registerFunction(OV_A::class, "any", listOf(p(Any::class)), { self, args -> (self as OV_A).any(args[0] as Any) })
+    kr.registerFunction(OV_A::class, "any", listOf(p(String::class)), { self, args -> (self as OV_A).any(args[0] as String) })
 }
 
 /** Runs a suspend block that never actually suspends, without needing kotlinx-coroutines. */

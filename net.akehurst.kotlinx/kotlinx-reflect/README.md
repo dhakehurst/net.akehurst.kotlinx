@@ -166,9 +166,26 @@ generated code opts in to their markers with `@file:OptIn`.
 **Inner classes** are registered, but not their constructors, which need an instance of the outer
 class.
 
-**Overloads.** Functions and constructors are matched by name and number of arguments. When two
-overloads have the same number of parameters, only the first is registered. A function that has
-overloads, including inherited ones, is registered without its `KFunction` reference.
+**Overloads.** Every overload is registered with the types of its parameters. A call is matched by
+name and number of arguments first. Only when several overloads take that many arguments are the
+arguments' types checked, so the usual case costs nothing extra:
+- the overload whose parameter types accept the arguments is called
+- if none accepts them, or more than one does (e.g. `f(Any)` and `f(String)` called with a
+  `String`), the call fails, rather than guessing
+- `null` is accepted only by a nullable parameter
+
+All platforms use the same code to choose, JVM included, so they choose the same overload. Types are
+checked as far as they can be at runtime: type arguments are not checked (`List<String>` is checked
+as `List`), a type parameter is checked against its bound, and function types and arrays are not
+checked. On JS, numbers don't keep their Kotlin type, so `f(Int)` and `f(Double)` can't be told
+apart for a whole number.
+
+When a declaration with default values can be called with the same arguments as another overload
+(e.g. `f(a: Int)` and `f(a: Int, b: Int = 0)` with one argument), the one that needs no default
+values is used, as in Kotlin.
+
+A function that has overloads, including inherited ones, is registered without its `KFunction`
+reference.
 
 Skipped declarations are logged at info level (`--info`).
 
@@ -242,6 +259,9 @@ Property 'name' on class 'Person' is not mutable
 Method 'greet' with 2 parameter(s) not found on class 'Person'
 Method 'load' on class 'Person' is a suspend function, use 'callSuspend' instead of 'call'
 No constructor with 0 parameter(s) found for class 'Person'
+No constructor of class 'Person' accepts arguments (Boolean)
+No overload of method 'greet' on class 'Person' accepts arguments (Int)
+Several overloads of method 'show' on class 'Person' accept arguments (String)
 ```
 
 An exception thrown by the code you call (a constructor, getter or function) is passed through
@@ -312,6 +332,18 @@ with(KotlinxReflect) {
 - **Enums:** pass the values function, for example `registerClass(qn, Colour::class, {
   Colour.values() as Array<Enum<*>> })`.
 - **Objects:** pass the instance, for example `registerClass(qn, MyObject::class, null, MyObject)`.
+- **Overloads with the same number of parameters:** register each with its parameter types instead
+  of the number of parameters, so that the right one can be chosen:
+  ```kotlin
+  registerConstructor(Person::class, listOf(ParameterType(String::class, false))) { args ->
+      Person(args[0] as String)
+  }
+  registerFunction(
+      Person::class, "greet", listOf(ParameterType(Int::class, isNullable = false)),
+      { self, args -> (self as Person).greet(args[0] as Int) }
+  )
+  ```
+  An overload registered by number of parameters only accepts any arguments.
 - **Function references** (the last argument of `registerFunction`) are optional. They're used for
   `allMemberFunctions` and `isSuspend()`.
 - **Registering twice is safe.** Calling `registerClass` again for the same class keeps what is

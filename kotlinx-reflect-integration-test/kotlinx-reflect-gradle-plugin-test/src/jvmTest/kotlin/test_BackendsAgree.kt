@@ -22,7 +22,7 @@ class test_BackendsAgree {
         Colour::class, Planet::class, Shape::class, Square::class,
         Settings::class, WithCompanion::class, WithCompanion.Companion::class,
         Ordered::class, OrderedBase::class, OrderedSub::class, PrivateSetter::class, InternalSetter::class, WithGetter::class,
-        OverloadBase::class, OverloadSub::class, Outer::class, Outer.Inner::class, InnerHolder::class, OptInMembers::class,
+        OverloadBase::class, OverloadSub::class, Outer::class, Outer.Inner::class, InnerHolder::class, OptInMembers::class, SameArity::class,
     )
 
     @BeforeTest

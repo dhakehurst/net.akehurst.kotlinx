@@ -153,3 +153,20 @@ class OptInClass(val v: Int)
 // ---- deprecated with level ERROR: cannot be referenced, so it is not registered ----
 @Deprecated("gone", level = DeprecationLevel.ERROR)
 class DeprecatedErrorClass
+
+// ---- overloads with the same number of parameters: chosen by the types of the arguments ----
+class SameArity(val tag: String) {
+    constructor(n: Int) : this("int:$n")
+
+    fun describe(s: String): String = "String $s"
+    fun describe(n: Int): String = "Int $n"
+    fun describe(items: List<String>, sep: String = ","): String = items.joinToString(sep)
+    fun describe(n: Int, sep: String): String = "Int $n$sep"
+
+    fun <T : Number> num(x: T): String = "Number $x"
+    fun num(s: String): String = "String $s"
+
+    // called with one argument, Kotlin uses the overload that needs no default value
+    fun width(a: Int): String = "one $a"
+    fun width(a: Int, b: Int = 0): String = "two $a $b"
+}

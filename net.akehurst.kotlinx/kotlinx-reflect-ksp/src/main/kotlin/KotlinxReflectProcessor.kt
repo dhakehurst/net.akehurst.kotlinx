@@ -106,6 +106,7 @@ class KotlinxReflectProcessor(
             |package $generatedPackage
             |
             |import net.akehurst.kotlinx.reflect.KotlinxReflect
+            |import net.akehurst.kotlinx.reflect.ParameterType
             |
             |""".trimMargin()
     }
@@ -404,6 +405,43 @@ class KotlinxReflectProcessor(
     private fun argList(params: List<KSValueParameter>, arity: Int, subst: Map<String, String?>) =
         (0 until arity).joinToString(", ") { i -> "args[$i] as ${renderType(params[i].type.resolve(), subst)}" }
 
+    /**
+     * `ParameterType(...)` for a parameter, used at runtime to choose between overloads; must match what
+     * `KotlinReflectBackend.parameterType` (JVM) works out: the erased class, with a type parameter replaced by its first bound,
+     * and no check (null class) for function types and arrays.
+     */
+    private fun parameterType(type: KSType, nullable: Boolean = type.isMarkedNullable): String {
+        val decl = type.declaration
+        return when {
+            decl is KSTypeParameter -> decl.bounds.firstOrNull()?.resolve()?.let { parameterType(it, nullable || it.isMarkedNullable) }
+                ?: "ParameterType(kotlin.Any::class, true)"
+
+            decl is KSTypeAlias -> decl.type.resolve().let { parameterType(it, nullable || it.isMarkedNullable) }
+            type.isFunctionType || type.isSuspendFunctionType -> "ParameterType(null, $nullable)"
+            decl is KSClassDeclaration && decl.qualifiedName?.asString() == "kotlin.Array" -> "ParameterType(null, $nullable)"
+            decl is KSClassDeclaration -> {
+                useDeclaration(decl)
+                "ParameterType(${decl.qualifiedName!!.asString()}::class, $nullable)"
+            }
+
+            else -> throw Unsupported("type '$type' cannot be checked at runtime")
+        }
+    }
+
+    /** The parameter types of the first [arity] parameters, e.g. `listOf(ParameterType(kotlin.Int::class, false))`. */
+    private fun parameterTypes(params: List<KSValueParameter>, arity: Int): String =
+        if (0 == arity) "emptyList()" else (0 until arity).joinToString(", ", "listOf(", ")") { i -> parameterType(params[i].type.resolve()) }
+
+    /** One way to call a constructor or function: with its first [arity] parameters (the others have default values). */
+    private class Overload(val key: String, val usesDefaults: Boolean, val line: String)
+
+    /**
+     * One registration per key (name, number and types of parameters). When two declarations can be called with the same key,
+     * e.g. `f(a: Int)` and `f(a: Int, b: Int = 0)` with one argument, the one that needs no default values wins, as in Kotlin.
+     */
+    private fun distinctOverloads(overloads: List<Overload>): List<String> =
+        overloads.groupBy { it.key }.values.map { group -> (group.firstOrNull { !it.usesDefaults } ?: group.first()).line }
+
     /** The numbers of arguments a call can be made with, given parameters with default values. */
     private fun arities(params: List<KSValueParameter>): IntRange {
         val minArity = params.indexOfLast { !it.hasDefault } + 1
@@ -476,13 +514,13 @@ class KotlinxReflectProcessor(
         return "KotlinxReflect.registerProperty(${t.ref}, \"$pname\", $getter, $setter)"
     }
 
-    private fun constructorLine(t: Target, arity: Int, typeArgs: String, args: String): String =
-        "KotlinxReflect.registerConstructor(${t.ref}, $arity) { args -> ${t.qn}$typeArgs($args) }"
+    private fun constructorLine(t: Target, parameterTypes: String, typeArgs: String, args: String): String =
+        "KotlinxReflect.registerConstructor(${t.ref}, $parameterTypes) { args -> ${t.qn}$typeArgs($args) }"
 
-    private fun functionLine(t: Target, isSuspend: Boolean, fname: String, arity: Int, typeArgs: String, args: String, reference: String?): String {
+    private fun functionLine(t: Target, isSuspend: Boolean, fname: String, parameterTypes: String, typeArgs: String, args: String, reference: String?): String {
         val register = if (isSuspend) "registerSuspendFunction" else "registerFunction"
         val invoker = "{ self, args -> (self as ${t.self}).${name(fname)}$typeArgs($args) }"
-        return "KotlinxReflect.$register(${t.ref}, \"$fname\", $arity, $invoker, ${reference ?: "null"})"
+        return "KotlinxReflect.$register(${t.ref}, \"$fname\", $parameterTypes, $invoker, ${reference ?: "null"})"
     }
 
     // ---- the members of a class ----
@@ -507,12 +545,11 @@ class KotlinxReflectProcessor(
         }
         .toList()
 
-    /** Constructors, one registration for each number of arguments. */
+    /** Constructors, one registration for each number and types of arguments they can be called with. */
     private fun constructorLines(t: Target): List<String> {
         val canConstruct = t.cls.classKind == ClassKind.CLASS && !isAbstract(t.cls) && Modifier.INNER !in t.cls.modifiers
         if (!canConstruct) return emptyList()
-        val lines = mutableListOf<String>()
-        val done = mutableSetOf<Int>()
+        val overloads = mutableListOf<Overload>()
         t.cls.getConstructors().filter { isAccessible(it) && isCallable(it) }.forEach { ctor ->
             val params = ctor.parameters
             if (params.any { it.isVararg }) {
@@ -523,16 +560,17 @@ class KotlinxReflectProcessor(
                 useOptIns(ctor)
                 val typeArgs = typeArgs(t.cls.typeParameters, t.subst)
                 for (arity in arities(params)) {
-                    if (done.add(arity)) lines.add(constructorLine(t, arity, typeArgs, argList(params, arity, t.subst)))
+                    val types = parameterTypes(params, arity)
+                    overloads.add(Overload(types, arity < params.size, constructorLine(t, types, typeArgs, argList(params, arity, t.subst))))
                 }
             } catch (e: Unsupported) {
                 skip("constructor of '${t.qn}'", e)
             }
         }
-        return lines
+        return distinctOverloads(overloads)
     }
 
-    /** Member functions declared in the class, one registration for each number of arguments. */
+    /** Member functions declared in the class, one registration for each number and types of arguments they can be called with. */
     private fun functionLines(t: Target): List<String> {
         val functions = t.cls.getDeclaredFunctions()
             .filter { isAccessible(it) && null == it.extensionReceiver && !it.isConstructor() && isCallable(it) }
@@ -541,8 +579,7 @@ class KotlinxReflectProcessor(
         // overloads include inherited functions: 'Sub::foo' is ambiguous if Sub declares foo(x) and inherits foo()
         val overloaded = t.cls.getAllFunctions().groupBy { it.simpleName.asString() }.filterValues { it.size > 1 }.keys +
                 functions.groupBy { it.simpleName.asString() }.filterValues { it.size > 1 }.keys
-        val lines = mutableListOf<String>()
-        val done = mutableSetOf<Pair<String, Int>>()
+        val overloads = mutableListOf<Overload>()
         functions.forEach { fn ->
             val fname = fn.simpleName.asString()
             val params = fn.parameters
@@ -558,12 +595,13 @@ class KotlinxReflectProcessor(
                 val reference = if (fname in overloaded || fn.typeParameters.isNotEmpty() || hasTypeParameters(t.cls)) null else "${t.self}::${name(fname)}"
                 val isSuspend = Modifier.SUSPEND in fn.modifiers
                 for (arity in arities(params)) {
-                    if (done.add(fname to arity)) lines.add(functionLine(t, isSuspend, fname, arity, typeArgs, argList(params, arity, subst), reference))
+                    val types = parameterTypes(params, arity)
+                    overloads.add(Overload("$fname$types", arity < params.size, functionLine(t, isSuspend, fname, types, typeArgs, argList(params, arity, subst), reference)))
                 }
             } catch (e: Unsupported) {
                 skip("function '${t.qn}.$fname'", e)
             }
         }
-        return lines
+        return distinctOverloads(overloads)
     }
 }

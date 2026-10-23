@@ -111,7 +111,7 @@ internal object JsNameFallbackBackend : ReflectionBackend {
     }
 
     override fun call(kclass: KClass<*>, self: Any, methodName: String, args: List<Any?>): Any? = when {
-        null != reg.registeredFunction(kclass, methodName, args.size) -> reg.call(kclass, self, methodName, args)
+        reg.registeredFunctions(kclass, methodName, args.size).isNotEmpty() -> reg.call(kclass, self, methodName, args)
         jsIsFunction(self, methodName) -> jsCall(self, methodName, args.toTypedArray())
         else -> ReflectErrors.methodNotFound(kclass, methodName, args.size)
     }

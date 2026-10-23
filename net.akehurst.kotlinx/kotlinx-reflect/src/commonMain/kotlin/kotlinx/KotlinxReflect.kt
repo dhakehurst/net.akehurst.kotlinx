@@ -40,6 +40,16 @@ typealias PropertyGetter = (self: Any) -> Any?
 typealias PropertySetter = (self: Any, value: Any?) -> Unit
 
 /**
+ * The type of a constructor or function parameter, as far as it can be checked at runtime: its class (with any type arguments
+ * erased) and whether it accepts null. Used to choose between overloads that take the same number of arguments.
+ * A null [kclass] means the type is not checked (e.g. function types and arrays); only nullability is.
+ */
+data class ParameterType(val kclass: KClass<*>?, val isNullable: Boolean) {
+    /** Whether [arg] can be passed for a parameter of this type. */
+    fun accepts(arg: Any?): Boolean = if (null == arg) isNullable else (null == kclass || kclass.isInstance(arg))
+}
+
+/**
  * Everything registered for one class.
  * Filled by the code that the kotlinx-reflect Gradle plugin generates (using KSP), or by hand.
  */
@@ -54,7 +64,7 @@ class RegisteredClass internal constructor(
 
     internal val _supertypes = mutableListOf<KClass<*>>()
     internal val _properties = linkedMapOf<String, RegisteredProperty>()
-    internal val _constructors = mutableMapOf<Int, ConstructorInvoker>()
+    internal val _constructors = mutableListOf<RegisteredConstructor>()
     internal val _functions = linkedMapOf<String, MutableList<RegisteredFunction>>()
 
     /** Direct supertypes, as registered. */
@@ -63,8 +73,8 @@ class RegisteredClass internal constructor(
     /** Properties declared or overridden in this class, in registration order. */
     val properties: Map<String, RegisteredProperty> get() = _properties
 
-    /** Constructors, keyed by number of parameters. */
-    val constructors: Map<Int, ConstructorInvoker> get() = _constructors
+    /** Constructors, in registration order. */
+    val constructors: List<RegisteredConstructor> get() = _constructors
 
     /** Member functions declared or overridden in this class, keyed by name. */
     val functions: Map<String, List<RegisteredFunction>> get() = _functions
@@ -82,9 +92,18 @@ class RegisteredProperty internal constructor(
     val isMutable: Boolean get() = null != setter
 }
 
+class RegisteredConstructor internal constructor(
+    val arity: Int,
+    /** null if registered by number of parameters only; then it is not checked when choosing between overloads */
+    val parameterTypes: List<ParameterType>?,
+    val invoker: ConstructorInvoker
+)
+
 class RegisteredFunction internal constructor(
     val name: String,
     val arity: Int,
+    /** null if registered by number of parameters only; then it is not checked when choosing between overloads */
+    val parameterTypes: List<ParameterType>?,
     val reference: KFunction<*>?,
     val invoker: FunctionInvoker?,
     val suspendInvoker: SuspendFunctionInvoker?
@@ -174,20 +193,38 @@ object KotlinxReflect {
         registrationVersion++
     }
 
-    /** Registers a constructor of [cls] that takes [arity] parameters. */
-    fun registerConstructor(cls: KClass<*>, arity: Int, invoker: ConstructorInvoker) {
-        registered(cls)._constructors[arity] = invoker
-        registrationVersion++
-    }
+    /**
+     * Registers a constructor of [cls] that takes [arity] parameters, without their types.
+     * Enough unless [cls] has several constructors with that number of parameters.
+     */
+    fun registerConstructor(cls: KClass<*>, arity: Int, invoker: ConstructorInvoker) =
+        addConstructor(cls, RegisteredConstructor(arity, null, invoker))
 
-    /** Registers a member function of [cls] that takes [arity] parameters. */
+    /** Registers a constructor of [cls] with the given parameter types, so that it can be told apart from other overloads. */
+    fun registerConstructor(cls: KClass<*>, parameterTypes: List<ParameterType>, invoker: ConstructorInvoker) =
+        addConstructor(cls, RegisteredConstructor(parameterTypes.size, parameterTypes, invoker))
+
+    /**
+     * Registers a member function of [cls] that takes [arity] parameters, without their types.
+     * Enough unless [cls] has several functions with that name and number of parameters.
+     */
     fun registerFunction(cls: KClass<*>, name: String, arity: Int, invoker: FunctionInvoker, reference: KFunction<*>? = null) {
-        addFunction(cls, RegisteredFunction(name, arity, reference, invoker, null))
+        addFunction(cls, RegisteredFunction(name, arity, null, reference, invoker, null))
     }
 
-    /** Registers a suspend member function of [cls] that takes [arity] parameters. */
+    /** Registers a member function of [cls] with the given parameter types, so that it can be told apart from other overloads. */
+    fun registerFunction(cls: KClass<*>, name: String, parameterTypes: List<ParameterType>, invoker: FunctionInvoker, reference: KFunction<*>? = null) {
+        addFunction(cls, RegisteredFunction(name, parameterTypes.size, parameterTypes, reference, invoker, null))
+    }
+
+    /** Registers a suspend member function of [cls] that takes [arity] parameters, without their types. */
     fun registerSuspendFunction(cls: KClass<*>, name: String, arity: Int, invoker: SuspendFunctionInvoker, reference: KFunction<*>? = null) {
-        addFunction(cls, RegisteredFunction(name, arity, reference, null, invoker))
+        addFunction(cls, RegisteredFunction(name, arity, null, reference, null, invoker))
+    }
+
+    /** Registers a suspend member function of [cls] with the given parameter types. */
+    fun registerSuspendFunction(cls: KClass<*>, name: String, parameterTypes: List<ParameterType>, invoker: SuspendFunctionInvoker, reference: KFunction<*>? = null) {
+        addFunction(cls, RegisteredFunction(name, parameterTypes.size, parameterTypes, reference, null, invoker))
     }
 
     /** Whether [function] is a suspend function, if it was registered (with its reference); otherwise null. */
@@ -225,9 +262,17 @@ object KotlinxReflect {
         _registeredClassesReverse[cls]
             ?: error("Class '$cls' must be registered with 'KotlinxReflect.registerClass' before its details are registered")
 
+    // registering the same overload again (same number and types of parameters) replaces it
+    private fun addConstructor(cls: KClass<*>, ctor: RegisteredConstructor) {
+        val list = registered(cls)._constructors
+        list.removeAll { it.arity == ctor.arity && it.parameterTypes == ctor.parameterTypes }
+        list.add(ctor)
+        registrationVersion++
+    }
+
     private fun addFunction(cls: KClass<*>, fn: RegisteredFunction) {
         val list = registered(cls)._functions.getOrPut(fn.name) { mutableListOf() }
-        list.removeAll { it.arity == fn.arity }
+        list.removeAll { it.arity == fn.arity && it.parameterTypes == fn.parameterTypes }
         list.add(fn)
         registrationVersion++
     }

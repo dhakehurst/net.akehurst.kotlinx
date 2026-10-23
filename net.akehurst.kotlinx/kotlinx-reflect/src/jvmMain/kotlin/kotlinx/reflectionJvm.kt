@@ -232,18 +232,40 @@ internal object KotlinReflectBackend : ReflectionBackend {
         }
     }
 
-    override fun construct(kclass: KClass<*>, args: List<Any?>): Any = unwrapped {
-        val ctor = kclass.constructors.firstOrNull { c ->
-            c.parameters.size == args.size && c.parameters.zip(args).all { (p, a) ->
-                null == a || (p.type.classifier as? KClass<*>)?.let { it.javaObjectType.isInstance(a) || it.isInstance(a) } ?: true
+    /**
+     * The parameter type as the registry has it (see the KSP processor): the erased class, with a type parameter replaced
+     * by its first bound; function types and arrays are not checked.
+     */
+    private fun parameterType(type: KType, nullable: Boolean = type.isMarkedNullable): ParameterType =
+        when (val c = type.classifier) {
+            is KTypeParameter -> c.upperBounds.firstOrNull()?.let { parameterType(it, nullable || it.isMarkedNullable) } ?: ParameterType(null, true)
+            is KClass<*> -> when {
+                c.java.isArray || Function::class.java.isAssignableFrom(c.java) -> ParameterType(null, nullable)
+                else -> ParameterType(c, nullable)
             }
-        } ?: ReflectErrors.constructorNotFound(kclass, args.size)
+            else -> ParameterType(null, true)
+        }
+
+    private fun parameterTypes(f: KFunction<*>): List<ParameterType> = f.valueParameters.map { parameterType(it.type) }
+
+    /** Public and internal ones if there are any, as the registry has; otherwise the others (e.g. private), which only JVM can call. */
+    private fun <F : KFunction<*>> preferVisible(candidates: List<F>): List<F> =
+        candidates.filter { it.visibility == KVisibility.PUBLIC || it.visibility == KVisibility.INTERNAL }.ifEmpty { candidates }
+
+    override fun construct(kclass: KClass<*>, args: List<Any?>): Any = unwrapped {
+        val candidates = preferVisible(kclass.constructors.filter { it.parameters.size == args.size })
+            .ifEmpty { ReflectErrors.constructorNotFound(kclass, args.size) }
+        val ctor = Overloads.select(candidates, args, ::parameterTypes, { ReflectErrors.noMatchingConstructor(kclass, args) }, { ReflectErrors.ambiguousConstructor(kclass, args) })
         ctor.isAccessible = true
         ctor.call(*args.toTypedArray())
     }
 
-    private fun kotlinFunction(kclass: KClass<*>, methodName: String, arity: Int): KFunction<*>? =
-        kclass.memberFunctions.firstOrNull { it.name == methodName && it.valueParameters.size == arity }
+    /** The member function to call, chosen as the registry does; null if there is none with that name and number of parameters. */
+    private fun kotlinFunction(kclass: KClass<*>, methodName: String, args: List<Any?>): KFunction<*>? {
+        val candidates = preferVisible(kclass.memberFunctions.filter { it.name == methodName && it.valueParameters.size == args.size })
+        if (candidates.isEmpty()) return null
+        return Overloads.select(candidates, args, ::parameterTypes, { ReflectErrors.noMatchingMethod(kclass, methodName, args) }, { ReflectErrors.ambiguousMethod(kclass, methodName, args) })
+    }
 
     // Kotlin mangles the JVM name of functions that take inline classes, e.g. 'foo-abc123'
     private fun mangledJavaMethod(kclass: KClass<*>, methodName: String, javaArity: Int): Method? =
@@ -260,7 +282,7 @@ internal object KotlinReflectBackend : ReflectionBackend {
     }.toTypedArray()
 
     override fun call(kclass: KClass<*>, self: Any, methodName: String, args: List<Any?>): Any? = unwrapped {
-        val kfun = kotlinFunction(kclass, methodName, args.size)
+        val kfun = kotlinFunction(kclass, methodName, args)
         when {
             null != kfun -> {
                 if (kfun.isSuspend) ReflectErrors.isSuspend(kclass, methodName)
@@ -278,7 +300,7 @@ internal object KotlinReflectBackend : ReflectionBackend {
     }
 
     override suspend fun callSuspend(kclass: KClass<*>, self: Any, methodName: String, args: List<Any?>): Any? {
-        val kfun = kotlinFunction(kclass, methodName, args.size)
+        val kfun = kotlinFunction(kclass, methodName, args)
         return when {
             null != kfun -> {
                 if (!kfun.isSuspend) ReflectErrors.notSuspend(kclass, methodName)
