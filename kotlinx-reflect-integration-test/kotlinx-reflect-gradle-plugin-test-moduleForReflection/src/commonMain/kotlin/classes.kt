@@ -7,6 +7,16 @@ class AAAA {
 class BBBB {
     var prop1 : String = "B says hello"
 }
+
+class CCCC(val name: String, var count: Int = 0) {
+    val description: String get() = "$name has $count"
+
+    fun greet(greeting: String) = "$greeting $name"
+    fun increment(by: Int = 1): Int {
+        count += by
+        return count
+    }
+}
 /* TODO: enums not working, not sure why !!
 enum class EEEE {
     red, blue, yellow, green

@@ -1,5 +1,6 @@
-import kotlinx_reflect_gradle_plugin_test_moduleForReflection_commonMain.KotlinxReflectForModule
+import net.akehurst.kotlinx.reflect.KotlinxReflect
 import net.akehurst.kotlinx.reflect.gradle.plugin.test.UseReflection
+import net.akehurst.kotlinx.reflect.gradle.plugin.test.generated.KotlinxReflectForModule
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -8,6 +9,8 @@ class test_UseReflection {
 
     @BeforeTest
     fun setup() {
+        // use only the generated registrations, on every platform
+        KotlinxReflect.forceRegistry = true
         KotlinxReflectForModule.registerUsedClasses()
     }
 
