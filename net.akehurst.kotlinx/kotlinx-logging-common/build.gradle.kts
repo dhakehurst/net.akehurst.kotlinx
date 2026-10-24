@@ -1,6 +1,4 @@
 
-val version_logj4j = "2.25.1"
-
 kotlin {
     sourceSets {
         commonMain {
@@ -11,12 +9,13 @@ kotlin {
         }
         jvmMain {
             dependencies {
-                api("org.apache.logging.log4j:log4j-core:$version_logj4j") // api so that downstream libs get access
-//                runtimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:$version_logj4j")
-//                runtimeOnly("org.apache.logging.log4j:log4j-jcl:$version_logj4j")
-//                runtimeOnly("org.apache.logging.log4j:log4j-jul:$version_logj4j")
-//                runtimeOnly("org.apache.logging.log4j:log4j-1.2-api:${version_logj4j}")
-//                runtimeOnly("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.20.0")
+                api(libs.log4j.api) // api so that downstream libs get access
+                implementation(libs.log4j.core) // used here, and on the runtime classpath of downstream libs
+//                runtimeOnly(libs.log4j.slf4j2.impl)
+//                runtimeOnly(libs.log4j.jcl)
+//                runtimeOnly(libs.log4j.jul)
+//                runtimeOnly(libs.log4j.v12.api)
+//                runtimeOnly(libs.jackson.dataformat.yaml)
             }
         }
         wasmJsMain {
