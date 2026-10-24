@@ -133,4 +133,54 @@ class test_HandleAbstract {
         val root = FakeDir(null, "root")
         assertNull(root.directory("missing"))
     }
+
+    // --- getOrCreateFile() / getOrCreateDirectory() ---
+
+    @Test
+    fun getOrCreateFile_returnsExistingFile() = runTest {
+        val root = FakeDir(null, "root")
+        val f = root.addFile("f.txt")
+        assertSame(f, root.getOrCreateFile("f.txt"))
+        assertEquals(1, root.entries.size)
+    }
+
+    @Test
+    fun getOrCreateFile_createsMissingFile() = runTest {
+        val root = FakeDir(null, "root")
+        val f = root.getOrCreateFile("new.txt")
+        assertNotNull(f)
+        assertSame(f, root.entries["new.txt"])
+    }
+
+    @Test
+    fun getOrCreateFile_returnsNullForDirectoryEntry() = runTest {
+        val root = FakeDir(null, "root")
+        val sub = root.addDir("sub")
+        assertNull(root.getOrCreateFile("sub"))
+        assertSame(sub, root.entries["sub"])
+    }
+
+    @Test
+    fun getOrCreateDirectory_returnsExistingDirectory() = runTest {
+        val root = FakeDir(null, "root")
+        val sub = root.addDir("sub")
+        assertSame(sub, root.getOrCreateDirectory("sub"))
+        assertEquals(1, root.entries.size)
+    }
+
+    @Test
+    fun getOrCreateDirectory_createsMissingDirectory() = runTest {
+        val root = FakeDir(null, "root")
+        val sub = root.getOrCreateDirectory("newDir")
+        assertNotNull(sub)
+        assertSame(sub, root.entries["newDir"])
+    }
+
+    @Test
+    fun getOrCreateDirectory_returnsNullForFileEntry() = runTest {
+        val root = FakeDir(null, "root")
+        val f = root.addFile("f.txt")
+        assertNull(root.getOrCreateDirectory("f.txt"))
+        assertSame(f, root.entries["f.txt"])
+    }
 }

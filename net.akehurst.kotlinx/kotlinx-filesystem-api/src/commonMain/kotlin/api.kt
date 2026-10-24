@@ -48,6 +48,26 @@ interface DirectoryHandle : FileSystemObjectHandle {
 
     suspend fun createFile(name: String): FileHandle?
     suspend fun createDirectory(name: String): DirectoryHandle?
+
+    /**
+     * return the existing file, or create it if no entry with that name exists.
+     * return null if the entry exists but is not a file, or if it cannot be created
+     */
+    suspend fun getOrCreateFile(name: String): FileHandle? = when (val entry = entry(name)) {
+        null -> createFile(name)
+        is FileHandle -> entry
+        else -> null
+    }
+
+    /**
+     * return the existing directory, or create it if no entry with that name exists.
+     * return null if the entry exists but is not a directory, or if it cannot be created
+     */
+    suspend fun getOrCreateDirectory(name: String): DirectoryHandle? = when (val entry = entry(name)) {
+        null -> createDirectory(name)
+        is DirectoryHandle -> entry
+        else -> null
+    }
 }
 
 interface FileHandle : FileSystemObjectHandle {
