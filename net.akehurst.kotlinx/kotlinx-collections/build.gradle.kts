@@ -3,7 +3,8 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                implementation(project(":kotlinx-utils"))
+                // api: Reference (from kotlinx-utils) is part of this module's public API (ManagedReference*)
+                api(project(":kotlinx-utils"))
             }
         }
     }

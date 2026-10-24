@@ -260,6 +260,10 @@ open class ManagedOrderedSet<E : Any>(
         }
         throw IndexOutOfBoundsException("$index")
     }
+
+    // order matters when compared to another OrderedSet (see OrderedSet); hashCode stays the Set hashCode
+    override fun equals(other: Any?): Boolean = orderedSetEquals(other)
+    override fun hashCode(): Int = super.hashCode()
 }
 
 // collections of references need different runtime validation of content

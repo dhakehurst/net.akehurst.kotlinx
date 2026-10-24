@@ -195,6 +195,26 @@ class test_OrderedSet {
     }
 
     @Test
+    fun ordered_sets_with_same_elements_in_different_order_are_not_equal() {
+        assertNotEquals(orderedSetOf(1, 2), orderedSetOf(2, 1))
+        assertNotEquals(mutableOrderedSetOf(1, 2), mutableOrderedSetOf(2, 1))
+        assertNotEquals<Any>(orderedSetOf(1, 2), mutableOrderedSetOf(2, 1))
+        val managed = ManagedOrderedSet<Int>("m", Int::class)
+        managed.add(2)
+        managed.add(1)
+        assertNotEquals<Any>(orderedSetOf(1, 2), managed)
+        assertNotEquals<Any>(managed, orderedSetOf(1, 2))
+        assertEquals<Any>(orderedSetOf(2, 1), managed)
+        assertEquals<Any>(managed, orderedSetOf(2, 1))
+    }
+
+    @Test
+    fun ordered_set_equals_plain_set_ignoring_order() {
+        assertEquals<Set<Int>>(orderedSetOf(1, 2), setOf(2, 1))
+        assertEquals<Set<Int>>(setOf(2, 1), orderedSetOf(1, 2))
+    }
+
+    @Test
     fun equality_with_plain_set_is_symmetric() {
         assertSymmetricEquality(orderedSetOf(1, 2), setOf(1, 2))
         assertSymmetricEquality(orderedSetOf(1, 2), setOf(2, 1))
