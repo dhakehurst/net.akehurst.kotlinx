@@ -19,6 +19,7 @@ package net.akehurst.kotlinx.filesystem
 import korlibs.io.file.VfsFile
 import korlibs.io.file.baseName
 import korlibs.io.file.std.jailedLocalVfs
+import korlibs.io.file.std.openAsZip
 import korlibs.io.file.std.resourcesVfs
 import korlibs.io.file.std.userHomeVfs
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
@@ -42,9 +43,8 @@ class DirectoryHandleVfs(
     override suspend fun listContent(): List<FileSystemObjectHandle> {
         return when {
             _handle.isFile() -> emptyList()
-            _handle.isDirectory() -> _handle.listNames().map {
-                entry(it) ?: error("Not found entry: $it")
-            }
+            // skip entries that are neither a directory nor a file
+            _handle.isDirectory() -> _handle.listNames().mapNotNull { entry(it) }
 
             else -> emptyList()
         }
@@ -61,7 +61,9 @@ class DirectoryHandleVfs(
     }
 
     override suspend fun createDirectory(name: String): DirectoryHandle? {
-        TODO("not implemented")
+        val newDir = _handle[name]
+        newDir.mkdir()
+        return DirectoryHandleVfs(fileSystem, this, newDir)
     }
 
     override suspend fun createFile(name: String): FileHandle? {
@@ -83,9 +85,8 @@ class FileHandleVfs(
     override suspend fun exists(): Boolean = fileSystem.exists(_handle)
     override suspend fun readContent(): String? = _handle.readString()
     override suspend fun writeContent(content: String)=_handle.writeString(content)
-    override suspend fun openAsZipDirectory(): DirectoryHandle {
-        TODO("not implemented")
-    }
+    override suspend fun openAsZipDirectory(): DirectoryHandle =
+        DirectoryHandleVfs(fileSystem, null, _handle.openAsZip())
 }
 
 open class FileSystemFromVfs(

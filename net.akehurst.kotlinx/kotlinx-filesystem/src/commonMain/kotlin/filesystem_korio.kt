@@ -19,7 +19,7 @@ package net.akehurst.kotlinx.filesystem
 import korlibs.io.file.VfsFile
 import korlibs.io.file.baseName
 import korlibs.io.file.std.openAsZip
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.toList
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
@@ -116,11 +116,12 @@ object FileSystemKorio : FileSystem {
     suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> =
         when (dir) {
             is DirectoryHandleKorio -> {
-                val list = dir.handle.list().map { child ->
+                // skip entries that are neither a directory nor a file (e.g. broken symlinks)
+                val list = dir.handle.list().mapNotNull { child ->
                     when {
                         child.isDirectory() -> DirectoryHandleKorio(this, dir,child)
                         child.isFile() -> FileHandleKorio(this, dir,child)
-                        else -> error("Should not happen")
+                        else -> null
                     }
                 }
                 list.toList()
