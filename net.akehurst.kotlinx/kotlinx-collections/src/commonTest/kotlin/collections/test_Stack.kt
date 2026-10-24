@@ -191,8 +191,7 @@ class test_MutableStack {
     @Test
     fun peek_n_returns_top_n_without_removing() {
         val s = mutableStackOf(1, 2, 3)
-        // order of the returned list is not asserted (see open question on peek(n)/pop(n) ordering)
-        assertEquals(setOf(2, 3), s.peek(2).toSet())
+        assertEquals(listOf(2, 3), s.peek(2))
         assertEquals(3, s.size)
     }
 
@@ -208,7 +207,7 @@ class test_MutableStack {
         val peeked = s.peek(2)
         s.pop()
         s.pop()
-        assertEquals(setOf(2, 3), peeked.toSet())
+        assertEquals(listOf(2, 3), peeked)
     }
 
     @Test
@@ -216,7 +215,7 @@ class test_MutableStack {
         val s = mutableStackOf(1, 2, 3)
         val peeked = s.peek(2)
         s.push(4)
-        assertEquals(setOf(2, 3), peeked.toSet())
+        assertEquals(listOf(2, 3), peeked)
     }
 
     @Test
@@ -229,9 +228,17 @@ class test_MutableStack {
     fun pop_n_removes_top_n() {
         val s = mutableStackOf(1, 2, 3)
         val popped = s.pop(2)
-        // order of the returned list is not asserted (see open question on peek(n)/pop(n) ordering)
-        assertEquals(setOf(2, 3), popped.toSet())
+        assertEquals(listOf(2, 3), popped)
         assertEquals(listOf(1), s.elements)
+    }
+
+    @Test
+    fun pop_n_returns_the_same_list_as_peek_n() {
+        val s = mutableStackOf("a", "b", "c", "d")
+        val peeked = s.peek(3)
+        assertEquals(peeked, s.pop(3))
+        assertEquals(listOf("b", "c", "d"), peeked)
+        assertEquals(listOf("a"), s.elements)
     }
 
     @Test
@@ -246,5 +253,30 @@ class test_MutableStack {
         val s = mutableStackOf(1, 2)
         assertFails { s.pop(3) }
         assertEquals(listOf(1, 2), s.elements)
+    }
+}
+
+class test_MutableStackElements {
+
+    @Test
+    fun elements_is_a_copy_not_affected_by_later_changes() {
+        val s = mutableStackOf(1, 2)
+        val e = s.elements
+        s.push(3)
+        s.pop()
+        s.pop()
+        assertEquals(listOf(1, 2), e)
+        assertEquals(listOf(1), s.elements)
+    }
+
+    @Test
+    fun changing_a_cast_elements_list_does_not_change_the_stack() {
+        val s = mutableStackOf(1, 2)
+        val e = s.elements
+        if (e is MutableList<Int>) {
+            e.add(99)
+        }
+        assertEquals(listOf(1, 2), s.elements)
+        assertEquals(2, s.peek())
     }
 }

@@ -175,3 +175,105 @@ class test_CachedValueSuspend {
         assertEquals(3, calls)
     }
 }
+
+/**
+ * Tests where the initializer really suspends, driven by hand (no kotlinx-coroutines):
+ * a [Gate] holds a suspended initializer until [Gate.open] is called.
+ */
+class test_CachedValueSuspendConcurrency {
+
+    private class Gate {
+        private val waiting = mutableListOf<kotlin.coroutines.Continuation<Unit>>()
+        suspend fun await() = kotlin.coroutines.suspendCoroutine<Unit> { waiting.add(it) }
+        fun open() {
+            val w = waiting.toList()
+            waiting.clear()
+            w.forEach { it.resumeWith(Result.success(Unit)) }
+        }
+    }
+
+    /** starts [block]; returns a function giving its result once it has finished (null while suspended) */
+    private fun <T> start(block: suspend () -> T): () -> Result<T>? {
+        var result: Result<T>? = null
+        block.startCoroutine(Continuation(EmptyCoroutineContext) { result = it })
+        return { result }
+    }
+
+    @Test
+    fun concurrent_gets_for_same_key_compute_once() {
+        val gate = Gate()
+        var calls = 0
+        val c = cachedByKeySuspend<String, Int> { calls++; gate.await(); it.length }
+
+        val r1 = start { c["abc"] }
+        val r2 = start { c["abc"] }
+        assertNull(r1())
+        assertNull(r2())
+        assertEquals(1, calls)
+
+        gate.open()
+        assertEquals(3, r1()?.getOrThrow())
+        assertEquals(3, r2()?.getOrThrow())
+        assertEquals(1, calls)
+        assertTrue(c.containsKey("abc"))
+    }
+
+    @Test
+    fun different_keys_compute_independently() {
+        val gate = Gate()
+        var calls = 0
+        val c = cachedByKeySuspend<String, Int> { calls++; gate.await(); it.length }
+        val r1 = start { c["a"] }
+        val r2 = start { c["bb"] }
+        assertEquals(2, calls)
+        gate.open()
+        assertEquals(1, r1()?.getOrThrow())
+        assertEquals(2, r2()?.getOrThrow())
+    }
+
+    @Test
+    fun failure_reaches_all_waiters_and_is_not_cached() {
+        val gate = Gate()
+        var calls = 0
+        val c = cachedByKeySuspend<String, Int> {
+            calls++
+            gate.await()
+            if (calls == 1) throw IllegalStateException("boom")
+            it.length
+        }
+        val r1 = start { c["abc"] }
+        val r2 = start { c["abc"] }
+        gate.open()
+        assertEquals("boom", r1()?.exceptionOrNull()?.message)
+        assertEquals("boom", r2()?.exceptionOrNull()?.message)
+        assertFalse(c.containsKey("abc"))
+
+        // next get computes again
+        val r3 = start { c["abc"] }
+        gate.open()
+        assertEquals(3, r3()?.getOrThrow())
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun reset_while_computing_does_not_cache_the_result() {
+        val gate = Gate()
+        val c = cachedByKeySuspend<String, Int> { gate.await(); it.length }
+        val r1 = start { c["abc"] }
+        c.reset("abc")
+        gate.open()
+        assertEquals(3, r1()?.getOrThrow())
+        assertFalse(c.containsKey("abc"))
+    }
+
+    @Test
+    fun set_while_computing_wins_over_the_result() {
+        val gate = Gate()
+        val c = cachedByKeySuspend<String, Int> { gate.await(); it.length }
+        val r1 = start { c["abc"] }
+        c["abc"] = 42
+        gate.open()
+        assertEquals(3, r1()?.getOrThrow())
+        assertEquals(42, c.getCachedValueOrNull("abc"))
+    }
+}

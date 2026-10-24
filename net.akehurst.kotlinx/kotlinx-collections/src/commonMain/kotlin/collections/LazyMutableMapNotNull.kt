@@ -39,6 +39,11 @@ class LazyMapNotNull<K, V : Any>(val accessor: (K) -> V) : MapNotNull<K, V> {
 
     override fun isEmpty(): Boolean = map.isEmpty()
 
+    // Map equality over the values computed so far. Compares entry sets, so no value is computed by equals.
+    override fun equals(other: Any?): Boolean = other is Map<*, *> && map.entries == other.entries
+    override fun hashCode(): Int = map.hashCode()
+    override fun toString(): String = map.toString()
+
     // enable property delegation
     operator fun getValue(thisRef: Any?, property: KProperty<*>): LazyMapNotNull<K, V> = this
 }
@@ -68,6 +73,11 @@ class LazyMutableMapNotNull<K, V : Any>(val accessor: (K) -> V) : MutableMapNotN
     }
 
     override fun remove(key: K): V? = this.map.remove(key)
+
+    // Map equality over the values computed (or put) so far. Compares entry sets, so no value is computed by equals.
+    override fun equals(other: Any?): Boolean = other is Map<*, *> && map.entries == other.entries
+    override fun hashCode(): Int = map.hashCode()
+    override fun toString(): String = map.toString()
 
     // enable property delegation
     operator fun getValue(thisRef: Any?, property: KProperty<*>): MutableMapNotNull<K, V> = this

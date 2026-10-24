@@ -152,7 +152,8 @@ class test_MutableMapNonNull {
     @Test
     fun get_for_missing_key_fails() {
         val m = mutableMapNonNullOf<String, Int>()
-        assertFails { m["missing"] }
+        val e = assertFailsWith<NoSuchElementException> { m["missing"] }
+        assertTrue(e.message?.contains("missing") == true, "message should name the key: ${e.message}")
     }
 
     @Test
@@ -164,5 +165,65 @@ class test_MutableMapNonNull {
         assertFalse(m.containsKey("a"))
         m.clear()
         assertTrue(m.isEmpty())
+    }
+}
+
+class test_LazyMapEquality {
+
+    @Test
+    fun lazyMap_equals_plain_map_of_computed_values() {
+        val m = lazyMap<String, Int> { it.length }
+        m["a"]
+        m["bb"]
+        assertEquals<Map<String, Int>>(mapOf("a" to 1, "bb" to 2), m)
+        assertEquals<Map<String, Int>>(m, mapOf("a" to 1, "bb" to 2))
+        assertEquals(mapOf("a" to 1, "bb" to 2).hashCode(), m.hashCode())
+        assertEquals("{a=1, bb=2}", m.toString())
+    }
+
+    @Test
+    fun lazyMaps_with_same_computed_values_are_equal() {
+        val a = lazyMap<String, Int> { it.length }
+        val b = lazyMap<String, Int> { it.length }
+        a["x"]
+        assertNotEquals(a, b)
+        b["x"]
+        assertEquals(a, b)
+        assertEquals(a.hashCode(), b.hashCode())
+    }
+
+    @Test
+    fun equals_does_not_compute_values() {
+        var calls = 0
+        val a = lazyMap<String, Int> { calls++; it.length }
+        val b = lazyMap<String, Int> { calls++; it.length }
+        a["x"]
+        b["y"]
+        assertEquals(2, calls)
+        assertNotEquals(a, b)
+        assertNotEquals(b, a)
+        assertEquals(2, calls)
+        assertEquals(setOf("x"), a.keys)
+        assertEquals(setOf("y"), b.keys)
+    }
+
+    @Test
+    fun lazyMapNotNull_equality() {
+        val m = lazyMapNotNull<String, Int> { it.length }
+        m["abc"]
+        assertEquals<Map<String, Int>>(mapOf("abc" to 3), m)
+        assertEquals<Map<String, Int>>(m, mapOf("abc" to 3))
+        assertEquals(mapOf("abc" to 3).hashCode(), m.hashCode())
+        assertEquals("{abc=3}", m.toString())
+    }
+
+    @Test
+    fun lazyMutableMapNotNull_equality() {
+        val m = lazyMutableMapNotNull<String, Int> { it.length }
+        m["abc"]
+        m["z"] = 9
+        assertEquals<Map<String, Int>>(mapOf("abc" to 3, "z" to 9), m)
+        assertEquals<Map<String, Int>>(m, mapOf("abc" to 3, "z" to 9))
+        assertEquals(mapOf("abc" to 3, "z" to 9).hashCode(), m.hashCode())
     }
 }

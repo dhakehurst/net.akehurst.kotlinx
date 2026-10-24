@@ -30,7 +30,8 @@ class MutableStack<T>() {
     val size: Int get() = this.list.size
     val isEmpty: Boolean get() = this.list.size == 0
     val isNotEmpty: Boolean get() = this.list.size != 0
-    val elements: List<T> get() = this.list
+    /** A copy of the elements, bottom first (top of stack last). Later pushes/pops don't change it. */
+    val elements: List<T> get() = this.list.toList()
 
     fun clear() {
         this.list.clear()
@@ -42,17 +43,25 @@ class MutableStack<T>() {
 
     fun peek(): T = list.last()
     fun peekOrNull(): T? = list.lastOrNull()
-    // copy, so later pushes/pops don't affect (or invalidate) the returned list
+    /**
+     * The top [n] elements, without removing them, bottom first (top of stack last) - the same order as
+     * [elements] and as [pop] (n). Returns a copy, so later pushes/pops don't affect it.
+     */
     fun peek(n: Int): List<T> = list.subList(list.size - n, list.size).toList()
 
     fun pop(): T = list.removeAt(list.lastIndex) //  list.removeLast() //this fails see KT-71375 [https://youtrack.jetbrains.com/issue/KT-71375/Prevent-Kotlins-removeFirst-and-removeLast-from-causing-crashes-on-Android-14-and-below-after-upgrading-to-Android-API-Level-35]
+    /**
+     * Removes the top [n] elements and returns them bottom first (top of stack last), i.e. in the order they
+     * were pushed - the same order as [peek] (n). E.g. after push(1), push(2), push(3): pop(2) == [2, 3].
+     *
+     * (Before 2.4.0 this returned them top first, [3, 2].)
+     */
     fun pop(n: Int): List<T> {
         // check first, so a failing pop leaves the stack unchanged
         if (n < 0 || n > list.size) throw IndexOutOfBoundsException("Cannot pop $n elements from a stack of size ${list.size}")
-        val removed = mutableListOf<T>()
-        for (i in 0 until n) {
-            removed.add(list.removeAt(list.lastIndex))
-        }
+        val top = list.subList(list.size - n, list.size)
+        val removed = top.toList()
+        top.clear()
         return removed
     }
 }

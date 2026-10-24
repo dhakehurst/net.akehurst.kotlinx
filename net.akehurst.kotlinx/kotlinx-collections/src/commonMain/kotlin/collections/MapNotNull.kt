@@ -27,5 +27,6 @@ interface MutableMapNotNull<K, V> : MapNotNull<K, V>, MutableMap<K, V> {
 }
 
 class MutableMapNonNullDefault<K, V>(private val map: MutableMap<K, V>) : MutableMapNotNull<K, V>, MutableMap<K, V> by map {
-    override fun get(key: K): V = this.map[key]!!
+    // getValue throws NoSuchElementException naming the missing key
+    override fun get(key: K): V = this.map.getValue(key)
 }
