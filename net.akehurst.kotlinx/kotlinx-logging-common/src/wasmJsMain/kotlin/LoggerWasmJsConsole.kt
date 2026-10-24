@@ -46,20 +46,19 @@ class LoggerWasmJsConsole(
             LogLevel.Trace -> this::consoleTrace
             else -> error("Internal Error: cannot log a message to '$lvl'")
         }
-        if (null == t) {
-            func("$prefix - $msg")
-        } else {
-            func("$prefix - $msg")
-            t.printStackTrace()
-        }
+        func("$prefix - $msg", t)
     }
 
-    private fun consoleFatal(msg: String?) = console.error(duration("Fatal","$msg"))
-    private fun consoleError(msg: String?) = console.error(duration("Error","$msg"))
-    private fun consoleWarn(msg: String?) = console.warn(duration("Warn","$msg"))
-    private fun consoleInfo(msg: String?) = console.info(duration("Info","$msg"))
-    private fun consoleDebug(msg: String?) = console.debug(duration("Debug","$msg"))
-    private fun consoleTrace(msg: String?) = console.debug(duration("Trace","$msg"))
+    // the throwable's stack trace is passed to the console with the message, so they appear together
+    private fun consoleArgs(msg: String, t: Throwable?): Array<JsAny?> =
+        if (null == t) arrayOf(msg.toJsString()) else arrayOf(msg.toJsString(), t.stackTraceToString().toJsString())
+
+    private fun consoleFatal(msg: String?, t: Throwable?) = console.error(*consoleArgs(duration("Fatal", "$msg"), t))
+    private fun consoleError(msg: String?, t: Throwable?) = console.error(*consoleArgs(duration("Error", "$msg"), t))
+    private fun consoleWarn(msg: String?, t: Throwable?) = console.warn(*consoleArgs(duration("Warn", "$msg"), t))
+    private fun consoleInfo(msg: String?, t: Throwable?) = console.info(*consoleArgs(duration("Info", "$msg"), t))
+    private fun consoleDebug(msg: String?, t: Throwable?) = console.debug(*consoleArgs(duration("Debug", "$msg"), t))
+    private fun consoleTrace(msg: String?, t: Throwable?) = console.debug(*consoleArgs(duration("Trace", "$msg"), t))
 
     private var lastTimeMark: TimeSource.Monotonic.ValueTimeMark? = null
     private fun duration(lev: String, msg: String): String {
