@@ -27,7 +27,8 @@ import kotlinx.coroutines.await
 import kotlinx.coroutines.flow.toList
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
-import net.akehurst.kotlinx.filesystem.api.FileSystem
+import net.akehurst.kotlinx.filesystem.api.FileAccessMode
+import net.akehurst.kotlinx.filesystem.api.UserFileSystem
 import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
 import web.blob.arrayBuffer
 import web.blob.text
@@ -37,7 +38,7 @@ import web.streams.close
 import kotlin.js.Promise
 
 data class DirectoryHandleJS(
-    val fileSystem: UserFileSystem,
+    val fileSystem: UserFileSystemDefault,
     override val parent: DirectoryHandleJS?,
     val handle: FileSystemDirectoryHandle
 ) : DirectoryHandleAbstract() {
@@ -61,7 +62,7 @@ data class DirectoryHandleJS(
 }
 
 data class FileHandleJS(
-    val fileSystem: UserFileSystem,
+    val fileSystem: UserFileSystemDefault,
     override val parent: DirectoryHandleJS?,
     val handle: FileSystemFileHandle
 ) : FileHandleAbstract() {
@@ -73,9 +74,9 @@ data class FileHandleJS(
     override suspend fun openAsZipDirectory(): DirectoryHandle? = fileSystem.openFileAsZipDirectory(this)
 }
 
-actual object UserFileSystem : FileSystem {
+actual object UserFileSystemDefault : UserFileSystem {
 
-    actual suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
+    override suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
         return when {
             name.isEmpty() -> parent
             parent is DirectoryHandleJS -> {
@@ -100,12 +101,12 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
+    override suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
         return selectDirectoryFromDialog("Choose Directory",null, mode)
     }
 
     @OptIn(ExperimentalWebApi::class)
-    actual suspend fun selectDirectoryFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
+    override suspend fun selectDirectoryFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
         return try {
             val dpo: DirectoryPickerOptions = when (accessMode) {
                 FileAccessMode.READ_ONLY -> unsafeJso { mode = FileSystemPermissionMode.read }
@@ -119,7 +120,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
+    override suspend fun selectExistingFileFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         val w: dynamic = window
         val p: Promise<dynamic> = when (accessMode) {
             FileAccessMode.READ_ONLY -> w.showOpenFilePicker(js("{mode:'read'}"))
@@ -134,7 +135,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectNewFileFromDialog(dialogTitle:String,parent: DirectoryHandle): FileHandle? {
+    override suspend fun selectNewFileFromDialog(dialogTitle:String,parent: DirectoryHandle): FileHandle? {
         return try {
             val w: dynamic = window
             val p: Promise<dynamic> = w.showSaveFilePicker(js("{}"))
@@ -146,7 +147,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> =
+    override suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> =
         try {
             when (dir) {
                 is DirectoryHandleJS -> {
@@ -177,7 +178,7 @@ actual object UserFileSystem : FileSystem {
             emptyList()
         }
 
-    actual suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
+    override suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
         return try {
             when (parent) {
                 is DirectoryHandleJS -> {
@@ -194,7 +195,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
+    override suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
         return try {
             when (parent) {
                 is DirectoryHandleJS -> {
@@ -210,7 +211,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun exists(entry: FileSystemObjectHandle): Boolean  {
+    override suspend fun exists(entry: FileSystemObjectHandle): Boolean  {
         return when (entry) {
             is FileHandleJS -> try { entry.handle.getFile(); true } catch (_: Exception) { false }
             is DirectoryHandleJS -> try { entry.handle.values(); true } catch (_: Exception) { false }
@@ -218,7 +219,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun readFileContent(file: FileHandle): String? =
+    override suspend fun readFileContent(file: FileHandle): String? =
         try {
             when (file) {
                 is FileHandleJS -> {
@@ -232,7 +233,7 @@ actual object UserFileSystem : FileSystem {
             null
         }
 
-    actual suspend fun writeFileContent(file: FileHandle, content: String) {
+    override suspend fun writeFileContent(file: FileHandle, content: String) {
         try {
             when (file) {
                 is FileHandleJS -> {
@@ -248,7 +249,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
+    override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
         return try {
             val handle = (file as FileHandleJS).handle
             val arrBuf = handle.getFile().arrayBuffer()

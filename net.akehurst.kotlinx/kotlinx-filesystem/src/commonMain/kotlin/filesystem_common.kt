@@ -18,11 +18,6 @@ package net.akehurst.kotlinx.filesystem
 
 import net.akehurst.kotlinx.filesystem.api.*
 
-enum class FileAccessMode {
-    READ_ONLY,
-    READ_WRITE
-}
-
 
 abstract class DirectoryHandleAbstract: DirectoryHandle {
 

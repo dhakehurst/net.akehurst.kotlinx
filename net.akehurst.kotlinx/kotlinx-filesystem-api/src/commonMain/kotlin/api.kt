@@ -56,3 +56,35 @@ interface FileHandle : FileSystemObjectHandle {
     suspend fun writeContent(content: String)
     suspend fun openAsZipDirectory(): DirectoryHandle?
 }
+
+enum class FileAccessMode {
+    READ_ONLY,
+    READ_WRITE
+}
+
+interface UserFileSystem : FileSystem {
+
+    suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle?
+
+    /**
+     * for JS/Wasm, this just calls the selectDirectoryFromDialog method
+     */
+    suspend fun getDirectory(fullPath: String, mode: FileAccessMode = FileAccessMode.READ_WRITE): DirectoryHandle?
+
+    suspend fun selectDirectoryFromDialog(dialogTitle: String, current: DirectoryHandle? = null, accessMode: FileAccessMode = FileAccessMode.READ_WRITE): DirectoryHandle?
+    suspend fun selectExistingFileFromDialog(dialogTitle: String, current: DirectoryHandle? = null, accessMode: FileAccessMode = FileAccessMode.READ_WRITE, useNativeDialog: Boolean = false): FileHandle?
+    suspend fun selectNewFileFromDialog(dialogTitle: String, parent: DirectoryHandle): FileHandle?
+
+    suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle>
+
+    suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle?
+    suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle?
+
+    suspend fun exists(entry: FileSystemObjectHandle): Boolean
+
+    suspend fun readFileContent(file: FileHandle): String?
+
+    suspend fun writeFileContent(file: FileHandle, content: String)
+
+    suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle?
+}
