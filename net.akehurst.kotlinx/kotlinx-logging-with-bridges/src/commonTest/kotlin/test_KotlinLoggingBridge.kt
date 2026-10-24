@@ -34,6 +34,7 @@ class test_KotlinLoggingBridge {
     fun before() {
         LoggingBridges.install()
         LoggingManager.use(framework)
+        framework.records.clear() // drop the "using ..." message logged by use()
     }
 
     @Test

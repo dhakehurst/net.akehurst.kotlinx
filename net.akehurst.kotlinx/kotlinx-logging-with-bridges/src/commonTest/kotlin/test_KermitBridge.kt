@@ -31,6 +31,7 @@ class test_KermitBridge {
     fun before() {
         LoggingBridges.install()
         LoggingManager.use(framework)
+        framework.records.clear() // drop the "using ..." message logged by use()
     }
 
     @Test
