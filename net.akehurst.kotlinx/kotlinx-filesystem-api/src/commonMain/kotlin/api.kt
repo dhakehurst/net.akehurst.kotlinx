@@ -29,10 +29,14 @@ interface FileSystemObjectHandle {
 }
 
 interface DirectoryHandle : FileSystemObjectHandle {
+    /**
+     * the files and directories directly inside this directory.
+     * Entries that are neither a file nor a directory (e.g. broken symlinks, FIFOs) are left out.
+     */
     suspend fun listContent(): List<FileSystemObjectHandle>
 
     /**
-     * return null if the entry does not exist
+     * return null if the entry does not exist, or is neither a file nor a directory
      */
     suspend fun entry(name: String): FileSystemObjectHandle?
 
@@ -46,7 +50,18 @@ interface DirectoryHandle : FileSystemObjectHandle {
      */
     suspend fun directory(name: String): DirectoryHandle?
 
+    /**
+     * create an empty file with this name.
+     * If a file with this name already exists it is returned unchanged (its content is kept).
+     * return null if a directory has this name, or if the file cannot be created
+     */
     suspend fun createFile(name: String): FileHandle?
+
+    /**
+     * create a directory with this name.
+     * If a directory with this name already exists it is returned unchanged.
+     * return null if a file has this name, or if the directory cannot be created
+     */
     suspend fun createDirectory(name: String): DirectoryHandle?
 
     /**
@@ -71,6 +86,9 @@ interface DirectoryHandle : FileSystemObjectHandle {
 }
 
 interface FileHandle : FileSystemObjectHandle {
+    /**
+     * the part of the name after the last '.', or "" if there is no '.'
+     */
     val extension: String
 
     /**
@@ -80,7 +98,17 @@ interface FileHandle : FileSystemObjectHandle {
     val nameWithoutExtension: String get() = name.substringBeforeLast('.')
 
     suspend fun readContent(): String?
+
+    /**
+     * replace the content of the file.
+     * In a browser (JS/Wasm) this asks the user for write permission if the page does not have it yet;
+     * the browser only shows that prompt when called soon after a user action such as a click.
+     */
     suspend fun writeContent(content: String)
+
+    /**
+     * open this file as a zip archive; the returned directory is the root of the archive
+     */
     suspend fun openAsZipDirectory(): DirectoryHandle?
 }
 
@@ -98,8 +126,26 @@ interface UserFileSystem : FileSystem {
      */
     suspend fun getDirectory(fullPath: String, mode: FileAccessMode = FileAccessMode.READ_WRITE): DirectoryHandle?
 
+    /**
+     * ask the user to choose a directory; return null if they cancel.
+     * [accessMode] is passed to the browser directory picker on JS/Wasm; other platforms do not use it.
+     */
     suspend fun selectDirectoryFromDialog(dialogTitle: String, current: DirectoryHandle? = null, accessMode: FileAccessMode = FileAccessMode.READ_WRITE): DirectoryHandle?
+
+    /**
+     * ask the user to choose an existing file; return null if they cancel.
+     * The dialog starts in [current] where the platform supports it, but the user may choose a file anywhere.
+     * The returned file's parent is the directory that contains it when that is known, otherwise null.
+     * [accessMode] is not used: browsers have no access mode for file pickers,
+     * and ask for write permission when the file is first written (see [FileHandle.writeContent]).
+     */
     suspend fun selectExistingFileFromDialog(dialogTitle: String, current: DirectoryHandle? = null, accessMode: FileAccessMode = FileAccessMode.READ_WRITE, useNativeDialog: Boolean = false): FileHandle?
+
+    /**
+     * ask the user to choose where to save a new file; return null if they cancel.
+     * The dialog starts in [parent] where the platform supports it, but the user may choose a location anywhere.
+     * The returned file's parent is the directory that contains it when that is known, otherwise null.
+     */
     suspend fun selectNewFileFromDialog(dialogTitle: String, parent: DirectoryHandle): FileHandle?
 
     suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle>
