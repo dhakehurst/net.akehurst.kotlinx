@@ -14,13 +14,7 @@
  * limitations under the License.
  */
 
-package net.akehurst.kotlinx.logging.common
-
-import net.akehurst.kotlinx.logging.api.LogLevel
-import net.akehurst.kotlinx.logging.api.LogThreshold
-import net.akehurst.kotlinx.logging.api.Logger
-import net.akehurst.kotlinx.logging.api.LoggingFramework
-import net.akehurst.kotlinx.logging.api.LoggingManager
+package net.akehurst.kotlinx.logging.api
 
 
 class LoggerConsole(

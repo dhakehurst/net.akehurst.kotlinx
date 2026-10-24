@@ -17,6 +17,7 @@
 package net.akehurst.kotlinx.logging.common
 
 import net.akehurst.kotlinx.logging.api.LogLevel
+import net.akehurst.kotlinx.logging.api.LoggingByConsole
 import net.akehurst.kotlinx.logging.api.LogThreshold
 import net.akehurst.kotlinx.logging.api.LoggingManager
 import net.akehurst.kotlinx.logging.api.logger

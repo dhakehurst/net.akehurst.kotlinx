@@ -16,7 +16,7 @@
 
 package net.akehurst.kotlinx.logging.api
 
-import net.akehurst.kotlinx.logging.common.LoggingByConsole
+import kotlin.concurrent.Volatile
 
 /**
  * A root logging level: which messages are output.
@@ -84,6 +84,8 @@ fun logger(prefix: String): Logger = LoggingManager.logger(prefix)
 
 object LoggingManager {
 
+    // volatile so a framework set by use() on one thread is seen by others
+    @Volatile
     private var _framework: LoggingFramework = LoggingByConsole
 
     var rootLoggingLevel: LogThreshold
