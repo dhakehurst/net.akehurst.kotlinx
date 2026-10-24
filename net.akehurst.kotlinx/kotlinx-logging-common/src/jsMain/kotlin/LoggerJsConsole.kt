@@ -17,6 +17,7 @@
 package net.akehurst.kotlinx.logging.common
 
 import net.akehurst.kotlinx.logging.api.LogLevel
+import net.akehurst.kotlinx.logging.api.LogThreshold
 import net.akehurst.kotlinx.logging.api.Logger
 import net.akehurst.kotlinx.logging.api.LoggingFramework
 import net.akehurst.kotlinx.logging.api.LoggingManager
@@ -27,11 +28,11 @@ class LoggerJsConsole(
     val prefix: String
 ) : Logger {
 
-    val outputLevel: LogLevel get() = LoggingManager.rootLoggingLevel
+    val outputLevel: LogThreshold get() = LoggingManager.rootLoggingLevel
 
     override fun log(level: LogLevel, t: Throwable?, lazyMessage: () -> String) {
         when {
-            level <= outputLevel -> logAll(level, lazyMessage(), t)
+            outputLevel.allows(level) -> logAll(level, lazyMessage(), t)
             else -> Unit
         }
     }
@@ -44,7 +45,6 @@ class LoggerJsConsole(
             LogLevel.Information -> this::consoleInfo
             LogLevel.Debug -> this::consoleDebug
             LogLevel.Trace -> this::consoleTrace
-            else -> error("Internal Error: cannot log a message to '$lvl'")
         }
         func("$prefix - $msg", t)
     }
@@ -77,7 +77,7 @@ class LoggerJsConsole(
 }
 
 object LoggingByBrowserConsoleJs: LoggingFramework {
-    override var rootLoggingLevel: LogLevel = LogLevel.Information
+    override var rootLoggingLevel: LogThreshold = LogLevel.Information
 
     override fun logger(prefix: String): Logger = LoggerJsConsole(prefix)
 

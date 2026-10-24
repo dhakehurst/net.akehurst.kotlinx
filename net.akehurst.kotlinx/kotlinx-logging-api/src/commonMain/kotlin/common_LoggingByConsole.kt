@@ -17,6 +17,7 @@
 package net.akehurst.kotlinx.logging.common
 
 import net.akehurst.kotlinx.logging.api.LogLevel
+import net.akehurst.kotlinx.logging.api.LogThreshold
 import net.akehurst.kotlinx.logging.api.Logger
 import net.akehurst.kotlinx.logging.api.LoggingFramework
 import net.akehurst.kotlinx.logging.api.LoggingManager
@@ -27,11 +28,11 @@ class LoggerConsole(
 ) : Logger {
 
     // read on every call, so a change to the root level also applies to existing loggers
-    val outputLevel: LogLevel get() = LoggingManager.rootLoggingLevel
+    val outputLevel: LogThreshold get() = LoggingManager.rootLoggingLevel
 
     override fun log(level: LogLevel, t: Throwable?, lazyMessage: () -> String) {
         when {
-            level <= this.outputLevel -> {
+            this.outputLevel.allows(level) -> {
                 println("$level: $prefix - ${lazyMessage()}")
                 if (null != t) println(t.stackTraceToString())
             }
@@ -42,7 +43,7 @@ class LoggerConsole(
 }
 
 object LoggingByConsole : LoggingFramework {
-    override var rootLoggingLevel: LogLevel = LogLevel.Information
+    override var rootLoggingLevel: LogThreshold = LogLevel.Information
 
     override fun logger(prefix: String): Logger = LoggerConsole(prefix)
 

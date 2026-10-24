@@ -17,6 +17,7 @@
 package net.akehurst.kotlinx.logging.common
 
 import net.akehurst.kotlinx.logging.api.LogLevel
+import net.akehurst.kotlinx.logging.api.LogThreshold
 import net.akehurst.kotlinx.logging.api.Logger
 import net.akehurst.kotlinx.logging.api.LoggingFramework
 import org.apache.logging.log4j.LogManager
@@ -27,30 +28,34 @@ import org.apache.logging.log4j.message.SimpleMessage
 
 private val LogLevel.asLog4J: org.apache.logging.log4j.Level
     get() = when (this) {
-        LogLevel.None -> org.apache.logging.log4j.Level.OFF
         LogLevel.Fatal -> org.apache.logging.log4j.Level.FATAL
         LogLevel.Error -> org.apache.logging.log4j.Level.ERROR
         LogLevel.Warning -> org.apache.logging.log4j.Level.WARN
         LogLevel.Information -> org.apache.logging.log4j.Level.INFO
         LogLevel.Debug -> org.apache.logging.log4j.Level.DEBUG
         LogLevel.Trace -> org.apache.logging.log4j.Level.TRACE
-        LogLevel.All -> org.apache.logging.log4j.Level.ALL
     }
-private val org.apache.logging.log4j.Level.asLevel: LogLevel
+private val LogThreshold.asLog4J: org.apache.logging.log4j.Level
     get() = when (this) {
-        org.apache.logging.log4j.Level.OFF -> LogLevel.None
+        LogThreshold.None -> org.apache.logging.log4j.Level.OFF
+        LogThreshold.All -> org.apache.logging.log4j.Level.ALL
+        is LogLevel -> this.asLog4J
+    }
+private val org.apache.logging.log4j.Level.asThreshold: LogThreshold
+    get() = when (this) {
+        org.apache.logging.log4j.Level.OFF -> LogThreshold.None
         org.apache.logging.log4j.Level.FATAL -> LogLevel.Fatal
         org.apache.logging.log4j.Level.ERROR -> LogLevel.Error
         org.apache.logging.log4j.Level.WARN -> LogLevel.Warning
         org.apache.logging.log4j.Level.INFO -> LogLevel.Information
         org.apache.logging.log4j.Level.DEBUG -> LogLevel.Debug
         org.apache.logging.log4j.Level.TRACE -> LogLevel.Trace
-        else -> LogLevel.All //TODO: this is wrong if there are custom logging levels!
+        else -> LogThreshold.All //TODO: this is wrong if there are custom logging levels!
     }
 
 object LoggingByLog4J : LoggingFramework {
-    override var rootLoggingLevel
-        get() = LogManager.getRootLogger().level.asLevel
+    override var rootLoggingLevel: LogThreshold
+        get() = LogManager.getRootLogger().level.asThreshold
         set(value) {
             val context = LogManager.getContext(false) as LoggerContext
             val config = context.getConfiguration()

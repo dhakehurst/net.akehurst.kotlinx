@@ -17,6 +17,7 @@
 package net.akehurst.kotlinx.logging.common
 
 import net.akehurst.kotlinx.logging.api.LogLevel
+import net.akehurst.kotlinx.logging.api.LogThreshold
 import net.akehurst.kotlinx.logging.api.LoggingManager
 import net.akehurst.kotlinx.logging.api.logger
 import org.apache.logging.log4j.LogManager
@@ -98,6 +99,17 @@ class test_LoggerLog4JLocation {
         LoggingManager.use(LoggingByLog4J)
 
         assertEquals(LogLevel.Warning, LoggingManager.rootLoggingLevel)
+    }
+
+    @Test
+    fun threshold_None_and_All_map_to_log4j_OFF_and_ALL() {
+        LoggingManager.rootLoggingLevel = LogThreshold.None
+        assertEquals(org.apache.logging.log4j.Level.OFF, LogManager.getRootLogger().level)
+        assertEquals(LogThreshold.None, LoggingManager.rootLoggingLevel)
+
+        LoggingManager.rootLoggingLevel = LogThreshold.All
+        assertEquals(org.apache.logging.log4j.Level.ALL, LogManager.getRootLogger().level)
+        assertEquals(LogThreshold.All, LoggingManager.rootLoggingLevel)
     }
 
     @Test

@@ -18,7 +18,35 @@ package net.akehurst.kotlinx.logging.api
 
 import net.akehurst.kotlinx.logging.common.LoggingByConsole
 
-enum class LogLevel { None, Fatal, Error, Warning, Information, Debug, Trace, All }
+/**
+ * A root logging level: which messages are output.
+ * Either a [LogLevel] (output messages at that level or more severe), [None] or [All].
+ */
+sealed interface LogThreshold {
+    /** lower is more severe */
+    val severity: Int
+
+    /** true if a message at [level] is output under this threshold */
+    fun allows(level: LogLevel): Boolean = level.severity <= this.severity
+
+    /** output no messages */
+    data object None : LogThreshold {
+        override val severity: Int = 0
+    }
+
+    /** output all messages */
+    data object All : LogThreshold {
+        override val severity: Int = Int.MAX_VALUE
+    }
+}
+
+/**
+ * The level of a logged message, most severe first.
+ * Each level can also be used as a [LogThreshold].
+ */
+enum class LogLevel(override val severity: Int) : LogThreshold {
+    Fatal(1), Error(2), Warning(3), Information(4), Debug(5), Trace(6)
+}
 
 typealias LogFunction = (level: LogLevel, prefix: String, t: Throwable?, lazyMessage: () -> String) -> Unit
 
@@ -48,7 +76,7 @@ interface Logger {
 
 
 interface LoggingFramework {
-    var rootLoggingLevel: LogLevel
+    var rootLoggingLevel: LogThreshold
     fun logger(prefix: String): Logger
 }
 
@@ -58,7 +86,7 @@ object LoggingManager {
 
     private var _framework: LoggingFramework = LoggingByConsole
 
-    var rootLoggingLevel
+    var rootLoggingLevel: LogThreshold
         get() = _framework.rootLoggingLevel
         set(value) = _framework.let { it.rootLoggingLevel = value }
 
@@ -67,7 +95,7 @@ object LoggingManager {
      * The root level is only changed when [rootLoggingLevel] is given,
      * otherwise the framework keeps its own level (e.g. from a log4j2 config file).
      */
-    fun use(framework: LoggingFramework, rootLoggingLevel: LogLevel? = null) {
+    fun use(framework: LoggingFramework, rootLoggingLevel: LogThreshold? = null) {
         _framework = framework
         if (null != rootLoggingLevel) this.rootLoggingLevel = rootLoggingLevel
         framework.logger("LoggingManager").logDebug { "using ${_framework::class.simpleName}" }

@@ -17,11 +17,13 @@
 package net.akehurst.kotlinx.logging.common
 
 import net.akehurst.kotlinx.logging.api.LogLevel
+import net.akehurst.kotlinx.logging.api.LogThreshold
 import net.akehurst.kotlinx.logging.api.LoggingManager
 import net.akehurst.kotlinx.logging.api.logger
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -53,6 +55,18 @@ class test_LoggerConsole {
 
         assertFalse(out.contains("before-level-change"))
         assertTrue(out.contains("Debug: test - after-level-change"))
+    }
+
+    @Test
+    fun threshold_None_outputs_nothing() {
+        LoggingManager.use(LoggingByConsole, LogThreshold.None)
+        val logger = logger("test")
+
+        val out = captureStdOut {
+            logger.logFatal { "fatal" }
+        }
+
+        assertEquals("", out)
     }
 
     @Test
