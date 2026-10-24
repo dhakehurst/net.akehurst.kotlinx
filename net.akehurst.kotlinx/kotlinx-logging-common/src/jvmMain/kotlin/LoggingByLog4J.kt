@@ -50,6 +50,46 @@ private val org.apache.logging.log4j.Level.asThreshold: LogThreshold
     }
 
 object LoggingByLog4J : LoggingFramework {
+
+    private var julBridgeInstalled = false
+
+    init {
+        installJulBridge()
+    }
+
+    /**
+     * Route java.util.logging to log4j when log4j-jul is on the classpath (e.g. via kotlinx-logging-with-bridges),
+     * so apps do not need to start with -Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager.
+     * JUL's default root handlers are removed so messages are not output twice,
+     * and JUL logger levels follow the log4j configuration.
+     */
+    private fun installJulBridge() {
+        // already routed to log4j by the system property
+        if (java.util.logging.LogManager.getLogManager().javaClass.name == "org.apache.logging.log4j.jul.LogManager") return
+        val bridge = try {
+            Class.forName("org.apache.logging.log4j.jul.Log4jBridgeHandler")
+        } catch (_: ClassNotFoundException) {
+            return // log4j-jul is not on the classpath
+        }
+        bridge
+            .getMethod("install", Boolean::class.javaPrimitiveType, String::class.java, Boolean::class.javaPrimitiveType)
+            .invoke(null, true, null, true)
+        julBridgeInstalled = true
+    }
+
+    // the bridge only copies log4j levels to JUL when installed or when log4j is reconfigured,
+    // so a change of the root level is also applied to the JUL root logger
+    private val LogThreshold.asJul: java.util.logging.Level
+        get() = when (this) {
+            LogThreshold.None -> java.util.logging.Level.OFF
+            LogLevel.Fatal, LogLevel.Error -> java.util.logging.Level.SEVERE
+            LogLevel.Warning -> java.util.logging.Level.WARNING
+            LogLevel.Information -> java.util.logging.Level.INFO
+            LogLevel.Debug -> java.util.logging.Level.FINE
+            LogLevel.Trace -> java.util.logging.Level.FINEST
+            LogThreshold.All -> java.util.logging.Level.ALL
+        }
+
     override var rootLoggingLevel: LogThreshold
         get() = LogManager.getRootLogger().level.asThreshold
         set(value) {
@@ -58,6 +98,7 @@ object LoggingByLog4J : LoggingFramework {
             val rootLogger: LoggerConfig = config.getRootLogger()
             rootLogger.setLevel(value.asLog4J)
             context.updateLoggers()
+            if (julBridgeInstalled) java.util.logging.Logger.getLogger("").level = value.asJul
         }
 
     override fun logger(prefix: String): Logger {
