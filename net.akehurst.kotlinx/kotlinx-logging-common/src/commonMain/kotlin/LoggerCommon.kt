@@ -27,7 +27,7 @@ class LoggerCommon(
 
     override fun log(level: LogLevel, t: Throwable?, lazyMessage: () -> String) {
         when {
-            level <= this.outputLevel -> this.bind.invoke(level, prefix, t, lazyMessage)
+            this.outputLevel.allows(level) -> this.bind.invoke(level, prefix, t, lazyMessage)
             else -> Unit // do nothing
         }
     }

@@ -16,6 +16,7 @@
 package net.akehurst.kotlinx.logging.common
 
 import net.akehurst.kotlinx.logging.api.LogLevel
+import net.akehurst.kotlinx.logging.api.LogThreshold
 import net.akehurst.kotlinx.logging.api.Logger
 import net.akehurst.kotlinx.logging.api.LoggingFramework
 import net.akehurst.kotlinx.logging.api.LoggingManager
@@ -23,15 +24,18 @@ import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
 import web.console.console
 
-class LoggerWasmJsConsole(
+// the value passed to the console for a throwable: on JS the Error itself, on Wasm its stack trace text
+internal expect fun Throwable.toConsoleArg(): JsAny?
+
+class LoggerBrowserConsole(
     val prefix: String
 ) : Logger {
 
-    val outputLevel: LogLevel get() = LoggingManager.rootLoggingLevel
+    val outputLevel: LogThreshold get() = LoggingManager.rootLoggingLevel
 
     override fun log(level: LogLevel, t: Throwable?, lazyMessage: () -> String) {
         when {
-            level <= outputLevel -> logAll(level, lazyMessage(), t)
+            outputLevel.allows(level) -> logAll(level, lazyMessage(), t)
             else -> Unit
         }
     }
@@ -44,22 +48,20 @@ class LoggerWasmJsConsole(
             LogLevel.Information -> this::consoleInfo
             LogLevel.Debug -> this::consoleDebug
             LogLevel.Trace -> this::consoleTrace
-            else -> error("Internal Error: cannot log a message to '$lvl'")
         }
-        if (null == t) {
-            func("$prefix - $msg")
-        } else {
-            func("$prefix - $msg")
-            t.printStackTrace()
-        }
+        func("$prefix - $msg", t)
     }
 
-    private fun consoleFatal(msg: String?) = console.error(duration("Fatal","$msg"))
-    private fun consoleError(msg: String?) = console.error(duration("Error","$msg"))
-    private fun consoleWarn(msg: String?) = console.warn(duration("Warn","$msg"))
-    private fun consoleInfo(msg: String?) = console.info(duration("Info","$msg"))
-    private fun consoleDebug(msg: String?) = console.debug(duration("Debug","$msg"))
-    private fun consoleTrace(msg: String?) = console.debug(duration("Trace","$msg"))
+    // the throwable is passed to the console with the message, so they appear together
+    private fun consoleArgs(msg: String, t: Throwable?): Array<JsAny?> =
+        if (null == t) arrayOf(msg.toJsString()) else arrayOf(msg.toJsString(), t.toConsoleArg())
+
+    private fun consoleFatal(msg: String?, t: Throwable?) = console.error(*consoleArgs(duration("Fatal", "$msg"), t))
+    private fun consoleError(msg: String?, t: Throwable?) = console.error(*consoleArgs(duration("Error", "$msg"), t))
+    private fun consoleWarn(msg: String?, t: Throwable?) = console.warn(*consoleArgs(duration("Warn", "$msg"), t))
+    private fun consoleInfo(msg: String?, t: Throwable?) = console.info(*consoleArgs(duration("Info", "$msg"), t))
+    private fun consoleDebug(msg: String?, t: Throwable?) = console.debug(*consoleArgs(duration("Debug", "$msg"), t))
+    private fun consoleTrace(msg: String?, t: Throwable?) = console.debug(*consoleArgs(duration("Trace", "$msg"), t))
 
     private var lastTimeMark: TimeSource.Monotonic.ValueTimeMark? = null
     private fun duration(lev: String, msg: String): String {
@@ -78,9 +80,10 @@ class LoggerWasmJsConsole(
     }
 }
 
-object LoggingByBrowserConsoleWasm : LoggingFramework {
-    override var rootLoggingLevel: LogLevel = LogLevel.Information
+/** Logs to the browser (or Node.js) console, from both Kotlin/JS and Kotlin/Wasm. */
+object LoggingByBrowserConsole : LoggingFramework {
+    override var rootLoggingLevel: LogThreshold = LogLevel.Information
 
-    override fun logger(prefix: String): Logger = LoggerWasmJsConsole(prefix)
+    override fun logger(prefix: String): Logger = LoggerBrowserConsole(prefix)
 
 }

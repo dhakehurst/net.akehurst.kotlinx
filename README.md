@@ -8,7 +8,7 @@
 A collection of useful multiplatform extensions to the kotlin stdlib
 
 - Filsystem
-- Logging
+- [Logging](net.akehurst.kotlinx/kotlinx-logging-api/README.md)
 - Reflection
 - Collections
   - OrderedSet
