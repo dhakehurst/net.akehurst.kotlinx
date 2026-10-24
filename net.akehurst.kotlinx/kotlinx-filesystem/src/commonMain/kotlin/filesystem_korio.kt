@@ -130,7 +130,7 @@ object FileSystemKorio : FileSystem {
                 list.toList()
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${dir::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleKorio: ${dir::class.simpleName}")
         }
 
     suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
@@ -141,7 +141,7 @@ object FileSystemKorio : FileSystem {
                 FileHandleKorio(this, parent,newFile)
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleKorio: ${parent::class.simpleName}")
         }
     }
 
@@ -153,7 +153,7 @@ object FileSystemKorio : FileSystem {
                 DirectoryHandleKorio(this, parent,newDir)
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleKorio: ${parent::class.simpleName}")
         }
     }
 
@@ -171,7 +171,7 @@ object FileSystemKorio : FileSystem {
                 file.handle.readString()
             }
 
-            else -> error("FileHandle is not a FileHandleJS: ${file::class.simpleName}")
+            else -> error("FileHandle is not a FileHandleKorio: ${file::class.simpleName}")
         }
 
     suspend fun writeFileContent(file: FileHandle, content: String) {
@@ -180,7 +180,7 @@ object FileSystemKorio : FileSystem {
                 file.handle.writeString(content)
             }
 
-            else -> error("FileHandle is not a FileHandleJS: ${file::class.simpleName}")
+            else -> error("FileHandle is not a FileHandleKorio: ${file::class.simpleName}")
         }
     }
 

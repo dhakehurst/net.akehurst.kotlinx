@@ -220,7 +220,7 @@ actual object UserFileSystemDefault : UserFileSystem {
                     }
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${dir::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJVM: ${dir::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -237,7 +237,7 @@ actual object UserFileSystemDefault : UserFileSystem {
                     FileHandleJVM(this, parent, newFile)
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJVM: ${parent::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -254,7 +254,7 @@ actual object UserFileSystemDefault : UserFileSystem {
                     DirectoryHandleJVM(this, parent, newDir)
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJVM: ${parent::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -277,7 +277,7 @@ actual object UserFileSystemDefault : UserFileSystem {
                     file.handle.readText()
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${file::class.simpleName}")
+                else -> error("FileHandle is not a FileHandleJVM: ${file::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -292,7 +292,7 @@ actual object UserFileSystemDefault : UserFileSystem {
                     file.handle.writeText(content)
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${file::class.simpleName}")
+                else -> error("FileHandle is not a FileHandleJVM: ${file::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()

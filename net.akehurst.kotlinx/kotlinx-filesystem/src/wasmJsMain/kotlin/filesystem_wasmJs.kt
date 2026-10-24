@@ -180,7 +180,7 @@ actual object UserFileSystemDefault : UserFileSystem {
                     FileHandleWasmJS(this, parent, newFile)
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleWasmJS: ${parent::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -196,7 +196,7 @@ actual object UserFileSystemDefault : UserFileSystem {
                     DirectoryHandleWasmJS(this, parent, newDir)
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleWasmJS: ${parent::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -229,7 +229,7 @@ actual object UserFileSystemDefault : UserFileSystem {
                     file.handle.getFile().text()
                 }
 
-                else -> error("FileHandle is not a FileHandleJS: ${file::class.simpleName}")
+                else -> error("FileHandle is not a FileHandleWasmJS: ${file::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -245,7 +245,7 @@ actual object UserFileSystemDefault : UserFileSystem {
                     w.close()
                 }
 
-                else -> error("FileHandle is not a FileHandleJS: ${file::class.simpleName}")
+                else -> error("FileHandle is not a FileHandleWasmJS: ${file::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
