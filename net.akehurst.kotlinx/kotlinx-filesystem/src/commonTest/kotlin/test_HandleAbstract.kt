@@ -67,6 +67,30 @@ class test_HandleAbstract {
         assertEquals("", FakeFile(null, "Makefile").extension)
     }
 
+    // --- nameWithoutExtension ---
+
+    @Test
+    fun nameWithoutExtension_simple() {
+        assertEquals("a", FakeFile(null, "a.txt").nameWithoutExtension)
+    }
+
+    @Test
+    fun nameWithoutExtension_multipleDots_removesLastPartOnly() {
+        assertEquals("archive.tar", FakeFile(null, "archive.tar.gz").nameWithoutExtension)
+    }
+
+    @Test
+    fun nameWithoutExtension_noDot_isWholeName() {
+        assertEquals("Makefile", FakeFile(null, "Makefile").nameWithoutExtension)
+    }
+
+    @Test
+    fun nameWithoutExtension_dotFile_isEmpty() {
+        val f = FakeFile(null, ".bashrc")
+        assertEquals("", f.nameWithoutExtension)
+        assertEquals("bashrc", f.extension)
+    }
+
     // --- path ---
 
     @Test

@@ -72,6 +72,13 @@ interface DirectoryHandle : FileSystemObjectHandle {
 
 interface FileHandle : FileSystemObjectHandle {
     val extension: String
+
+    /**
+     * the name up to (not including) the last '.', or the whole name if there is no '.'
+     * (same as kotlin.io File.nameWithoutExtension)
+     */
+    val nameWithoutExtension: String get() = name.substringBeforeLast('.')
+
     suspend fun readContent(): String?
     suspend fun writeContent(content: String)
     suspend fun openAsZipDirectory(): DirectoryHandle?
