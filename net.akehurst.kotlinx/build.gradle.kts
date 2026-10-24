@@ -122,7 +122,7 @@ subprojects {
                 browser()
             }
 
-//            macosArm64()
+            macosArm64()
 
             applyDefaultHierarchyTemplate()
 
