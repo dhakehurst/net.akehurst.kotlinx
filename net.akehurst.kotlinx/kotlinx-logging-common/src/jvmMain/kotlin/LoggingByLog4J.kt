@@ -22,6 +22,8 @@ import net.akehurst.kotlinx.logging.api.LoggingFramework
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.core.LoggerContext
 import org.apache.logging.log4j.core.config.LoggerConfig
+import org.apache.logging.log4j.message.Message
+import org.apache.logging.log4j.message.SimpleMessage
 
 private val LogLevel.asLog4J: org.apache.logging.log4j.Level
     get() = when (this) {
@@ -66,9 +68,35 @@ class LoggerLog4J(
     val log4j: org.apache.logging.log4j.Logger
 ) : Logger {
 
-    override fun log(level: LogLevel, t: Throwable?, lazyMessage: () -> String) {
-        log4j.log(level.asLog4J, lazyMessage, t)
+    companion object {
+        // classes whose stack frames sit between the calling code and log4j
+        private val wrapperClassNames = setOf(
+            LoggerLog4J::class.java.name,
+            Logger::class.java.name,
+            Logger::class.java.name + "\$DefaultImpls",
+        )
+
+        // the first frame outside the wrapper classes, i.e. the code that called the logger
+        private fun callerLocation(): StackTraceElement? =
+            StackWalker.getInstance().walk { frames ->
+                frames
+                    .dropWhile { it.className !in wrapperClassNames }
+                    .dropWhile { it.className in wrapperClassNames }
+                    .findFirst()
+                    .map { it.toStackTraceElement() }
+                    .orElse(null)
+            }
     }
 
+    override fun log(level: LogLevel, t: Throwable?, lazyMessage: () -> String) {
+        val lvl = level.asLog4J
+        if (log4j.isEnabled(lvl)) {
+            // pass the caller's location explicitly, otherwise log4j reports this class as the source
+            log4j.atLevel(lvl)
+                .withLocation(callerLocation())
+                .withThrowable(t)
+                .log(SimpleMessage(lazyMessage()) as Message)
+        }
+    }
 
 }

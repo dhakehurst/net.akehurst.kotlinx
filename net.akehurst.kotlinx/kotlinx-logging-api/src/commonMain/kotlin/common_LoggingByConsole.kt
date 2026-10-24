@@ -26,11 +26,16 @@ class LoggerConsole(
     val prefix: String
 ) : Logger {
 
-    val outputLevel = LoggingManager.rootLoggingLevel
+    // read on every call, so a change to the root level also applies to existing loggers
+    val outputLevel: LogLevel get() = LoggingManager.rootLoggingLevel
 
     override fun log(level: LogLevel, t: Throwable?, lazyMessage: () -> String) {
         when {
-            level <= this.outputLevel -> println("$level: $prefix - ${lazyMessage()}")
+            level <= this.outputLevel -> {
+                println("$level: $prefix - ${lazyMessage()}")
+                if (null != t) println(t.stackTraceToString())
+            }
+
             else -> Unit // do nothing
         }
     }
