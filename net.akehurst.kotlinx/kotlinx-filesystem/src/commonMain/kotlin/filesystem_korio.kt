@@ -32,7 +32,7 @@ data class DirectoryHandleKorio(
     val handle: VfsFile
 ) : DirectoryHandleAbstract() {
 
-    override val path: String get() = TODO()
+    override val path: String get() = handle.path
 
     override val name: String get() = handle.pathInfo.baseName
 
@@ -40,13 +40,8 @@ data class DirectoryHandleKorio(
     override suspend fun entry(name: String): FileSystemObjectHandle? = fileSystem.getEntry(this, name)
     override suspend fun listContent(): List<FileSystemObjectHandle> = fileSystem.listDirectoryContent(this)
 
-    override suspend fun createDirectory(name: String): DirectoryHandle? {
-        TODO("not implemented")
-    }
-
-    override suspend fun createFile(name: String): FileHandle? {
-        TODO("not implemented")
-    }
+    override suspend fun createDirectory(name: String): DirectoryHandle? = fileSystem.createNewDirectory(this, name)
+    override suspend fun createFile(name: String): FileHandle? = fileSystem.createNewFile(this, name)
 
 }
 
@@ -56,6 +51,7 @@ data class FileHandleKorio(
     val handle: VfsFile
 ) : FileHandleAbstract() {
     override val name: String get() = handle.pathInfo.baseName
+    override val path: String get() = handle.path
 
     override suspend fun exists(): Boolean = fileSystem.exists(this)
     override suspend fun readContent(): String? = fileSystem.readFileContent(this)

@@ -125,9 +125,11 @@ actual object UserFileSystemDefault : UserFileSystem {
 
     override suspend fun selectExistingFileFromDialog(dialogTitle: String, current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         return try {
-            val p = (window as WasmWindow).showOpenFilePicker(
-                FilePickerOptions(mode = accessMode.name)
-            )
+            val mode = when (accessMode) {
+                FileAccessMode.READ_ONLY -> "read"
+                FileAccessMode.READ_WRITE -> "readwrite"
+            }
+            val p = (window as WasmWindow).showOpenFilePicker(FilePickerOptions(mode = mode))
             p.await()[0]?.let { handle ->
                 FileHandleWasmJS(this, null, handle)
             }
@@ -138,8 +140,8 @@ actual object UserFileSystemDefault : UserFileSystem {
     }
 
     override suspend fun selectNewFileFromDialog(dialogTitle: String, parent: DirectoryHandle): FileHandle? {
-        val p = (window as WasmWindow).showSaveFilePicker()
         return try {
+            val p = (window as WasmWindow).showSaveFilePicker()
             val handle: FileSystemFileHandle = p.await()
             FileHandleWasmJS(this, parent as DirectoryHandleWasmJS, handle)
         } catch (t: Throwable) {

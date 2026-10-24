@@ -57,7 +57,7 @@ data class FileHandleJVM(
 ) : FileHandleAbstract() {
 
     override val name: String get() = handle.name
-    override val absolutePath: String get() = handle.path
+    override val absolutePath: String get() = handle.absolutePath
 
     override suspend fun exists(): Boolean = fileSystem.exists(this)
     override suspend fun readContent(): String? = fileSystem.readFileContent(this)
@@ -211,11 +211,12 @@ actual object UserFileSystemDefault : UserFileSystem {
             return when (dir) {
                 is DirectoryHandleJVM -> {
                     val dirEntries = dir.handle.toPath().listDirectoryEntries()
-                    dirEntries.map {
+                    // skip entries that are neither a directory nor a regular file (e.g. broken symlinks)
+                    dirEntries.mapNotNull {
                         when {
                             it.isDirectory() -> DirectoryHandleJVM(this, dir, it.toFile())
                             it.isRegularFile() -> FileHandleJVM(this, dir, it.toFile())
-                            else -> error("should not happen")
+                            else -> null
                         }
                     }
                 }
