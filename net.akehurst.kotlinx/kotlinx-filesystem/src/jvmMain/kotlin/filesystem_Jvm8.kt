@@ -215,7 +215,7 @@ actual object UserFileSystemDefault : UserFileSystem {
                         when {
                             it.isDirectory() -> DirectoryHandleJVM(this, dir, it.toFile())
                             it.isRegularFile() -> FileHandleJVM(this, dir, it.toFile())
-                            else -> error("shoudl not happen")
+                            else -> error("should not happen")
                         }
                     }
                 }
