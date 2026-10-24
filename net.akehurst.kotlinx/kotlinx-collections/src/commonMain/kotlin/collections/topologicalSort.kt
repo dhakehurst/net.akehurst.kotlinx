@@ -16,55 +16,60 @@
 
 package net.akehurst.kotlinx.collections
 
-import kotlin.collections.iterator
-
 /**
  * A Partial Order Sort, because sometimes things are unrelated but still need sorting.
  * Using a Topological Sort from Kahn's Algorithm [https://en.wikipedia.org/wiki/Topological_sorting]
+ *
+ * `comparator.compare(a, b) > 0` means 'a' must come after 'b'; 0 means unrelated.
+ * Elements are tracked by position, so equal (or duplicate) elements are all kept.
+ * Fails if the ordering contains a cycle.
+ *
+ * Stable: at each step the next element is the earliest one (by input position) that has nothing left that
+ * it must come after. So an already-sorted input is returned unchanged, and an element only goes ahead of an
+ * element that was earlier in the input when that earlier element is still waiting for something.
+ *
+ * Unrelated elements can still swap when keeping every unrelated pair in input order would contradict the
+ * required order - then no order satisfies both. E.g. input [x, y, p, q] with x after q and y after p:
+ * keeping x before p and p before q would put x before q. That input gives [p, y, q, x].
  */
 fun <E> Collection<E>.topologicalSort(comparator: Comparator<in E>): List<E> {
     //TODO: perhaps can find something faster!
+    val elements = this.toList()
+    val n = elements.size
 
-    val comparisons = this.associate { el1 ->
-        val set = this.filter { el2 ->
-            el2 !== el1 && 1 == comparator.compare(el1, el2) //de.dependsOn(it)
-        }.toMutableSet()
-        Pair(el1, set)
-    }.toMutableMap()
-
-    val toRemove = mutableSetOf<E>()
-    val sortedElements = mutableListOf<E>()
-    val S = comparisons.filter {
-        it.value.isEmpty()
-    }.map { it.key }.toMutableList()
-    S.forEach { comparisons.remove(it) }
-
-    while (S.isNotEmpty()) {
-        val n = S.first()
-        S -= n
-        sortedElements.add(n)
-        for (comp in comparisons) {
-            val set = comp.value
-            if (set.contains(n)) {
-                set.remove(n)
-                if (set.isEmpty()) {
-                    S += comp.key
-                    toRemove.add(comp.key)
-                } else {
-                    // other relationship
-                }
-            } else {
-                // no comparator relationship
+    // dependents[j] = indices of elements that must come after element j
+    val dependents = List(n) { mutableListOf<Int>() }
+    val unmetCount = IntArray(n)
+    for (i in 0 until n) {
+        for (j in 0 until n) {
+            if (i != j && comparator.compare(elements[i], elements[j]) > 0) {
+                dependents[j].add(i)
+                unmetCount[i]++
             }
         }
-        if (toRemove.isNotEmpty()) {
-            toRemove.forEach { comparisons.remove(it) }
-            toRemove.clear()
+    }
+
+    // indices with no unmet dependencies, kept in ascending order, so the earliest is always taken next
+    val ready = mutableListOf<Int>()
+    for (i in 0 until n) if (unmetCount[i] == 0) ready.add(i)
+
+    val sortedElements = mutableListOf<E>()
+    while (ready.isNotEmpty()) {
+        val j = ready.removeAt(0)
+        sortedElements.add(elements[j])
+        for (i in dependents[j]) {
+            unmetCount[i]--
+            if (unmetCount[i] == 0) {
+                val pos = ready.binarySearch(i)
+                ready.add(-(pos + 1), i)
+            }
         }
     }
-    if (comparisons.isEmpty()) {
+
+    if (sortedElements.size == n) {
         return sortedElements
     } else {
-        error("Internal Error: Could not sort elements:\n${comparisons.keys.joinToString("\n") { it.toString() }} ")
+        val unsorted = (0 until n).filter { unmetCount[it] > 0 }.map { elements[it] }
+        error("Could not sort elements, the ordering contains a cycle involving:\n${unsorted.joinToString("\n")}")
     }
 }

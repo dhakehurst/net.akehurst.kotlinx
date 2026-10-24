@@ -40,7 +40,7 @@ data class DirectoryHandleJVM(
 ) : DirectoryHandleAbstract() {
 
     override val name: String get() = handle.name
-    override val absolutePath: String get() = handle.path
+    override val absolutePath: String get() = handle.absolutePath
 
     override suspend fun exists(): Boolean = fileSystem.exists(this)
     override suspend fun entry(name: String): FileSystemObjectHandle? = fileSystem.getEntry(this, name)

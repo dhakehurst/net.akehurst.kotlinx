@@ -19,22 +19,15 @@ package net.akehurst.kotlinx.collections
 
 import kotlin.reflect.KProperty
 
-fun <K, V> lazyMapNotNull(accessor: (K) -> V) = LazyMapNotNull(accessor)
-fun <K, V> lazyMutableMapNotNull(accessor: (K) -> V) = LazyMutableMapNotNull(accessor)
+// V is non-null (V : Any), so a cached value is never null and getOrPut is safe
+fun <K, V : Any> lazyMapNotNull(accessor: (K) -> V) = LazyMapNotNull(accessor)
+fun <K, V : Any> lazyMutableMapNotNull(accessor: (K) -> V) = LazyMutableMapNotNull(accessor)
 
-class LazyMapNotNull<K, V>(val accessor: (K) -> V) : MapNotNull<K, V> {
+class LazyMapNotNull<K, V : Any>(val accessor: (K) -> V) : MapNotNull<K, V> {
 
     val map = hashMapOf<K, V>()
 
-    override operator fun get(key: K): V {
-        return if (map.containsKey(key)) {
-            map.get(key) ?: throw Exception("This map should never contain nulls")
-        } else {
-            val v = accessor.invoke(key)
-            map[key] = v
-            v
-        }
-    }
+    override operator fun get(key: K): V = map.getOrPut(key) { accessor.invoke(key) }
 
     override val entries: MutableSet<MutableMap.MutableEntry<K, V>> get() = map.entries
     override val keys: MutableSet<K> get() = map.keys
@@ -46,23 +39,20 @@ class LazyMapNotNull<K, V>(val accessor: (K) -> V) : MapNotNull<K, V> {
 
     override fun isEmpty(): Boolean = map.isEmpty()
 
+    // Map equality over the values computed so far. Compares entry sets, so no value is computed by equals.
+    override fun equals(other: Any?): Boolean = other is Map<*, *> && map.entries == other.entries
+    override fun hashCode(): Int = map.hashCode()
+    override fun toString(): String = map.toString()
+
     // enable property delegation
     operator fun getValue(thisRef: Any?, property: KProperty<*>): LazyMapNotNull<K, V> = this
 }
 
-class LazyMutableMapNotNull<K, V>(val accessor: (K) -> V) : MutableMapNotNull<K, V> {
+class LazyMutableMapNotNull<K, V : Any>(val accessor: (K) -> V) : MutableMapNotNull<K, V> {
 
     val map = hashMapOf<K, V>()
 
-    override operator fun get(key: K): V {
-        return if (map.containsKey(key)) {
-            map.get(key) ?: throw Exception("This map should never contain nulls")
-        } else {
-            val v = accessor.invoke(key)
-            map[key] = v
-            v
-        }
-    }
+    override operator fun get(key: K): V = map.getOrPut(key) { accessor.invoke(key) }
 
     override val entries: MutableSet<MutableMap.MutableEntry<K, V>> get() = map.entries
     override val keys: MutableSet<K> get() = map.keys
@@ -83,6 +73,11 @@ class LazyMutableMapNotNull<K, V>(val accessor: (K) -> V) : MutableMapNotNull<K,
     }
 
     override fun remove(key: K): V? = this.map.remove(key)
+
+    // Map equality over the values computed (or put) so far. Compares entry sets, so no value is computed by equals.
+    override fun equals(other: Any?): Boolean = other is Map<*, *> && map.entries == other.entries
+    override fun hashCode(): Int = map.hashCode()
+    override fun toString(): String = map.toString()
 
     // enable property delegation
     operator fun getValue(thisRef: Any?, property: KProperty<*>): MutableMapNotNull<K, V> = this

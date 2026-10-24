@@ -16,7 +16,7 @@
 
 package net.akehurst.kotlinx.collections
 
-fun <T> Set<T>.transitveClosure(function: (T) -> Set<T>): Set<T> {
+fun <T> Set<T>.transitiveClosure(function: (T) -> Set<T>): Set<T> {
     var result: MutableSet<T> = this.toMutableSet()
     var newThings: MutableSet<T> = this.toMutableSet()
     var newStuff = true

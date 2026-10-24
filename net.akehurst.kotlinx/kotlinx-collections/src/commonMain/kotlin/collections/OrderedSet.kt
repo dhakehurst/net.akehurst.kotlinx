@@ -19,8 +19,35 @@ package net.akehurst.kotlinx.collections
 
 import kotlin.js.JsName
 
+/**
+ * A Set whose elements have an order (insertion order).
+ *
+ * Equality:
+ *  - with another OrderedSet: same elements in the same order.
+ *  - with a plain (unordered) Set: same elements, order ignored. A plain Set's own equals ignores order,
+ *    so this keeps equals symmetric. It does mean equality is not transitive across ordered and plain sets.
+ *
+ * hashCode is the plain Set hashCode, so equal sets always have equal hashCodes.
+ */
 interface OrderedSet<out E> : Set<E> {
     operator fun get(index: Int): E
+}
+
+/** The equality rules described on [OrderedSet], shared by all implementations. */
+internal fun OrderedSet<*>.orderedSetEquals(other: Any?): Boolean = when {
+    this === other -> true
+    other !is Set<*> -> false
+    this.size != other.size -> false
+    other is OrderedSet<*> -> {
+        val it1 = this.iterator()
+        val it2 = other.iterator()
+        while (it1.hasNext()) {
+            if (it1.next() != it2.next()) return false
+        }
+        true
+    }
+
+    else -> this.containsAll(other)
 }
 
 interface MutableOrderedSet<E> : OrderedSet<E>, MutableSet<E>
@@ -77,18 +104,7 @@ class OrderedSetImpl<E> : OrderedSet<E> {
     override fun contains(element: E): Boolean = _impl.contains(element)
     override fun containsAll(elements: Collection<E>): Boolean = _impl.containsAll(elements)
 
-    override fun equals(other: Any?): Boolean {
-        return when {
-            other !is OrderedSet<*> -> false
-            other.size != this.size -> false
-            else -> {
-                for (i in 0 until this.size) {
-                    if (this[i] != other[i]) return false
-                }
-                true
-            }
-        }
-    }
+    override fun equals(other: Any?): Boolean = orderedSetEquals(other)
 
     override fun hashCode() = _impl.hashCode()
     override fun toString() = _impl.toString()
@@ -124,18 +140,7 @@ class MutableOrderedSetImpl<E> : MutableOrderedSet<E> {
         _impl.clear()
     }
 
-    override fun equals(other: Any?): Boolean {
-        return when {
-            other !is OrderedSet<*> -> false
-            other.size != this.size -> false
-            else -> {
-                for (i in 0 until this.size) {
-                    if (this[i] != other[i]) return false
-                }
-                true
-            }
-        }
-    }
+    override fun equals(other: Any?): Boolean = orderedSetEquals(other)
 
     override fun hashCode() = _impl.hashCode()
     override fun toString() = _impl.toString()
@@ -160,7 +165,7 @@ internal object EmptyOrderedSet : OrderedSet<Nothing> {
     override fun get(index: Int): Nothing = throw IndexOutOfBoundsException("An empty OrderedSet does not contain element at index $index.")
     override fun iterator(): Iterator<Nothing> = EmptyIterator
 
-    override fun equals(other: Any?): Boolean = other is OrderedSet<*> && other.isEmpty()
+    override fun equals(other: Any?): Boolean = other is Set<*> && other.isEmpty()
     override fun hashCode(): Int = 0
     override fun toString(): String = "[]"
 }

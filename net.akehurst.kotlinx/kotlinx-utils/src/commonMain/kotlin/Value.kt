@@ -64,7 +64,7 @@ data class ManagedValue<T>(
     private fun validateType(element: T) {
         if (!expectedType.isInstance(element)) {
             throw IllegalArgumentException(
-                "Managed List violation on '$name': Expected '${expectedType.simpleName}', but got '${element?.let { it::class.simpleName }}'."
+                "Managed Value violation on '$name': Expected '${expectedType.simpleName}', but got '${element?.let { it::class.simpleName }}'."
             )
         }
     }
