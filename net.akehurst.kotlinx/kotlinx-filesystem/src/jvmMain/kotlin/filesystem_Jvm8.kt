@@ -76,7 +76,7 @@ actual object UserFileSystemDefault : UserFileSystem {
                     f.exists().not() -> null
                     f.isDirectory -> DirectoryHandleJVM(parent.fileSystem, parent, f)
                     f.isFile -> FileHandleJVM(parent.fileSystem, parent, f)
-                    else -> error("directory entry ${parent.path}/$name is neither a file nor a directory")
+                    else -> null // neither a file nor a directory (e.g. FIFO, socket); listDirectoryContent skips these too
                 }
             }
 
@@ -234,8 +234,8 @@ actual object UserFileSystemDefault : UserFileSystem {
             return when (parent) {
                 is DirectoryHandleJVM -> {
                     val newFile = parent.handle.resolve(name)
-                    newFile.createNewFile()
-                    FileHandleJVM(this, parent, newFile)
+                    newFile.createNewFile() // does nothing if something already has that name
+                    if (newFile.isFile) FileHandleJVM(this, parent, newFile) else null
                 }
 
                 else -> error("DirectoryHandle is not a DirectoryHandleJVM: ${parent::class.simpleName}")
@@ -251,8 +251,8 @@ actual object UserFileSystemDefault : UserFileSystem {
             return when (parent) {
                 is DirectoryHandleJVM -> {
                     val newDir = parent.handle.resolve(name)
-                    newDir.mkdirs()
-                    DirectoryHandleJVM(this, parent, newDir)
+                    newDir.mkdirs() // does nothing if something already has that name
+                    if (newDir.isDirectory) DirectoryHandleJVM(this, parent, newDir) else null
                 }
 
                 else -> error("DirectoryHandle is not a DirectoryHandleJVM: ${parent::class.simpleName}")

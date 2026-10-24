@@ -131,4 +131,36 @@ class test_FileSystemFromVfs {
         assertEquals("hello", zipRoot.file("a.txt")!!.readContent())
         assertEquals("world", zipRoot.directory("sub")!!.file("b.txt")!!.readContent())
     }
+
+    // --- create when the name already exists ---
+
+    @Test
+    fun createFile_existingFile_keepsContent() = runTest {
+        val r = fileSystem().root
+        val f = r.createFile("a.txt")
+        assertNotNull(f)
+        assertEquals("hello", f.readContent())
+    }
+
+    @Test
+    fun createFile_whereDirectoryExists_isNull() = runTest {
+        val r = fileSystem().root
+        assertNull(r.createFile("sub"))
+        assertIs<DirectoryHandle>(r.entry("sub"))
+    }
+
+    @Test
+    fun createDirectory_existingDirectory_returnsIt() = runTest {
+        val r = fileSystem().root
+        val d = r.createDirectory("sub")
+        assertNotNull(d)
+        assertNotNull(d.file("b.txt"))
+    }
+
+    @Test
+    fun createDirectory_whereFileExists_isNull() = runTest {
+        val r = fileSystem().root
+        assertNull(r.createDirectory("a.txt"))
+        assertEquals("hello", r.file("a.txt")!!.readContent())
+    }
 }

@@ -211,4 +211,36 @@ class test_UserFileSystemDefault {
         val b = zipRoot.directory("sub")!!.file("b.txt")!!
         assertTrue(b.path.endsWith("/sub/b.txt"), "path was '${b.path}'")
     }
+
+    // --- create when the name already exists ---
+
+    @Test
+    fun createFile_existingFile_keepsContent() = runTest {
+        val r = root()
+        val f = r.createFile("a.txt")
+        assertNotNull(f)
+        assertEquals("hello", f.readContent())
+    }
+
+    @Test
+    fun createFile_whereDirectoryExists_isNull() = runTest {
+        val r = root()
+        assertNull(r.createFile("sub"))
+        assertIs<DirectoryHandle>(r.entry("sub"))
+    }
+
+    @Test
+    fun createDirectory_existingDirectory_returnsIt() = runTest {
+        val r = root()
+        val d = r.createDirectory("sub")
+        assertNotNull(d)
+        assertNotNull(d.file("b.txt"))
+    }
+
+    @Test
+    fun createDirectory_whereFileExists_isNull() = runTest {
+        val r = root()
+        assertNull(r.createDirectory("a.txt"))
+        assertEquals("hello", r.file("a.txt")!!.readContent())
+    }
 }

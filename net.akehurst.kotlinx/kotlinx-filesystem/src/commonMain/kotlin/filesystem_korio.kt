@@ -134,8 +134,9 @@ object FileSystemKorio : FileSystem {
         return when (parent) {
             is DirectoryHandleKorio -> {
                 val newFile = parent.handle[name]
-                newFile.writeString("") //creates the file
-                FileHandleKorio(this, parent,newFile)
+                // only create when missing, so an existing file keeps its content
+                if (newFile.exists().not()) newFile.writeString("")
+                if (newFile.isFile()) FileHandleKorio(this, parent, newFile) else null
             }
 
             else -> error("DirectoryHandle is not a DirectoryHandleKorio: ${parent::class.simpleName}")
@@ -146,8 +147,8 @@ object FileSystemKorio : FileSystem {
         return when (parent) {
             is DirectoryHandleKorio -> {
                 val newDir = parent.handle[name]
-                newDir.mkdir()
-                DirectoryHandleKorio(this, parent,newDir)
+                if (newDir.exists().not()) newDir.mkdir()
+                if (newDir.isDirectory()) DirectoryHandleKorio(this, parent, newDir) else null
             }
 
             else -> error("DirectoryHandle is not a DirectoryHandleKorio: ${parent::class.simpleName}")

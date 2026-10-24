@@ -62,14 +62,18 @@ class DirectoryHandleVfs(
 
     override suspend fun createDirectory(name: String): DirectoryHandle? {
         val newDir = _handle[name]
-        newDir.mkdir()
-        return DirectoryHandleVfs(fileSystem, this, newDir)
+        if (newDir.exists().not()) newDir.mkdir()
+        return if (newDir.isDirectory()) DirectoryHandleVfs(fileSystem, this, newDir) else null
     }
 
     override suspend fun createFile(name: String): FileHandle? {
-        _handle[name].ensureParents()
-        _handle[name].writeString("")
-        return FileHandleVfs(fileSystem, this,_handle[name])
+        val newFile = _handle[name]
+        // only create when missing, so an existing file keeps its content
+        if (newFile.exists().not()) {
+            newFile.ensureParents()
+            newFile.writeString("")
+        }
+        return if (newFile.isFile()) FileHandleVfs(fileSystem, this, newFile) else null
     }
 }
 

@@ -176,8 +176,9 @@ actual object UserFileSystemDefault : UserFileSystem {
         return try {
             when (parent) {
                 is DirectoryHandleJS -> {
-                    val newFile = parent.handle.getFileHandle(name)
-                    newFile.createWritable()
+                    // create = true makes an empty file if missing and returns an existing file unchanged;
+                    // throws TypeMismatchError (caught below) if a directory has that name
+                    val newFile = parent.handle.getFileHandle(name, unsafeJso<FileSystemGetFileOptions> { create = true })
                     FileHandleJS(this, parent, newFile)
                 }
 
@@ -193,7 +194,9 @@ actual object UserFileSystemDefault : UserFileSystem {
         return try {
             when (parent) {
                 is DirectoryHandleJS -> {
-                    val newDir = parent.handle.getDirectoryHandle(name)
+                    // create = true makes the directory if missing and returns an existing directory unchanged;
+                    // throws TypeMismatchError (caught below) if a file has that name
+                    val newDir = parent.handle.getDirectoryHandle(name, unsafeJso<FileSystemGetDirectoryOptions> { create = true })
                     DirectoryHandleJS(this, parent, newDir)
                 }
 
