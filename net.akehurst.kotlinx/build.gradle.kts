@@ -22,7 +22,7 @@ plugins {
     alias(libs.plugins.jsPlainObjects) apply false
     alias(libs.plugins.dokka) apply false
     alias(libs.plugins.buildconfig) apply false
-    //alias(libs.plugins.exportPublic) apply false
+    alias(libs.plugins.exportPublic) apply false
     alias(libs.plugins.vanniktech.maven.publish) apply false
 }
 val kotlin_languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4
@@ -72,7 +72,7 @@ subprojects {
         if (name !in jvmLibraryModules) {
             apply(plugin = "org.jetbrains.kotlin.multiplatform")
             apply(plugin = "org.jetbrains.kotlin.plugin.js-plain-objects")
-            //apply(plugin = "net.akehurst.kotlin.gradle.plugin.exportPublic")
+            apply(plugin = "net.akehurst.kotlin.gradle.plugin.exportPublic")
         }
 
         configure<BuildConfigExtension> {
@@ -122,7 +122,7 @@ subprojects {
                 browser()
             }
 
-            macosArm64()
+//            macosArm64()
 
             applyDefaultHierarchyTemplate()
 
