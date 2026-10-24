@@ -84,7 +84,7 @@ class ManagedReference<R : Any, T : Any>(
     private fun validateType(element: T) {
         if (!expectedType.isInstance(element)) {
             throw IllegalArgumentException(
-                "Managed List violation on '$name': Expected '${expectedType.simpleName}', but got '${element::class.simpleName}'."
+                "Managed Reference violation on '$name': Expected reference to '${expectedType.simpleName}', but got '${element::class.simpleName}'."
             )
         }
     }
