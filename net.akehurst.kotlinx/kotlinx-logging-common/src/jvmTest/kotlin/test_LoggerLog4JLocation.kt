@@ -113,6 +113,29 @@ class test_LoggerLog4JLocation {
     }
 
     @Test
+    fun custom_log4j_level_maps_to_the_most_verbose_level_it_enables() {
+        val context = LogManager.getContext(false) as LoggerContext
+        fun setLog4JRoot(level: org.apache.logging.log4j.Level) {
+            context.configuration.rootLogger.level = level
+            context.updateLoggers()
+        }
+
+        setLog4JRoot(org.apache.logging.log4j.Level.forName("BETWEEN_WARN_AND_INFO", 350))
+        assertEquals(LogLevel.Warning, LoggingManager.rootLoggingLevel)
+
+        setLog4JRoot(org.apache.logging.log4j.Level.forName("ABOVE_FATAL", 50))
+        assertEquals(LogThreshold.None, LoggingManager.rootLoggingLevel)
+
+        setLog4JRoot(org.apache.logging.log4j.Level.forName("BEYOND_TRACE", 700))
+        assertEquals(LogLevel.Trace, LoggingManager.rootLoggingLevel)
+
+        LogLevel.entries.forEach {
+            LoggingManager.rootLoggingLevel = it
+            assertEquals<LogThreshold>(it, LoggingManager.rootLoggingLevel)
+        }
+    }
+
+    @Test
     fun use_logs_framework_at_debug() {
         LoggingManager.use(LoggingByLog4J, LogLevel.Information)
         output.buffer.setLength(0) // drop the line logged by before()

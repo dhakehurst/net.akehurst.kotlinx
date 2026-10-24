@@ -41,16 +41,12 @@ private val LogThreshold.asLog4J: org.apache.logging.log4j.Level
         LogThreshold.All -> org.apache.logging.log4j.Level.ALL
         is LogLevel -> this.asLog4J
     }
+// log4j enables a message when its level's intLevel <= the threshold's intLevel (lower is more severe).
+// A custom level maps to the most verbose LogLevel it still enables, e.g. one between WARN and INFO gives Warning.
 private val org.apache.logging.log4j.Level.asThreshold: LogThreshold
-    get() = when (this) {
-        org.apache.logging.log4j.Level.OFF -> LogThreshold.None
-        org.apache.logging.log4j.Level.FATAL -> LogLevel.Fatal
-        org.apache.logging.log4j.Level.ERROR -> LogLevel.Error
-        org.apache.logging.log4j.Level.WARN -> LogLevel.Warning
-        org.apache.logging.log4j.Level.INFO -> LogLevel.Information
-        org.apache.logging.log4j.Level.DEBUG -> LogLevel.Debug
-        org.apache.logging.log4j.Level.TRACE -> LogLevel.Trace
-        else -> LogThreshold.All //TODO: this is wrong if there are custom logging levels!
+    get() = when {
+        this.intLevel() >= org.apache.logging.log4j.Level.ALL.intLevel() -> LogThreshold.All
+        else -> LogLevel.entries.lastOrNull { it.asLog4J.intLevel() <= this.intLevel() } ?: LogThreshold.None
     }
 
 object LoggingByLog4J : LoggingFramework {
