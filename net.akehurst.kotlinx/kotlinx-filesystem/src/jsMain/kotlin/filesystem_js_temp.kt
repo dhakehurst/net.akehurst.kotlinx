@@ -84,7 +84,7 @@ data class FileHandleJS(
     val handle: FileSystemFileHandle
 ) : FileHandle {
     override val name: String get() = handle.name
-    override val extension: String get() = name.substringAfterLast('.', "")
+    override val extension: String get() = name.substringAfterLast('.')
 
     override suspend fun readContent(): String? =
         fileSystem.readFileContent(this)
