@@ -273,7 +273,7 @@ actual object UserFileSystemDefault : UserFileSystem {
             val bytes = handle.getFile().bytes()
             val byteArray = ByteArray(bytes.byteLength) { bytes[it].toKotlinByte() }
             val zipFs = ZipVfs(byteArray.openAsync())
-            return DirectoryHandleKorio(FileSystemKorio, null, zipFs)
+            return FileSystemFromVfs(zipFs).root
         } catch (t: Throwable) {
             t.printStackTrace()
             return null
