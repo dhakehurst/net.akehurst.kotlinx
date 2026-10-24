@@ -62,15 +62,20 @@ object LoggingManager {
         get() = _framework.rootLoggingLevel
         set(value) = _framework.let { it.rootLoggingLevel = value }
 
-    fun use(framework: LoggingFramework, rootLoggingLevel:LogLevel = LogLevel.Information) {
+    /**
+     * Switch to the given logging framework.
+     * The root level is only changed when [rootLoggingLevel] is given,
+     * otherwise the framework keeps its own level (e.g. from a log4j2 config file).
+     */
+    fun use(framework: LoggingFramework, rootLoggingLevel: LogLevel? = null) {
         _framework = framework
-        this.rootLoggingLevel = rootLoggingLevel
-        framework.logger("LoggingManager").logInformation { "using ${_framework::class.simpleName}" }
+        if (null != rootLoggingLevel) this.rootLoggingLevel = rootLoggingLevel
+        framework.logger("LoggingManager").logDebug { "using ${_framework::class.simpleName}" }
     }
 
     fun logger(prefix: String): Logger = _framework.logger(prefix)
 
     init {
-        _framework.logger("LoggingManager").logInformation { "using ${_framework::class.simpleName}" }
+        _framework.logger("LoggingManager").logDebug { "using ${_framework::class.simpleName}" }
     }
 }

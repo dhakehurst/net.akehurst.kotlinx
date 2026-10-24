@@ -91,4 +91,24 @@ class test_LoggerLog4JLocation {
         assertTrue(output.toString().lines().none { it.endsWith(" hidden") })
     }
 
+    @Test
+    fun use_without_level_keeps_framework_level() {
+        LoggingManager.rootLoggingLevel = LogLevel.Warning
+
+        LoggingManager.use(LoggingByLog4J)
+
+        assertEquals(LogLevel.Warning, LoggingManager.rootLoggingLevel)
+    }
+
+    @Test
+    fun use_logs_framework_at_debug() {
+        LoggingManager.use(LoggingByLog4J, LogLevel.Information)
+        output.buffer.setLength(0) // drop the line logged by before()
+        LoggingManager.use(LoggingByLog4J)
+        assertTrue(output.toString().lines().none { it.endsWith(" using LoggingByLog4J") })
+
+        LoggingManager.use(LoggingByLog4J, LogLevel.Debug)
+        assertEquals("${LoggingManager::class.java.name}.use", locationOf("using LoggingByLog4J"))
+    }
+
 }
