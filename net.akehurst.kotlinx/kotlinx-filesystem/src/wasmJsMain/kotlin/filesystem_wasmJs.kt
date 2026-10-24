@@ -115,8 +115,13 @@ actual object UserFileSystemDefault : UserFileSystem {
     @OptIn(ExperimentalWebApi::class)
     override suspend fun selectExistingFileFromDialog(dialogTitle: String, current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         return try {
-            showOpenFilePicker().toList().firstOrNull()?.let { handle ->
-                FileHandleWasmJS(this, null, handle)
+            val cur = current as? DirectoryHandleWasmJS
+            val picked = when (cur) {
+                null -> showOpenFilePicker()
+                else -> showOpenFilePicker(unsafeJso<OpenFilePickerOptions> { startIn = cur.handle })
+            }
+            picked.toList().firstOrNull()?.let { handle ->
+                FileHandleWasmJS(this, parentWithin(cur, handle), handle)
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -127,11 +132,31 @@ actual object UserFileSystemDefault : UserFileSystem {
     @OptIn(ExperimentalWebApi::class)
     override suspend fun selectNewFileFromDialog(dialogTitle: String, parent: DirectoryHandle): FileHandle? {
         return try {
-            val handle: FileSystemFileHandle = showSaveFilePicker()
-            FileHandleWasmJS(this, parent as DirectoryHandleWasmJS, handle)
+            val cur = parent as? DirectoryHandleWasmJS
+            val handle: FileSystemFileHandle = when (cur) {
+                null -> showSaveFilePicker()
+                else -> showSaveFilePicker(unsafeJso<SaveFilePickerOptions> { startIn = cur.handle })
+            }
+            FileHandleWasmJS(this, parentWithin(cur, handle), handle)
         } catch (t: Throwable) {
             null
         }
+    }
+
+    /**
+     * The user can pick a file in any directory, so [dir] is only used as the parent when the file is inside it.
+     * Returns the directory directly containing [file] (building handles for any directories between),
+     * or null if [dir] is null or the file is not inside it.
+     */
+    private suspend fun parentWithin(dir: DirectoryHandleWasmJS?, file: FileSystemFileHandle): DirectoryHandleWasmJS? {
+        if (dir == null) return null
+        // names from dir down to the file; the last name is the file itself
+        val names = dir.handle.resolve(file)?.toList()?.map { it.toString() } ?: return null
+        var parent: DirectoryHandleWasmJS = dir
+        for (name in names.dropLast(1)) {
+            parent = DirectoryHandleWasmJS(this, parent, parent.handle.getDirectoryHandle(name))
+        }
+        return parent
     }
 
     override suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> =
