@@ -14,30 +14,30 @@
  * limitations under the License.
  */
 
-package net.akehurst.kotlinx.logging.common
-
-import net.akehurst.kotlinx.logging.api.LogLevel
-import net.akehurst.kotlinx.logging.api.Logger
-import net.akehurst.kotlinx.logging.api.LoggingFramework
-import net.akehurst.kotlinx.logging.api.LoggingManager
+package net.akehurst.kotlinx.logging.api
 
 
 class LoggerConsole(
     val prefix: String
 ) : Logger {
 
-    val outputLevel = LoggingManager.rootLoggingLevel
+    // read on every call, so a change to the root level also applies to existing loggers
+    val outputLevel: LogThreshold get() = LoggingManager.rootLoggingLevel
 
     override fun log(level: LogLevel, t: Throwable?, lazyMessage: () -> String) {
         when {
-            level <= this.outputLevel -> println("$level: $prefix - ${lazyMessage()}")
+            this.outputLevel.allows(level) -> {
+                println("$level: $prefix - ${lazyMessage()}")
+                if (null != t) println(t.stackTraceToString())
+            }
+
             else -> Unit // do nothing
         }
     }
 }
 
 object LoggingByConsole : LoggingFramework {
-    override var rootLoggingLevel: LogLevel = LogLevel.Information
+    override var rootLoggingLevel: LogThreshold = LogLevel.Information
 
     override fun logger(prefix: String): Logger = LoggerConsole(prefix)
 
