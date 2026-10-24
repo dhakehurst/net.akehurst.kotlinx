@@ -18,7 +18,7 @@ kotlin {
 //                runtimeOnly(libs.jackson.dataformat.yaml)
             }
         }
-        wasmJsMain {
+        webMain {
             dependencies {
                 implementation(libs.kotlinx.wrappers.browser)
             }

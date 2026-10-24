@@ -45,7 +45,7 @@ class test_LoggerWasmJsConsole {
 
     @Test
     fun throwable_is_passed_to_console_with_message() {
-        LoggingManager.use(LoggingByBrowserConsoleWasm, LogLevel.Information)
+        LoggingManager.use(LoggingByBrowserConsole, LogLevel.Information)
         val logger = logger("test")
 
         captureConsoleError {
@@ -60,7 +60,7 @@ class test_LoggerWasmJsConsole {
 
     @Test
     fun no_throwable_passes_message_only() {
-        LoggingManager.use(LoggingByBrowserConsoleWasm, LogLevel.Information)
+        LoggingManager.use(LoggingByBrowserConsole, LogLevel.Information)
         val logger = logger("test")
 
         captureConsoleError {

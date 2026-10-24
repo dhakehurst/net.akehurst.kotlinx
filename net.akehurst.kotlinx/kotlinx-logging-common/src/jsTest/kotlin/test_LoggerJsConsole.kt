@@ -44,7 +44,7 @@ class test_LoggerJsConsole {
 
     @Test
     fun throwable_is_passed_to_console_with_message() {
-        LoggingManager.use(LoggingByBrowserConsoleJs, LogLevel.Information)
+        LoggingManager.use(LoggingByBrowserConsole, LogLevel.Information)
         val logger = logger("test")
         val ex = IllegalStateException("bad")
 
@@ -60,7 +60,7 @@ class test_LoggerJsConsole {
 
     @Test
     fun no_throwable_passes_message_only() {
-        LoggingManager.use(LoggingByBrowserConsoleJs, LogLevel.Information)
+        LoggingManager.use(LoggingByBrowserConsole, LogLevel.Information)
         val logger = logger("test")
 
         val calls = captureConsoleError {

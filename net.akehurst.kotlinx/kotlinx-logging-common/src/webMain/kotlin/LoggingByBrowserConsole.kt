@@ -24,7 +24,10 @@ import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
 import web.console.console
 
-class LoggerWasmJsConsole(
+// the value passed to the console for a throwable: on JS the Error itself, on Wasm its stack trace text
+internal expect fun Throwable.toConsoleArg(): JsAny?
+
+class LoggerBrowserConsole(
     val prefix: String
 ) : Logger {
 
@@ -49,9 +52,9 @@ class LoggerWasmJsConsole(
         func("$prefix - $msg", t)
     }
 
-    // the throwable's stack trace is passed to the console with the message, so they appear together
+    // the throwable is passed to the console with the message, so they appear together
     private fun consoleArgs(msg: String, t: Throwable?): Array<JsAny?> =
-        if (null == t) arrayOf(msg.toJsString()) else arrayOf(msg.toJsString(), t.stackTraceToString().toJsString())
+        if (null == t) arrayOf(msg.toJsString()) else arrayOf(msg.toJsString(), t.toConsoleArg())
 
     private fun consoleFatal(msg: String?, t: Throwable?) = console.error(*consoleArgs(duration("Fatal", "$msg"), t))
     private fun consoleError(msg: String?, t: Throwable?) = console.error(*consoleArgs(duration("Error", "$msg"), t))
@@ -77,9 +80,10 @@ class LoggerWasmJsConsole(
     }
 }
 
-object LoggingByBrowserConsoleWasm : LoggingFramework {
+/** Logs to the browser (or Node.js) console, from both Kotlin/JS and Kotlin/Wasm. */
+object LoggingByBrowserConsole : LoggingFramework {
     override var rootLoggingLevel: LogThreshold = LogLevel.Information
 
-    override fun logger(prefix: String): Logger = LoggerWasmJsConsole(prefix)
+    override fun logger(prefix: String): Logger = LoggerBrowserConsole(prefix)
 
 }
