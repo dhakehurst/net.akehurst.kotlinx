@@ -116,7 +116,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         val fd = FileDialog(parentFrame, dialogTitle)
         fd.mode = FileDialog.LOAD
         fd.isMultipleMode = false
-        fd.directory = current?.handle?.name
+        fd.directory = current?.handle?.absolutePath
         fd.isVisible = true
         val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
         return selectedFile?.let {
@@ -182,7 +182,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         val fd = FileDialog(parentFrame, dialogTitle)
         fd.mode = mode
         fd.isMultipleMode = false
-        fd.directory = current?.handle?.name
+        fd.directory = current?.handle?.absolutePath
         fd.isVisible = true
         val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
         return selectedFile?.let {
