@@ -2,6 +2,18 @@ plugins {
     alias(libs.plugins.jsPlainObjects)
 }
 kotlin {
+    // browser tests (src/webTest) use the browser's private file system, so run them in headless Chrome
+    js {
+        browser {
+            testTask { useKarma { useChromeHeadless() } }
+        }
+    }
+    wasmJs {
+        browser {
+            testTask { useKarma { useChromeHeadless() } }
+        }
+    }
+
     sourceSets {
         commonMain {
             dependencies {
