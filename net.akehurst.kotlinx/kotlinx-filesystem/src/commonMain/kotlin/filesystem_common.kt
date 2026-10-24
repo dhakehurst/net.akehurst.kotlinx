@@ -18,11 +18,6 @@ package net.akehurst.kotlinx.filesystem
 
 import net.akehurst.kotlinx.filesystem.api.*
 
-enum class FileAccessMode {
-    READ_ONLY,
-    READ_WRITE
-}
-
 
 abstract class DirectoryHandleAbstract: DirectoryHandle {
 
@@ -47,7 +42,7 @@ abstract class DirectoryHandleAbstract: DirectoryHandle {
 }
 
 abstract class FileHandleAbstract : FileHandle {
-    override val extension: String get() = name.substringAfterLast('.')
+    override val extension: String get() = name.substringAfterLast('.', "")
 
     override val path: String get() = "${parent?.path?:""}/$name"
     override val absolutePath: String get() = path

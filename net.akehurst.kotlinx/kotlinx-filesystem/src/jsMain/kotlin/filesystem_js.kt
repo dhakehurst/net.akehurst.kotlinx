@@ -16,28 +16,26 @@
 
 package net.akehurst.kotlinx.filesystem
 
+import js.array.toList
 import js.iterable.asFlow
 import js.objects.unsafeJso
-import js.promise.await
 import js.typedarrays.Uint8Array
 import korlibs.io.file.std.ZipVfs
 import korlibs.io.stream.openAsync
-import kotlinx.browser.window
-import kotlinx.coroutines.await
 import kotlinx.coroutines.flow.toList
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
-import net.akehurst.kotlinx.filesystem.api.FileSystem
+import net.akehurst.kotlinx.filesystem.api.FileAccessMode
+import net.akehurst.kotlinx.filesystem.api.UserFileSystem
 import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
 import web.blob.arrayBuffer
 import web.blob.text
 import web.experimental.ExperimentalWebApi
 import web.fs.*
 import web.streams.close
-import kotlin.js.Promise
 
 data class DirectoryHandleJS(
-    val fileSystem: UserFileSystem,
+    val fileSystem: UserFileSystemDefault,
     override val parent: DirectoryHandleJS?,
     val handle: FileSystemDirectoryHandle
 ) : DirectoryHandleAbstract() {
@@ -61,7 +59,7 @@ data class DirectoryHandleJS(
 }
 
 data class FileHandleJS(
-    val fileSystem: UserFileSystem,
+    val fileSystem: UserFileSystemDefault,
     override val parent: DirectoryHandleJS?,
     val handle: FileSystemFileHandle
 ) : FileHandleAbstract() {
@@ -73,9 +71,9 @@ data class FileHandleJS(
     override suspend fun openAsZipDirectory(): DirectoryHandle? = fileSystem.openFileAsZipDirectory(this)
 }
 
-actual object UserFileSystem : FileSystem {
+actual object UserFileSystemDefault : UserFileSystem {
 
-    actual suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
+    override suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
         return when {
             name.isEmpty() -> parent
             parent is DirectoryHandleJS -> {
@@ -100,12 +98,12 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
+    override suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
         return selectDirectoryFromDialog("Choose Directory",null, mode)
     }
 
     @OptIn(ExperimentalWebApi::class)
-    actual suspend fun selectDirectoryFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
+    override suspend fun selectDirectoryFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
         return try {
             val dpo: DirectoryPickerOptions = when (accessMode) {
                 FileAccessMode.READ_ONLY -> unsafeJso { mode = FileSystemPermissionMode.read }
@@ -119,34 +117,56 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
-        val w: dynamic = window
-        val p: Promise<dynamic> = when (accessMode) {
-            FileAccessMode.READ_ONLY -> w.showOpenFilePicker(js("{mode:'read'}"))
-            FileAccessMode.READ_WRITE -> w.showOpenFilePicker(js("{mode:'readwrite'}"))
-        }
+    // the open file picker has no access mode; write permission is requested by createWritable when writing
+    @OptIn(ExperimentalWebApi::class)
+    override suspend fun selectExistingFileFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         return try {
-            val handle: FileSystemFileHandle = p.await()
-            FileHandleJS(this, current as DirectoryHandleJS?, handle)
+            val cur = current as? DirectoryHandleJS
+            val picked = when (cur) {
+                null -> showOpenFilePicker()
+                else -> showOpenFilePicker(unsafeJso<OpenFilePickerOptions> { startIn = cur.handle })
+            }
+            picked.toList().firstOrNull()?.let { handle ->
+                FileHandleJS(this, parentWithin(cur, handle), handle)
+            }
         } catch (t: Throwable) {
             t.printStackTrace()
             null
         }
     }
 
-    actual suspend fun selectNewFileFromDialog(dialogTitle:String,parent: DirectoryHandle): FileHandle? {
+    @OptIn(ExperimentalWebApi::class)
+    override suspend fun selectNewFileFromDialog(dialogTitle:String,parent: DirectoryHandle): FileHandle? {
         return try {
-            val w: dynamic = window
-            val p: Promise<dynamic> = w.showSaveFilePicker(js("{}"))
-            val handle: FileSystemFileHandle = p.await()
-            FileHandleJS(this, parent as DirectoryHandleJS, handle)
+            val cur = parent as? DirectoryHandleJS
+            val handle: FileSystemFileHandle = when (cur) {
+                null -> showSaveFilePicker()
+                else -> showSaveFilePicker(unsafeJso<SaveFilePickerOptions> { startIn = cur.handle })
+            }
+            FileHandleJS(this, parentWithin(cur, handle), handle)
         } catch (t: Throwable) {
             t.printStackTrace()
             null
         }
     }
 
-    actual suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> =
+    /**
+     * The user can pick a file in any directory, so [dir] is only used as the parent when the file is inside it.
+     * Returns the directory directly containing [file] (building handles for any directories between),
+     * or null if [dir] is null or the file is not inside it.
+     */
+    private suspend fun parentWithin(dir: DirectoryHandleJS?, file: FileSystemFileHandle): DirectoryHandleJS? {
+        if (dir == null) return null
+        // names from dir down to the file; the last name is the file itself
+        val names = dir.handle.resolve(file)?.toList()?.map { it.toString() } ?: return null
+        var parent: DirectoryHandleJS = dir
+        for (name in names.dropLast(1)) {
+            parent = DirectoryHandleJS(this, parent, parent.handle.getDirectoryHandle(name))
+        }
+        return parent
+    }
+
+    override suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> =
         try {
             when (dir) {
                 is DirectoryHandleJS -> {
@@ -177,12 +197,13 @@ actual object UserFileSystem : FileSystem {
             emptyList()
         }
 
-    actual suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
+    override suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
         return try {
             when (parent) {
                 is DirectoryHandleJS -> {
-                    val newFile = parent.handle.getFileHandle(name)
-                    newFile.createWritable()
+                    // create = true makes an empty file if missing and returns an existing file unchanged;
+                    // throws TypeMismatchError (caught below) if a directory has that name
+                    val newFile = parent.handle.getFileHandle(name, unsafeJso<FileSystemGetFileOptions> { create = true })
                     FileHandleJS(this, parent, newFile)
                 }
 
@@ -194,11 +215,13 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
+    override suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
         return try {
             when (parent) {
                 is DirectoryHandleJS -> {
-                    val newDir = parent.handle.getDirectoryHandle(name)
+                    // create = true makes the directory if missing and returns an existing directory unchanged;
+                    // throws TypeMismatchError (caught below) if a file has that name
+                    val newDir = parent.handle.getDirectoryHandle(name, unsafeJso<FileSystemGetDirectoryOptions> { create = true })
                     DirectoryHandleJS(this, parent, newDir)
                 }
 
@@ -210,7 +233,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun exists(entry: FileSystemObjectHandle): Boolean  {
+    override suspend fun exists(entry: FileSystemObjectHandle): Boolean  {
         return when (entry) {
             is FileHandleJS -> try { entry.handle.getFile(); true } catch (_: Exception) { false }
             is DirectoryHandleJS -> try { entry.handle.values(); true } catch (_: Exception) { false }
@@ -218,7 +241,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun readFileContent(file: FileHandle): String? =
+    override suspend fun readFileContent(file: FileHandle): String? =
         try {
             when (file) {
                 is FileHandleJS -> {
@@ -232,7 +255,7 @@ actual object UserFileSystem : FileSystem {
             null
         }
 
-    actual suspend fun writeFileContent(file: FileHandle, content: String) {
+    override suspend fun writeFileContent(file: FileHandle, content: String) {
         try {
             when (file) {
                 is FileHandleJS -> {
@@ -248,7 +271,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
+    override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
         return try {
             val handle = (file as FileHandleJS).handle
             val arrBuf = handle.getFile().arrayBuffer()

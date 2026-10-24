@@ -19,28 +19,27 @@
 package net.akehurst.kotlinx.filesystem
 
 
+import js.array.toList
 import js.iterable.asFlow
 import js.numbers.JsNumbers.toKotlinByte
 import js.objects.unsafeJso
 import korlibs.io.file.std.ZipVfs
 import korlibs.io.stream.openAsync
-import kotlinx.coroutines.await
 import kotlinx.coroutines.flow.toList
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
-import net.akehurst.kotlinx.filesystem.api.FileSystem
+import net.akehurst.kotlinx.filesystem.api.FileAccessMode
+import net.akehurst.kotlinx.filesystem.api.UserFileSystem
 import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
 import web.blob.bytes
 import web.blob.text
 import web.experimental.ExperimentalWebApi
 import web.fs.*
 import web.streams.close
-import web.window.window
-import kotlin.js.Promise
 
 
 data class DirectoryHandleWasmJS(
-    val fileSystem: UserFileSystem,
+    val fileSystem: UserFileSystemDefault,
     override val parent: DirectoryHandleWasmJS?,
     val handle: FileSystemDirectoryHandle
 ) : DirectoryHandleAbstract() {
@@ -55,7 +54,7 @@ data class DirectoryHandleWasmJS(
 }
 
 data class FileHandleWasmJS(
-    val fileSystem: UserFileSystem,
+    val fileSystem: UserFileSystemDefault,
     override val parent: DirectoryHandleWasmJS?,
     val handle: FileSystemFileHandle
 ) : FileHandleAbstract() {
@@ -67,19 +66,9 @@ data class FileHandleWasmJS(
     override suspend fun openAsZipDirectory(): DirectoryHandle? = fileSystem.openFileAsZipDirectory(this)
 }
 
-external interface WasmWindow {
-    //fun showDirectoryPicker(options: JsAny? = definedExternally): Promise<FileSystemDirectoryHandle>
-    fun showSaveFilePicker(options: JsAny? = definedExternally): Promise<FileSystemFileHandle>
-    fun showOpenFilePicker(options: JsAny? = definedExternally): Promise<JsArray<FileSystemFileHandle>>
-    fun alert(message: String)
-    fun prompt(message: String, defaultText: String): String?
-}
+actual object UserFileSystemDefault : UserFileSystem {
 
-fun FilePickerOptions(mode: String): JsAny = js("({mode:mode})")
-
-actual object UserFileSystem : FileSystem {
-
-    actual suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
+    override suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
         return when {
             name.isEmpty() -> parent
             parent is DirectoryHandleWasmJS -> {
@@ -103,12 +92,12 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
+    override suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
         return selectDirectoryFromDialog("Choose Directory", null, mode)
     }
 
     @OptIn(ExperimentalWebApi::class)
-    actual suspend fun selectDirectoryFromDialog(dialogTitle: String, current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
+    override suspend fun selectDirectoryFromDialog(dialogTitle: String, current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
         return try {
             val dpo: DirectoryPickerOptions = when (accessMode) {
                 FileAccessMode.READ_ONLY -> unsafeJso { mode = FileSystemPermissionMode.read }
@@ -122,13 +111,17 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(dialogTitle: String, current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
+    // the open file picker has no access mode; write permission is requested by createWritable when writing
+    @OptIn(ExperimentalWebApi::class)
+    override suspend fun selectExistingFileFromDialog(dialogTitle: String, current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         return try {
-            val p = (window as WasmWindow).showOpenFilePicker(
-                FilePickerOptions(mode = accessMode.name)
-            )
-            p.await()[0]?.let { handle ->
-                FileHandleWasmJS(this, null, handle)
+            val cur = current as? DirectoryHandleWasmJS
+            val picked = when (cur) {
+                null -> showOpenFilePicker()
+                else -> showOpenFilePicker(unsafeJso<OpenFilePickerOptions> { startIn = cur.handle })
+            }
+            picked.toList().firstOrNull()?.let { handle ->
+                FileHandleWasmJS(this, parentWithin(cur, handle), handle)
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -136,17 +129,37 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectNewFileFromDialog(dialogTitle: String, parent: DirectoryHandle): FileHandle? {
-        val p = (window as WasmWindow).showSaveFilePicker()
+    @OptIn(ExperimentalWebApi::class)
+    override suspend fun selectNewFileFromDialog(dialogTitle: String, parent: DirectoryHandle): FileHandle? {
         return try {
-            val handle: FileSystemFileHandle = p.await()
-            FileHandleWasmJS(this, parent as DirectoryHandleWasmJS, handle)
+            val cur = parent as? DirectoryHandleWasmJS
+            val handle: FileSystemFileHandle = when (cur) {
+                null -> showSaveFilePicker()
+                else -> showSaveFilePicker(unsafeJso<SaveFilePickerOptions> { startIn = cur.handle })
+            }
+            FileHandleWasmJS(this, parentWithin(cur, handle), handle)
         } catch (t: Throwable) {
             null
         }
     }
 
-    actual suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> =
+    /**
+     * The user can pick a file in any directory, so [dir] is only used as the parent when the file is inside it.
+     * Returns the directory directly containing [file] (building handles for any directories between),
+     * or null if [dir] is null or the file is not inside it.
+     */
+    private suspend fun parentWithin(dir: DirectoryHandleWasmJS?, file: FileSystemFileHandle): DirectoryHandleWasmJS? {
+        if (dir == null) return null
+        // names from dir down to the file; the last name is the file itself
+        val names = dir.handle.resolve(file)?.toList()?.map { it.toString() } ?: return null
+        var parent: DirectoryHandleWasmJS = dir
+        for (name in names.dropLast(1)) {
+            parent = DirectoryHandleWasmJS(this, parent, parent.handle.getDirectoryHandle(name))
+        }
+        return parent
+    }
+
+    override suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> =
         try {
             when (dir) {
                 is DirectoryHandleWasmJS -> {
@@ -170,16 +183,17 @@ actual object UserFileSystem : FileSystem {
             emptyList()
         }
 
-    actual suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
+    override suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
         try {
             return when (parent) {
                 is DirectoryHandleWasmJS -> {
-                    val newFile = parent.handle.getFileHandle(name)
-                    newFile.createWritable()
+                    // create = true makes an empty file if missing and returns an existing file unchanged;
+                    // throws TypeMismatchError (caught below) if a directory has that name
+                    val newFile = parent.handle.getFileHandle(name, unsafeJso<FileSystemGetFileOptions> { create = true })
                     FileHandleWasmJS(this, parent, newFile)
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleWasmJS: ${parent::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -187,15 +201,17 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
+    override suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
         try {
             return when (parent) {
                 is DirectoryHandleWasmJS -> {
-                    val newDir = parent.handle.getDirectoryHandle(name)
+                    // create = true makes the directory if missing and returns an existing directory unchanged;
+                    // throws TypeMismatchError (caught below) if a file has that name
+                    val newDir = parent.handle.getDirectoryHandle(name, unsafeJso<FileSystemGetDirectoryOptions> { create = true })
                     DirectoryHandleWasmJS(this, parent, newDir)
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleWasmJS: ${parent::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -203,7 +219,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun exists(entry: FileSystemObjectHandle): Boolean {
+    override suspend fun exists(entry: FileSystemObjectHandle): Boolean {
         return when (entry) {
             is FileHandleWasmJS -> try {
                 entry.handle.getFile(); true
@@ -221,21 +237,21 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun readFileContent(file: FileHandle): String? =
+    override suspend fun readFileContent(file: FileHandle): String? =
         try {
             when (file) {
                 is FileHandleWasmJS -> {
                     file.handle.getFile().text()
                 }
 
-                else -> error("FileHandle is not a FileHandleJS: ${file::class.simpleName}")
+                else -> error("FileHandle is not a FileHandleWasmJS: ${file::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
             null
         }
 
-    actual suspend fun writeFileContent(file: FileHandle, content: String) {
+    override suspend fun writeFileContent(file: FileHandle, content: String) {
         try {
             when (file) {
                 is FileHandleWasmJS -> {
@@ -244,14 +260,14 @@ actual object UserFileSystem : FileSystem {
                     w.close()
                 }
 
-                else -> error("FileHandle is not a FileHandleJS: ${file::class.simpleName}")
+                else -> error("FileHandle is not a FileHandleWasmJS: ${file::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
         }
     }
 
-    actual suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
+    override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
         try {
             val handle = (file as FileHandleWasmJS).handle
             val bytes = handle.getFile().bytes()

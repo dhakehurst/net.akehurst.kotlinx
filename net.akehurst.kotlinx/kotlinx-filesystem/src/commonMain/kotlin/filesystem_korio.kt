@@ -19,7 +19,7 @@ package net.akehurst.kotlinx.filesystem
 import korlibs.io.file.VfsFile
 import korlibs.io.file.baseName
 import korlibs.io.file.std.openAsZip
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.toList
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
@@ -32,7 +32,7 @@ data class DirectoryHandleKorio(
     val handle: VfsFile
 ) : DirectoryHandleAbstract() {
 
-    override val path: String get() = TODO()
+    override val path: String get() = handle.path
 
     override val name: String get() = handle.pathInfo.baseName
 
@@ -40,13 +40,8 @@ data class DirectoryHandleKorio(
     override suspend fun entry(name: String): FileSystemObjectHandle? = fileSystem.getEntry(this, name)
     override suspend fun listContent(): List<FileSystemObjectHandle> = fileSystem.listDirectoryContent(this)
 
-    override suspend fun createDirectory(name: String): DirectoryHandle? {
-        TODO("not implemented")
-    }
-
-    override suspend fun createFile(name: String): FileHandle? {
-        TODO("not implemented")
-    }
+    override suspend fun createDirectory(name: String): DirectoryHandle? = fileSystem.createNewDirectory(this, name)
+    override suspend fun createFile(name: String): FileHandle? = fileSystem.createNewFile(this, name)
 
 }
 
@@ -56,6 +51,7 @@ data class FileHandleKorio(
     val handle: VfsFile
 ) : FileHandleAbstract() {
     override val name: String get() = handle.pathInfo.baseName
+    override val path: String get() = handle.path
 
     override suspend fun exists(): Boolean = fileSystem.exists(this)
     override suspend fun readContent(): String? = fileSystem.readFileContent(this)
@@ -120,28 +116,30 @@ object FileSystemKorio : FileSystem {
     suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> =
         when (dir) {
             is DirectoryHandleKorio -> {
-                val list = dir.handle.list().map { child ->
+                // skip entries that are neither a directory nor a file (e.g. broken symlinks)
+                val list = dir.handle.list().mapNotNull { child ->
                     when {
                         child.isDirectory() -> DirectoryHandleKorio(this, dir,child)
                         child.isFile() -> FileHandleKorio(this, dir,child)
-                        else -> error("Should not happen")
+                        else -> null
                     }
                 }
                 list.toList()
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${dir::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleKorio: ${dir::class.simpleName}")
         }
 
     suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
         return when (parent) {
             is DirectoryHandleKorio -> {
                 val newFile = parent.handle[name]
-                newFile.writeString("") //creates the file
-                FileHandleKorio(this, parent,newFile)
+                // only create when missing, so an existing file keeps its content
+                if (newFile.exists().not()) newFile.writeString("")
+                if (newFile.isFile()) FileHandleKorio(this, parent, newFile) else null
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleKorio: ${parent::class.simpleName}")
         }
     }
 
@@ -149,11 +147,11 @@ object FileSystemKorio : FileSystem {
         return when (parent) {
             is DirectoryHandleKorio -> {
                 val newDir = parent.handle[name]
-                newDir.mkdir()
-                DirectoryHandleKorio(this, parent,newDir)
+                if (newDir.exists().not()) newDir.mkdir()
+                if (newDir.isDirectory()) DirectoryHandleKorio(this, parent, newDir) else null
             }
 
-            else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+            else -> error("DirectoryHandle is not a DirectoryHandleKorio: ${parent::class.simpleName}")
         }
     }
 
@@ -171,7 +169,7 @@ object FileSystemKorio : FileSystem {
                 file.handle.readString()
             }
 
-            else -> error("FileHandle is not a FileHandleJS: ${file::class.simpleName}")
+            else -> error("FileHandle is not a FileHandleKorio: ${file::class.simpleName}")
         }
 
     suspend fun writeFileContent(file: FileHandle, content: String) {
@@ -180,7 +178,7 @@ object FileSystemKorio : FileSystem {
                 file.handle.writeString(content)
             }
 
-            else -> error("FileHandle is not a FileHandleJS: ${file::class.simpleName}")
+            else -> error("FileHandle is not a FileHandleKorio: ${file::class.simpleName}")
         }
     }
 

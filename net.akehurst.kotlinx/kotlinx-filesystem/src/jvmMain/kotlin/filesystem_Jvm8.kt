@@ -20,7 +20,8 @@ import korlibs.io.file.std.ZipVfs
 import korlibs.io.stream.openAsync
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
-import net.akehurst.kotlinx.filesystem.api.FileSystem
+import net.akehurst.kotlinx.filesystem.api.FileAccessMode
+import net.akehurst.kotlinx.filesystem.api.UserFileSystem
 import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
 import java.awt.EventQueue
 import java.awt.FileDialog
@@ -34,7 +35,7 @@ import kotlin.io.path.listDirectoryEntries
 import kotlin.printStackTrace
 
 data class DirectoryHandleJVM(
-    val fileSystem: UserFileSystem,
+    val fileSystem: UserFileSystemDefault,
     override val parent: DirectoryHandleJVM?,
     val handle: File
 ) : DirectoryHandleAbstract() {
@@ -50,13 +51,13 @@ data class DirectoryHandleJVM(
 }
 
 data class FileHandleJVM(
-    val fileSystem: UserFileSystem,
+    val fileSystem: UserFileSystemDefault,
     override val parent: DirectoryHandleJVM?,
     val handle: File
 ) : FileHandleAbstract() {
 
     override val name: String get() = handle.name
-    override val absolutePath: String get() = handle.path
+    override val absolutePath: String get() = handle.absolutePath
 
     override suspend fun exists(): Boolean = fileSystem.exists(this)
     override suspend fun readContent(): String? = fileSystem.readFileContent(this)
@@ -64,9 +65,9 @@ data class FileHandleJVM(
     override suspend fun openAsZipDirectory(): DirectoryHandle? = fileSystem.openFileAsZipDirectory(this)
 }
 
-actual object UserFileSystem : FileSystem {
+actual object UserFileSystemDefault : UserFileSystem {
 
-    actual suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
+    override suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
         return when {
             name.isEmpty() -> parent
             parent is DirectoryHandleJVM -> {
@@ -75,7 +76,7 @@ actual object UserFileSystem : FileSystem {
                     f.exists().not() -> null
                     f.isDirectory -> DirectoryHandleJVM(parent.fileSystem, parent, f)
                     f.isFile -> FileHandleJVM(parent.fileSystem, parent, f)
-                    else -> error("directory entry ${parent.path}/$name is neither a file nor a directory")
+                    else -> null // neither a file nor a directory (e.g. FIFO, socket); listDirectoryContent skips these too
                 }
             }
 
@@ -83,7 +84,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
+    override suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
         val file = File(fullPath)
         return if (file.exists() && file.isDirectory) {
             DirectoryHandleJVM(this, null, file)
@@ -92,7 +93,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectDirectoryFromDialog(dialogTitle:String, current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
+    override suspend fun selectDirectoryFromDialog(dialogTitle:String, current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
         try {
             return if (EventQueue.isDispatchThread()) {
                 chooseDirectory2(dialogTitle,current as DirectoryHandleJVM?)
@@ -115,7 +116,7 @@ actual object UserFileSystem : FileSystem {
         val fd = FileDialog(parentFrame, dialogTitle)
         fd.mode = FileDialog.LOAD
         fd.isMultipleMode = false
-        fd.directory = current?.handle?.name
+        fd.directory = current?.handle?.absolutePath
         fd.isVisible = true
         val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
         return selectedFile?.let {
@@ -125,7 +126,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectExistingFileFromDialog(dialogTitle:String, current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
+    override suspend fun selectExistingFileFromDialog(dialogTitle:String, current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         try {
             return if (EventQueue.isDispatchThread()) {
                 if (useNativeDialog) {
@@ -181,7 +182,7 @@ actual object UserFileSystem : FileSystem {
         val fd = FileDialog(parentFrame, dialogTitle)
         fd.mode = mode
         fd.isMultipleMode = false
-        fd.directory = current?.handle?.name
+        fd.directory = current?.handle?.absolutePath
         fd.isVisible = true
         val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
         return selectedFile?.let {
@@ -191,7 +192,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun selectNewFileFromDialog(dialogTitle:String, parent: DirectoryHandle): FileHandle? {
+    override suspend fun selectNewFileFromDialog(dialogTitle:String, parent: DirectoryHandle): FileHandle? {
         val file = chooseFile(dialogTitle,parent as DirectoryHandleJVM)
         return if (null != file) {
             val jFile = (file as FileHandleJVM).handle
@@ -205,21 +206,22 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> {
+    override suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> {
         try {
             return when (dir) {
                 is DirectoryHandleJVM -> {
                     val dirEntries = dir.handle.toPath().listDirectoryEntries()
-                    dirEntries.map {
+                    // skip entries that are neither a directory nor a regular file (e.g. broken symlinks)
+                    dirEntries.mapNotNull {
                         when {
                             it.isDirectory() -> DirectoryHandleJVM(this, dir, it.toFile())
                             it.isRegularFile() -> FileHandleJVM(this, dir, it.toFile())
-                            else -> error("shoudl not happen")
+                            else -> null
                         }
                     }
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${dir::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJVM: ${dir::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -227,16 +229,16 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
+    override suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
         try {
             return when (parent) {
                 is DirectoryHandleJVM -> {
                     val newFile = parent.handle.resolve(name)
-                    newFile.createNewFile()
-                    FileHandleJVM(this, parent, newFile)
+                    newFile.createNewFile() // does nothing if something already has that name
+                    if (newFile.isFile) FileHandleJVM(this, parent, newFile) else null
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJVM: ${parent::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -244,16 +246,16 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
+    override suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
         try {
             return when (parent) {
                 is DirectoryHandleJVM -> {
                     val newDir = parent.handle.resolve(name)
-                    newDir.mkdirs()
-                    DirectoryHandleJVM(this, parent, newDir)
+                    newDir.mkdirs() // does nothing if something already has that name
+                    if (newDir.isDirectory) DirectoryHandleJVM(this, parent, newDir) else null
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${parent::class.simpleName}")
+                else -> error("DirectoryHandle is not a DirectoryHandleJVM: ${parent::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -261,7 +263,7 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun exists(entry: FileSystemObjectHandle): Boolean {
+    override suspend fun exists(entry: FileSystemObjectHandle): Boolean {
         return when (entry) {
             is DirectoryHandleJVM -> entry.handle.exists()
             is FileHandleJVM -> entry.handle.exists()
@@ -269,14 +271,14 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun readFileContent(file: FileHandle): String? {
+    override suspend fun readFileContent(file: FileHandle): String? {
         try {
             return when (file) {
                 is FileHandleJVM -> {
                     file.handle.readText()
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${file::class.simpleName}")
+                else -> error("FileHandle is not a FileHandleJVM: ${file::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -284,21 +286,21 @@ actual object UserFileSystem : FileSystem {
         }
     }
 
-    actual suspend fun writeFileContent(file: FileHandle, content: String) {
+    override suspend fun writeFileContent(file: FileHandle, content: String) {
         try {
             return when (file) {
                 is FileHandleJVM -> {
                     file.handle.writeText(content)
                 }
 
-                else -> error("DirectoryHandle is not a DirectoryHandleJS: ${file::class.simpleName}")
+                else -> error("FileHandle is not a FileHandleJVM: ${file::class.simpleName}")
             }
         } catch (t: Throwable) {
             t.printStackTrace()
         }
     }
 
-    actual suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
+    override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
         try {
             val handle = (file as FileHandleJVM).handle
             val byteArray = handle.readBytes()

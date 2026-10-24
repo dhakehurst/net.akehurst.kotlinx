@@ -19,6 +19,7 @@ package net.akehurst.kotlinx.filesystem
 import korlibs.io.file.VfsFile
 import korlibs.io.file.baseName
 import korlibs.io.file.std.jailedLocalVfs
+import korlibs.io.file.std.openAsZip
 import korlibs.io.file.std.resourcesVfs
 import korlibs.io.file.std.userHomeVfs
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
@@ -42,9 +43,8 @@ class DirectoryHandleVfs(
     override suspend fun listContent(): List<FileSystemObjectHandle> {
         return when {
             _handle.isFile() -> emptyList()
-            _handle.isDirectory() -> _handle.listNames().map {
-                entry(it) ?: error("Not found entry: $it")
-            }
+            // skip entries that are neither a directory nor a file
+            _handle.isDirectory() -> _handle.listNames().mapNotNull { entry(it) }
 
             else -> emptyList()
         }
@@ -61,13 +61,19 @@ class DirectoryHandleVfs(
     }
 
     override suspend fun createDirectory(name: String): DirectoryHandle? {
-        TODO("not implemented")
+        val newDir = _handle[name]
+        if (newDir.exists().not()) newDir.mkdir()
+        return if (newDir.isDirectory()) DirectoryHandleVfs(fileSystem, this, newDir) else null
     }
 
     override suspend fun createFile(name: String): FileHandle? {
-        _handle[name].ensureParents()
-        _handle[name].writeString("")
-        return FileHandleVfs(fileSystem, this,_handle[name])
+        val newFile = _handle[name]
+        // only create when missing, so an existing file keeps its content
+        if (newFile.exists().not()) {
+            newFile.ensureParents()
+            newFile.writeString("")
+        }
+        return if (newFile.isFile()) FileHandleVfs(fileSystem, this, newFile) else null
     }
 }
 
@@ -83,9 +89,8 @@ class FileHandleVfs(
     override suspend fun exists(): Boolean = fileSystem.exists(_handle)
     override suspend fun readContent(): String? = _handle.readString()
     override suspend fun writeContent(content: String)=_handle.writeString(content)
-    override suspend fun openAsZipDirectory(): DirectoryHandle {
-        TODO("not implemented")
-    }
+    override suspend fun openAsZipDirectory(): DirectoryHandle =
+        DirectoryHandleVfs(fileSystem, null, _handle.openAsZip())
 }
 
 open class FileSystemFromVfs(
