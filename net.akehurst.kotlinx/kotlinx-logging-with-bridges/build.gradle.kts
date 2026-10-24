@@ -4,6 +4,8 @@ kotlin {
         commonMain {
             dependencies {
                 api(project(":kotlinx-logging-common"))
+                implementation(libs.kermit)
+                implementation(libs.oshai.kotlin.logging)
             }
         }
         jvmMain {

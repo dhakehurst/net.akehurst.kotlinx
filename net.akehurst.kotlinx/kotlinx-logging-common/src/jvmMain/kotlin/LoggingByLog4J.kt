@@ -112,11 +112,20 @@ class LoggerLog4J(
 
     companion object {
         // classes whose stack frames sit between the calling code and log4j
-        private val wrapperClassNames = setOf(
+        @Volatile
+        private var wrapperClassNames = setOf(
             LoggerLog4J::class.java.name,
             Logger::class.java.name,
             Logger::class.java.name + "\$DefaultImpls",
         )
+
+        /**
+         * Treat the named classes as part of the logging path, so log4j reports the code that called them
+         * as the source of a message. Used by bridges that forward another logging library's messages to a Logger.
+         */
+        fun addWrapperClassNames(vararg classNames: String) {
+            synchronized(this) { wrapperClassNames = wrapperClassNames + classNames }
+        }
 
         // the first frame outside the wrapper classes, i.e. the code that called the logger
         private fun callerLocation(): StackTraceElement? =
