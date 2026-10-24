@@ -9,7 +9,7 @@ A collection of useful multiplatform extensions to the kotlin stdlib
 
 - [Filesystem](net.akehurst.kotlinx/kotlinx-filesystem-api/README.md)
 - [Logging](net.akehurst.kotlinx/kotlinx-logging-api/README.md)
-- Reflection
+- [Reflection](net.akehurst.kotlinx/kotlinx-reflect/README.md)
 - Collections
   - OrderedSet
   - Stack 
