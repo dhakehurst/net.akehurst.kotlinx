@@ -7,7 +7,7 @@
 
 A collection of useful multiplatform extensions to the kotlin stdlib
 
-- Filsystem
+- [Filesystem](net.akehurst.kotlinx/kotlinx-filesystem-api/README.md)
 - [Logging](net.akehurst.kotlinx/kotlinx-logging-api/README.md)
 - Reflection
 - Collections
