@@ -22,7 +22,15 @@ package net.akehurst.kotlinx.collections
  *
  * `comparator.compare(a, b) > 0` means 'a' must come after 'b'; 0 means unrelated.
  * Elements are tracked by position, so equal (or duplicate) elements are all kept.
- * Unrelated elements keep their input order. Fails if the ordering contains a cycle.
+ * Fails if the ordering contains a cycle.
+ *
+ * Stable: at each step the next element is the earliest one (by input position) that has nothing left that
+ * it must come after. So an already-sorted input is returned unchanged, and an element only goes ahead of an
+ * element that was earlier in the input when that earlier element is still waiting for something.
+ *
+ * Unrelated elements can still swap when keeping every unrelated pair in input order would contradict the
+ * required order - then no order satisfies both. E.g. input [x, y, p, q] with x after q and y after p:
+ * keeping x before p and p before q would put x before q. That input gives [p, y, q, x].
  */
 fun <E> Collection<E>.topologicalSort(comparator: Comparator<in E>): List<E> {
     //TODO: perhaps can find something faster!
@@ -41,16 +49,20 @@ fun <E> Collection<E>.topologicalSort(comparator: Comparator<in E>): List<E> {
         }
     }
 
-    val ready = ArrayDeque<Int>()
-    for (i in 0 until n) if (unmetCount[i] == 0) ready.addLast(i)
+    // indices with no unmet dependencies, kept in ascending order, so the earliest is always taken next
+    val ready = mutableListOf<Int>()
+    for (i in 0 until n) if (unmetCount[i] == 0) ready.add(i)
 
     val sortedElements = mutableListOf<E>()
     while (ready.isNotEmpty()) {
-        val j = ready.removeFirst()
+        val j = ready.removeAt(0)
         sortedElements.add(elements[j])
         for (i in dependents[j]) {
             unmetCount[i]--
-            if (unmetCount[i] == 0) ready.addLast(i)
+            if (unmetCount[i] == 0) {
+                val pos = ready.binarySearch(i)
+                ready.add(-(pos + 1), i)
+            }
         }
     }
 

@@ -95,6 +95,40 @@ class test_topologicalSort {
     }
 
     @Test
+    fun unrelated_elements_keep_input_order() {
+        assertEquals(listOf("z", "x", "y"), listOf("z", "x", "y").topologicalSort(dependsOn(emptyMap())))
+    }
+
+    @Test
+    fun unrelated_elements_keep_input_order_around_a_dependency() {
+        // c after a; b and d are unrelated to everything, so they stay where they are relative to the others
+        val deps = mapOf("c" to setOf("a"))
+        assertEquals(listOf("b", "a", "c", "d"), listOf("b", "c", "a", "d").topologicalSort(dependsOn(deps)))
+    }
+
+    @Test
+    fun earliest_ready_element_is_taken_next() {
+        // x after q, y after p. No order keeps all unrelated pairs in input order here (see KDoc);
+        // each step takes the earliest element whose dependencies are placed: p, then y (now ready), q, x
+        val deps = mapOf("x" to setOf("q"), "y" to setOf("p"))
+        val result = listOf("x", "y", "p", "q").topologicalSort(dependsOn(deps))
+        assertEquals(listOf("p", "y", "q", "x"), result)
+    }
+
+    @Test
+    fun already_sorted_input_is_unchanged() {
+        val deps = mapOf("b" to setOf("a"), "d" to setOf("c"))
+        assertEquals(listOf("a", "b", "c", "d"), listOf("a", "b", "c", "d").topologicalSort(dependsOn(deps)))
+    }
+
+    @Test
+    fun element_is_moved_only_as_far_as_needed() {
+        // a must come after d; b and c are unrelated, so only a moves
+        val deps = mapOf("a" to setOf("d"))
+        assertEquals(listOf("b", "c", "d", "a"), listOf("a", "b", "c", "d").topologicalSort(dependsOn(deps)))
+    }
+
+    @Test
     fun equal_elements_are_not_lost() {
         val result = listOf(2, 1, 2, 1).topologicalSort(naturalOrder())
         assertEquals(listOf(1, 1, 2, 2), result)

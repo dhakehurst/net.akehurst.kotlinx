@@ -89,6 +89,63 @@ class test_Stack {
         val a = Stack(listOf(1, 2))
         assertEquals(a, a.clone())
     }
+
+    @Test
+    fun many_pops_do_not_overflow() {
+        // each pop used to wrap the list in another subList; on JS that overflowed the call stack
+        val n = 20000
+        var s = Stack(List(n) { it })
+        repeat(n - 1) { s = s.pop().stack }
+        assertEquals(1, s.size)
+        assertEquals(0, s.peek())
+        assertEquals(listOf(0), s.elements)
+    }
+
+    @Test
+    fun many_pushes() {
+        val n = 20000
+        var s = Stack<Int>()
+        repeat(n) { s = s.push(it) }
+        assertEquals(n, s.size)
+        assertEquals(n - 1, s.peek())
+        assertEquals(List(n) { it }, s.elements)
+    }
+
+    @Test
+    fun stacks_sharing_lower_elements_are_independent() {
+        val base = Stack(listOf(1, 2))
+        val a = base.push(3)
+        val b = base.push(4)
+        assertEquals(listOf(1, 2, 3), a.elements)
+        assertEquals(listOf(1, 2, 4), b.elements)
+        assertEquals(listOf(1, 2), base.elements)
+        assertNotEquals(a, b)
+        assertEquals(a.pop().stack, b.pop().stack)
+    }
+
+    @Test
+    fun constructor_copies_the_given_list() {
+        val source = mutableListOf(1, 2)
+        val s = Stack(source)
+        source.add(3)
+        assertEquals(listOf(1, 2), s.elements)
+        assertEquals(2, s.peek())
+    }
+
+    @Test
+    fun null_items_are_allowed() {
+        val s = Stack<String?>().push("a").push(null)
+        assertNull(s.peek())
+        assertNull(s.peekOrNull())
+        val r = s.pop()
+        assertNull(r.item)
+        assertEquals("a", r.stack.peek())
+    }
+
+    @Test
+    fun toString_shows_elements() {
+        assertEquals("Stack[1, 2]", Stack(listOf(1, 2)).toString())
+    }
 }
 
 class test_MutableStack {
