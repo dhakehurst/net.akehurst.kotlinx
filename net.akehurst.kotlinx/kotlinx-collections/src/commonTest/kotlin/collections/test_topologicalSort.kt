@@ -153,37 +153,37 @@ class test_transitiveClosure {
     @Test
     fun chain() {
         val next = mapOf(1 to setOf(2), 2 to setOf(3), 3 to setOf(4))
-        val result = setOf(1).transitveClosure { next[it] ?: emptySet() }
+        val result = setOf(1).transitiveClosure { next[it] ?: emptySet() }
         assertEquals(setOf(1, 2, 3, 4), result)
     }
 
     @Test
     fun includes_start_elements_even_with_no_successors() {
-        assertEquals(setOf(1, 2), setOf(1, 2).transitveClosure { emptySet() })
+        assertEquals(setOf(1, 2), setOf(1, 2).transitiveClosure { emptySet() })
     }
 
     @Test
     fun empty_start_set() {
-        assertEquals(emptySet(), emptySet<Int>().transitveClosure { setOf(it + 1) })
+        assertEquals(emptySet(), emptySet<Int>().transitiveClosure { setOf(it + 1) })
     }
 
     @Test
     fun cycle_terminates() {
         val next = mapOf(1 to setOf(2), 2 to setOf(3), 3 to setOf(1))
-        assertEquals(setOf(1, 2, 3), setOf(1).transitveClosure { next[it] ?: emptySet() })
+        assertEquals(setOf(1, 2, 3), setOf(1).transitiveClosure { next[it] ?: emptySet() })
     }
 
     @Test
     fun branching() {
         val next = mapOf(1 to setOf(2, 3), 2 to setOf(4), 3 to setOf(4, 5))
-        assertEquals(setOf(1, 2, 3, 4, 5), setOf(1).transitveClosure { next[it] ?: emptySet() })
+        assertEquals(setOf(1, 2, 3, 4, 5), setOf(1).transitiveClosure { next[it] ?: emptySet() })
     }
 
     @Test
     fun function_called_once_per_element() {
         val next = mapOf(1 to setOf(2, 3), 2 to setOf(3), 3 to setOf(1))
         val calls = mutableMapOf<Int, Int>()
-        setOf(1).transitveClosure {
+        setOf(1).transitiveClosure {
             calls[it] = (calls[it] ?: 0) + 1
             next[it] ?: emptySet()
         }
@@ -193,7 +193,7 @@ class test_transitiveClosure {
     @Test
     fun does_not_modify_input() {
         val start = setOf(1)
-        start.transitveClosure { if (it < 3) setOf(it + 1) else emptySet() }
+        start.transitiveClosure { if (it < 3) setOf(it + 1) else emptySet() }
         assertEquals(setOf(1), start)
     }
 }

@@ -374,3 +374,38 @@ class test_ManagedReferenceCollections {
         assertSame(r1, s[1])
     }
 }
+
+class test_ManagedCollectionMessages {
+
+    private fun messageOf(block: () -> Unit): String = assertFailsWith<IllegalArgumentException> { block() }.message ?: ""
+
+    @Suppress("UNCHECKED_CAST")
+    private fun wrongTypeReference(): Reference<Any, String> {
+        val r = MutableReferenceDefault<Any, Any>("k")
+        r.resolved = 42
+        return r as Reference<Any, String>
+    }
+
+    @Test
+    fun type_violation_messages_name_the_kind_and_collection() {
+        val wrong = 1 as Any
+        assertEquals(
+            "Managed Collection violation on 'c': Expected 'String', but got 'Int'.",
+            messageOf { ManagedCollection<Any>("c", String::class).add(wrong) }
+        )
+        assertTrue(messageOf { ManagedList<Any>("l", String::class).add(wrong) }.startsWith("Managed List violation on 'l'"))
+        assertTrue(messageOf { ManagedSet<Any>("s", String::class).add(wrong) }.startsWith("Managed Set violation on 's'"))
+        assertTrue(messageOf { ManagedOrderedSet<Any>("o", String::class).add(wrong) }.startsWith("Managed OrderedSet violation on 'o'"))
+    }
+
+    @Test
+    fun reference_violation_messages_name_the_kind_and_collection() {
+        assertEquals(
+            "Managed Reference Set violation on 'rs': Expected reference to 'String', but got 'Int'.",
+            messageOf { ManagedReferenceSet("rs", String::class).add(wrongTypeReference()) }
+        )
+        assertTrue(messageOf { ManagedReferenceCollection("rc", String::class).add(wrongTypeReference()) }.startsWith("Managed Reference Collection violation on 'rc'"))
+        assertTrue(messageOf { ManagedReferenceList("rl", String::class).add(wrongTypeReference()) }.startsWith("Managed Reference List violation on 'rl'"))
+        assertTrue(messageOf { ManagedReferenceOrderedSet("ro", String::class).add(wrongTypeReference()) }.startsWith("Managed Reference OrderedSet violation on 'ro'"))
+    }
+}
