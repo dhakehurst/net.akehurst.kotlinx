@@ -1,7 +1,6 @@
 package net.akehurst.kotlinx.utils
 
 import org.w3c.dom.Document
-import org.w3c.dom.css.CSSStyleSheet
 
 inline fun objectJS(init: dynamic.() -> Unit): JsAny {
     val o:dynamic = js("{}")
@@ -28,7 +27,9 @@ fun <T : JsAny> T.getJsAny(key: String): T {
 }
 
 fun Document.adoptCss(css: String) {
-    val sheet = object : CSSStyleSheet() {}
-    sheet.asDynamic().replace(css)
+    // Create the sheet at call time. A Kotlin subclass of CSSStyleSheet would be defined when the module loads,
+    // which crashes outside a browser (e.g. node), where CSSStyleSheet does not exist.
+    val sheet: dynamic = js("new CSSStyleSheet()")
+    sheet.replace(css)
     this.asDynamic().adoptedStyleSheets.push(sheet)
 }
