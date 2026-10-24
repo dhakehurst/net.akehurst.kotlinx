@@ -19,12 +19,12 @@
 package net.akehurst.kotlinx.filesystem
 
 
+import js.array.toList
 import js.iterable.asFlow
 import js.numbers.JsNumbers.toKotlinByte
 import js.objects.unsafeJso
 import korlibs.io.file.std.ZipVfs
 import korlibs.io.stream.openAsync
-import kotlinx.coroutines.await
 import kotlinx.coroutines.flow.toList
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
@@ -36,8 +36,6 @@ import web.blob.text
 import web.experimental.ExperimentalWebApi
 import web.fs.*
 import web.streams.close
-import web.window.window
-import kotlin.js.Promise
 
 
 data class DirectoryHandleWasmJS(
@@ -67,16 +65,6 @@ data class FileHandleWasmJS(
     override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
     override suspend fun openAsZipDirectory(): DirectoryHandle? = fileSystem.openFileAsZipDirectory(this)
 }
-
-external interface WasmWindow {
-    //fun showDirectoryPicker(options: JsAny? = definedExternally): Promise<FileSystemDirectoryHandle>
-    fun showSaveFilePicker(options: JsAny? = definedExternally): Promise<FileSystemFileHandle>
-    fun showOpenFilePicker(options: JsAny? = definedExternally): Promise<JsArray<FileSystemFileHandle>>
-    fun alert(message: String)
-    fun prompt(message: String, defaultText: String): String?
-}
-
-fun FilePickerOptions(mode: String): JsAny = js("({mode:mode})")
 
 actual object UserFileSystemDefault : UserFileSystem {
 
@@ -123,14 +111,11 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
+    // the open file picker has no access mode; write permission is requested by createWritable when writing
+    @OptIn(ExperimentalWebApi::class)
     override suspend fun selectExistingFileFromDialog(dialogTitle: String, current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         return try {
-            val mode = when (accessMode) {
-                FileAccessMode.READ_ONLY -> "read"
-                FileAccessMode.READ_WRITE -> "readwrite"
-            }
-            val p = (window as WasmWindow).showOpenFilePicker(FilePickerOptions(mode = mode))
-            p.await()[0]?.let { handle ->
+            showOpenFilePicker().toList().firstOrNull()?.let { handle ->
                 FileHandleWasmJS(this, null, handle)
             }
         } catch (t: Throwable) {
@@ -139,10 +124,10 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
+    @OptIn(ExperimentalWebApi::class)
     override suspend fun selectNewFileFromDialog(dialogTitle: String, parent: DirectoryHandle): FileHandle? {
         return try {
-            val p = (window as WasmWindow).showSaveFilePicker()
-            val handle: FileSystemFileHandle = p.await()
+            val handle: FileSystemFileHandle = showSaveFilePicker()
             FileHandleWasmJS(this, parent as DirectoryHandleWasmJS, handle)
         } catch (t: Throwable) {
             null

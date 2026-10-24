@@ -16,14 +16,12 @@
 
 package net.akehurst.kotlinx.filesystem
 
+import js.array.toList
 import js.iterable.asFlow
 import js.objects.unsafeJso
-import js.promise.await
 import js.typedarrays.Uint8Array
 import korlibs.io.file.std.ZipVfs
 import korlibs.io.stream.openAsync
-import kotlinx.browser.window
-import kotlinx.coroutines.await
 import kotlinx.coroutines.flow.toList
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
@@ -35,7 +33,6 @@ import web.blob.text
 import web.experimental.ExperimentalWebApi
 import web.fs.*
 import web.streams.close
-import kotlin.js.Promise
 
 data class DirectoryHandleJS(
     val fileSystem: UserFileSystemDefault,
@@ -120,26 +117,23 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
+    // the open file picker has no access mode; write permission is requested by createWritable when writing
+    @OptIn(ExperimentalWebApi::class)
     override suspend fun selectExistingFileFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
-        val w: dynamic = window
-        val p: Promise<dynamic> = when (accessMode) {
-            FileAccessMode.READ_ONLY -> w.showOpenFilePicker(js("{mode:'read'}"))
-            FileAccessMode.READ_WRITE -> w.showOpenFilePicker(js("{mode:'readwrite'}"))
-        }
         return try {
-            val handle: FileSystemFileHandle = p.await()
-            FileHandleJS(this, current as DirectoryHandleJS?, handle)
+            showOpenFilePicker().toList().firstOrNull()?.let { handle ->
+                FileHandleJS(this, current as DirectoryHandleJS?, handle)
+            }
         } catch (t: Throwable) {
             t.printStackTrace()
             null
         }
     }
 
+    @OptIn(ExperimentalWebApi::class)
     override suspend fun selectNewFileFromDialog(dialogTitle:String,parent: DirectoryHandle): FileHandle? {
         return try {
-            val w: dynamic = window
-            val p: Promise<dynamic> = w.showSaveFilePicker(js("{}"))
-            val handle: FileSystemFileHandle = p.await()
+            val handle: FileSystemFileHandle = showSaveFilePicker()
             FileHandleJS(this, parent as DirectoryHandleJS, handle)
         } catch (t: Throwable) {
             t.printStackTrace()
