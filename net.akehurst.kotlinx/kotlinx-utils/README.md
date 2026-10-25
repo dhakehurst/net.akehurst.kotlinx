@@ -132,11 +132,27 @@ store.resolve(ref)   // returns alice, and sets ref.resolved to alice
 Objects are stored under the exact class given: something stored as `Person::class` is not found
 when looked up as `Any::class`. Setting a `null` value does nothing; it does not remove an entry.
 
-`HierarchicalReferenceStoreByHashMap(parent, identity)` is a store with a parent. Each child registers
-itself with its parent. Lookups with `get` only look in the store itself. To resolve from anywhere in
-the tree, use `HierarchicalReferenceStoreExt.resolve`: when a store sets an object of a type, the root
-records that store as the owner of the type, and `resolve` looks in that owner. If several stores
-set objects of the same type, the last one to do so is the owner.
+`HierarchicalReferenceStoreByHashMap(parent, identity)` is a store with a parent, so stores form a
+tree. `get` and `set` only use the store itself. To find an object anywhere in the tree, use
+`HierarchicalReferenceStoreExt.resolve`, from any store in the tree:
+
+```kotlin
+import net.akehurst.kotlinx.utils.HierarchicalReferenceStoreExt.resolve
+
+val model = HierarchicalReferenceStoreByHashMap<String>(null, "model")
+val shapes = HierarchicalReferenceStoreByHashMap(model, "shapes")
+shapes[Circle::class, "c1"] = c1
+
+model.resolve(MutableReferenceDefault<String, Circle>("c1"))   // c1
+model.resolve(MutableReferenceDefault<String, Shape>("c1"))    // c1, a Circle is a Shape
+```
+
+- **Each type belongs to one store.** The first store to set an object of a type becomes that type's
+  owner. If a different store then sets an object of the same type, it throws `IllegalStateException`.
+- **`resolve` looks in the owner of the reference's type first.** If the object isn't there, it looks
+  for an object with the same key, stored under any other type, that is an instance of the
+  reference's type. So a reference to `Shape` finds a `Circle`. If more than one object matches, it
+  throws `IllegalStateException`.
 
 ## Unique identities
 
