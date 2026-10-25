@@ -66,17 +66,25 @@ fun String.toRegexFromGlob(separator: Char, options: Set<RegexOption> = emptySet
             }
             '*' -> {
                 if (inCharacterClass == 0) {
-                    if (i + 1 >= globStr.length) {
-                        regex += "[^$sep]*"
-                    } else {
-                        val next = globStr[i + 1]
-                        when (next) {
-                            '*' -> {
-                                regex += ".*"
-                                i++
-                            }
-                            else -> regex += "[^$sep]*"
+                    // Standard globstar: '**' as a whole segment matches zero or more segments;
+                    // anywhere else it is the same as '*'.
+                    val isDouble = i + 1 < globStr.length && globStr[i + 1] == '*'
+                    val startsSegment = i == 0 || globStr[i - 1] == separator
+                    val afterDouble = i + 2
+                    when {
+                        isDouble && startsSegment && afterDouble >= globStr.length -> {
+                            regex += ".*"
+                            i++
                         }
+                        isDouble && startsSegment && globStr[afterDouble] == separator -> {
+                            regex += "(?:.*[$sep])?"
+                            i += 2
+                        }
+                        isDouble -> {
+                            regex += "[^$sep]*"
+                            i++
+                        }
+                        else -> regex += "[^$sep]*"
                     }
                 } else {
                     regex += '*'
