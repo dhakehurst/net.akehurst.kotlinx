@@ -41,11 +41,43 @@ class test_ReferenceStoreByHashMap {
 	}
 
 	@Test
-	fun testNullSetDoesNothing() {
-		store[String::class, "r3"] = "keep"
-		// setting to null is a no-op in the current implementation
+	fun testNullSetRemoves() {
+		store[String::class, "r3"] = "gone"
 		store[String::class, "r3"] = null
-		assertEquals("keep", store[String::class, "r3"])
+		assertNull(store[String::class, "r3"])
+	}
+
+	@Test
+	fun testRemove() {
+		store[String::class, "r4"] = "gone"
+		store[String::class, "r5"] = "kept"
+		store.remove(String::class, "r4")
+		assertNull(store[String::class, "r4"])
+		assertEquals("kept", store[String::class, "r5"])
+	}
+
+	@Test
+	fun testRemoveOnlyAffectsThatType() {
+		store[String::class, "shared"] = "s"
+		store[Int::class, "shared"] = 42
+		store.remove(String::class, "shared")
+		assertNull(store[String::class, "shared"])
+		assertEquals(42, store[Int::class, "shared"])
+	}
+
+	@Test
+	fun testRemoveMissingDoesNothing() {
+		store.remove(String::class, "never-set")
+		store[String::class, "r6"] = "x"
+		store.remove(String::class, "never-set")
+		assertEquals("x", store[String::class, "r6"])
+	}
+
+	@Test
+	fun testResolveAfterRemoveIsNull() {
+		store[String::class, "r7"] = "v"
+		store.remove(String::class, "r7")
+		assertNull(store.resolve(MutableReferenceDefault<String, String>("r7")))
 	}
 
 	@Test

@@ -138,7 +138,11 @@ store.resolve(ref)   // returns alice, and sets ref.resolved to alice
 ```
 
 Objects are stored under the exact class given: something stored as `Person::class` is not found
-when looked up as `Any::class`. Setting a `null` value does nothing; it does not remove an entry.
+when looked up as `Any::class`.
+
+`store.remove(Person::class, "alice")` removes an entry; setting a `null` value does the same.
+Removing doesn't change references that were already resolved: they keep the old object in
+`resolved` until you change them. Resolving them again returns `null`, but leaves `resolved` as it was.
 
 `HierarchicalReferenceStoreByHashMap(parent, identity)` is a store with a parent, so stores form a
 tree. `get` and `set` only use the store itself. To find an object anywhere in the tree, use
@@ -157,6 +161,7 @@ model.resolve(MutableReferenceDefault<String, Shape>("c1"))    // c1, a Circle i
 
 - **Each type belongs to one store.** The first store to set an object of a type becomes that type's
   owner. If a different store then sets an object of the same type, it throws `IllegalStateException`.
+  A store stays the owner even after all its objects of that type are removed.
 - **`resolve` looks in the owner of the reference's type first.** If the object isn't there, it looks
   for an object with the same key, stored under any other type, that is an instance of the
   reference's type. So a reference to `Shape` finds a `Circle`. If more than one object matches, it

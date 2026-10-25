@@ -181,4 +181,85 @@ class test_HierarchicalReferenceStore {
 
 		assertFailsWith<IllegalStateException> { root.resolve(MutableReferenceDefault<String, Shape>("x")) }
 	}
+
+	// --- removing ---
+
+	@Test
+	fun remove_then_get_and_resolve_give_null() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val child = HierarchicalReferenceStoreByHashMap(root, "child")
+		child.set(String::class, "leaf", "L")
+
+		child.remove(String::class, "leaf")
+
+		assertNull(child[String::class, "leaf"])
+		assertNull(root.resolve(MutableReferenceDefault<String, String>("leaf")))
+	}
+
+	@Test
+	fun set_null_removes() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val child = HierarchicalReferenceStoreByHashMap(root, "child")
+		child.set(String::class, "leaf", "L")
+
+		child.set(String::class, "leaf", null)
+
+		assertNull(child[String::class, "leaf"])
+	}
+
+	@Test
+	fun ownership_is_kept_after_last_object_removed() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val childA = HierarchicalReferenceStoreByHashMap(root, "a")
+		val childB = HierarchicalReferenceStoreByHashMap(root, "b")
+		childA.set(String::class, "x", "X")
+
+		childA.remove(String::class, "x")
+
+		assertSame(childA, root.getOwnerForReferenceType(String::class))
+		assertFailsWith<IllegalStateException> { childB.set(String::class, "y", "Y") }
+		childA.set(String::class, "z", "Z") // the owner can still add more
+		assertEquals("Z", root.resolve(MutableReferenceDefault<String, String>("z")))
+	}
+
+	@Test
+	fun removing_a_type_never_held_does_not_take_ownership() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val childA = HierarchicalReferenceStoreByHashMap(root, "a")
+		val childB = HierarchicalReferenceStoreByHashMap(root, "b")
+
+		childA.remove(String::class, "x")
+		childA.set(String::class, "y", null)
+
+		assertNull(root.getOwnerForReferenceType(String::class))
+		childB.set(String::class, "x", "X") // b can still become the owner
+		assertSame(childB, root.getOwnerForReferenceType(String::class))
+	}
+
+	@Test
+	fun remove_from_another_store_does_nothing() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val childA = HierarchicalReferenceStoreByHashMap(root, "a")
+		val childB = HierarchicalReferenceStoreByHashMap(root, "b")
+		childA.set(String::class, "x", "X")
+
+		childB.remove(String::class, "x")
+
+		assertEquals("X", childA[String::class, "x"])
+		assertSame(childA, root.getOwnerForReferenceType(String::class))
+	}
+
+	@Test
+	fun resolved_reference_keeps_removed_object_until_resolved_again() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val child = HierarchicalReferenceStoreByHashMap(root, "child")
+		child.set(String::class, "leaf", "L")
+		val ref = MutableReferenceDefault<String, String>("leaf")
+		root.resolve(ref)
+
+		child.remove(String::class, "leaf")
+
+		assertEquals("L", ref.resolved) // stores don't track references
+		assertNull(root.resolve(ref))
+	}
 }

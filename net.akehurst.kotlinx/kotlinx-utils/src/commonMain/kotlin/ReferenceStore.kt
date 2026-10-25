@@ -21,7 +21,17 @@ import kotlin.reflect.KClass
 
 interface ReferenceStore<R : Any> {
     operator fun <T : Any> get(clazz: KClass<T>, reference: R): T?
+
+    /**
+     * Stores [value] under type [clazz] and key [reference]. Setting `null` removes the entry.
+     */
     operator fun <T : Any> set(clazz: KClass<T>, reference: R, value: T?)
+
+    /**
+     * Removes the object stored under type [clazz] and key [reference], if there is one.
+     * The same as `set(clazz, reference, null)`.
+     */
+    fun <T : Any> remove(clazz: KClass<T>, reference: R) = set(clazz, reference, null)
 }
 
 interface HierarchicalReferenceStore<R : Any> : ReferenceStore<R> {
@@ -58,9 +68,12 @@ class ReferenceStoreByHashMap<R : Any> : ReferenceStore<R> {
     override fun <T : Any> get(clazz: KClass<T>, reference: R): T? = _map[clazz]?.get(reference) as? T
 
     override fun <T : Any> set(clazz: KClass<T>, reference: R, value: T?) {
-        value?.let {
-            val clsMap = _map[clazz] ?: let { HashMap<R, Any>().also { _map[clazz] = it } }
-            clsMap[reference] = value
+        when (value) {
+            null -> _map[clazz]?.remove(reference)
+            else -> {
+                val clsMap = _map[clazz] ?: let { HashMap<R, Any>().also { _map[clazz] = it } }
+                clsMap[reference] = value
+            }
         }
     }
 }
@@ -111,11 +124,17 @@ class HierarchicalReferenceStoreByHashMap<R : Any>(
     override fun <T : Any> get(clazz: KClass<T>, reference: R): T? =
         _map[clazz]?.get(reference) as? T
 
+    /**
+     * Setting `null` removes the entry. The store stays the owner of the type even when it holds no objects of it.
+     */
     override fun <T : Any> set(clazz: KClass<T>, reference: R, value: T?) {
-        value?.let {
-            rootReferenceStore.setOwnerForReferenceType(clazz, this) // throws if another store holds this type
-            val clsMap = _map[clazz] ?: let { HashMap<R, Any>().also { _map[clazz] = it } }
-            clsMap[reference] = value
+        when (value) {
+            null -> _map[clazz]?.remove(reference)
+            else -> {
+                rootReferenceStore.setOwnerForReferenceType(clazz, this) // throws if another store holds this type
+                val clsMap = _map[clazz] ?: let { HashMap<R, Any>().also { _map[clazz] = it } }
+                clsMap[reference] = value
+            }
         }
     }
 
