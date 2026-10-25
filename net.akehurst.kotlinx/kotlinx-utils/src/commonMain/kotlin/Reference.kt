@@ -90,7 +90,7 @@ class ManagedReference<R : Any, T : Any>(
     }
 
     override fun set(ref: R?, value: T?) {
-        if (this._resolved != value) {
+        if (this._resolved != value || this.reference != ref) {
             val old = ReferenceImmutable(reference, resolved)
             value?.let { validateType(value) }
             this.reference = ref

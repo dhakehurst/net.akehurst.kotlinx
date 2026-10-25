@@ -36,4 +36,28 @@ class test_ManagedReferenceAndValue {
         val e = assertFailsWith<IllegalArgumentException> { v.set(42) }
         assertEquals("Managed Value violation on 'v': Expected 'String', but got 'Int'.", e.message)
     }
+
+    @Test
+    fun managedReference_clear_when_unresolved_clears_reference() {
+        val r = ManagedReference<String, Any>("key", "r", String::class)
+        r.clear()
+        assertEquals(null, r.reference)
+    }
+
+    @Test
+    fun managedReference_set_new_reference_when_unresolved() {
+        var changes = 0
+        val r = ManagedReference<String, Any>("a", "r", String::class, onChanged = { _, _ -> changes++ })
+        r.set("b", null)
+        assertEquals("b", r.reference)
+        assertEquals(1, changes)
+    }
+
+    @Test
+    fun managedReference_set_same_reference_and_value_does_nothing() {
+        var changes = 0
+        val r = ManagedReference<String, Any>("a", "r", String::class, onChanged = { _, _ -> changes++ })
+        r.set("a", null)
+        assertEquals(0, changes)
+    }
 }

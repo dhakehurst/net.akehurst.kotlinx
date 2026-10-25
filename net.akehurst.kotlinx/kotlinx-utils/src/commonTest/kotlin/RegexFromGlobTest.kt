@@ -260,7 +260,19 @@ class RegexFromGlobTest {
             TestData("a\\?b", '/', "a?b", true),
             TestData("a[b", '/', "a[b", false, true),
             TestData("a\\[b", '/', "a[b", true),
-            TestData("a]b", '/', "a]b", false),
+            TestData("a]b", '/', "a]b", false, true),
+            TestData("a@b%c", '/', "a@b%c", true),
+            // separators that are special inside a regex character class
+            TestData("a*b", '\\', "axb", true),
+            TestData("a*b", '\\', "a\\b", false),
+            TestData("a?b", '\\', "a\\b", false),
+            TestData("a[!x]b", '\\', "ayb", true),
+            TestData("a[!x]b", '\\', "a\\b", false),
+            TestData("a*b", '-', "axb", true),
+            TestData("a*b", '-', "a-b", false),
+            TestData("a*b", ']', "a]b", false),
+            TestData("a*b", '^', "a^b", false),
+            TestData("a*b", '^', "axb", true),
             TestData("a\\]b", '/', "a]b", true),
         )
 

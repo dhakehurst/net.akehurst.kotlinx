@@ -41,6 +41,7 @@ package net.akehurst.kotlinx.text
  */
 fun String.toRegexFromGlob(separator: Char, options: Set<RegexOption> = emptySet()): Regex {
     val globStr = this
+    val sep = separator.escapedForCharacterClass()
     var regex = ""
     var inGroup = 0
     var inCharacterClass = 0
@@ -66,7 +67,7 @@ fun String.toRegexFromGlob(separator: Char, options: Set<RegexOption> = emptySet
             '*' -> {
                 if (inCharacterClass == 0) {
                     if (i + 1 >= globStr.length) {
-                        regex += "[^$separator]*"
+                        regex += "[^$sep]*"
                     } else {
                         val next = globStr[i + 1]
                         when (next) {
@@ -74,23 +75,25 @@ fun String.toRegexFromGlob(separator: Char, options: Set<RegexOption> = emptySet
                                 regex += ".*"
                                 i++
                             }
-                            else -> regex += "[^$separator]*"
+                            else -> regex += "[^$sep]*"
                         }
                     }
                 } else {
                     regex += '*'
                 }
             }
-            '?' -> regex += if (inCharacterClass == 0) "([^$separator])" else '?'
+            '?' -> regex += if (inCharacterClass == 0) "([^$sep])" else '?'
             '[' -> {
                 inCharacterClass++
                 firstIndexInClass = i + 1
-                // Wrap the user-provided class so we can always intersect with "not separator" safely.
-                regex += "[["
+                // A class must never match the separator. The lookahead does this on every platform
+                // (JS regexes have no class intersection '&&').
+                regex += "(?![$sep])["
             }
             ']' -> {
+                if (inCharacterClass == 0) throw IllegalArgumentException("Unmatched ']' at index $i in glob '$globStr'")
                 inCharacterClass--
-                regex += "]&&[^$separator]]"
+                regex += ']'
             }
             '{' -> {
                 inGroup++
@@ -102,7 +105,7 @@ fun String.toRegexFromGlob(separator: Char, options: Set<RegexOption> = emptySet
             }
             '!' -> regex += if (firstIndexInClass == i) '^' else '!'
             ',' -> regex += if (inGroup > 0) '|' else ','
-            '.', '(', ')', '+', '|', '^', '$', '@', '%' -> {
+            '.', '(', ')', '+', '|', '^', '$' -> {
                 if (inCharacterClass == 0 || (firstIndexInClass == i && ch == '^')) regex += '\\'
                 regex += ch
             }
@@ -113,3 +116,8 @@ fun String.toRegexFromGlob(separator: Char, options: Set<RegexOption> = emptySet
 
     return Regex(regex, options)
 }
+
+/**
+ * Escapes this character for use inside a regex character class, in a form valid on both JVM and JS (unicode mode).
+ */
+private fun Char.escapedForCharacterClass(): String = if (this in "\\]^-[") "\\$this" else this.toString()
