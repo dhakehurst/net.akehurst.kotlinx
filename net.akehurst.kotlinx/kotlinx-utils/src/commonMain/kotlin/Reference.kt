@@ -22,7 +22,9 @@ import kotlin.reflect.KClass
 // --- Reference values ---
 
 /**
- * One reference equals another if the reference is the same
+ * One reference equals another if the reference is the same.
+ * Every implementation must follow this, comparing with any other Reference, using [referenceEquals]
+ * and [referenceHashCode], so equality is the same whichever side it is called on.
  */
 interface Reference<R : Any, out T : Any> {
     //val storeIdentity:List<R>
@@ -36,6 +38,12 @@ interface MutableReference<R : Any, T : Any> : Reference<R, T> {
     fun clear()
 }
 
+/** Equality for [Reference] implementations: equal to any other Reference with the same key. */
+fun Reference<*, *>.referenceEquals(other: Any?): Boolean = other is Reference<*, *> && other.reference == this.reference
+
+/** Hash code for [Reference] implementations, consistent with [referenceEquals]. */
+fun Reference<*, *>.referenceHashCode(): Int = reference.hashCode()
+
 data class ReferenceImmutable<R : Any, T : Any>(
     override val reference: R?
 ) : Reference<R, T> {
@@ -46,6 +54,9 @@ data class ReferenceImmutable<R : Any, T : Any>(
     // Set only by the constructor; kept out of the primary constructor so equality stays based on reference only.
     override var resolved: T? = null
         private set
+
+    override fun equals(other: Any?): Boolean = referenceEquals(other)
+    override fun hashCode(): Int = referenceHashCode()
 }
 
 
@@ -65,17 +76,31 @@ data class MutableReferenceDefault<R : Any, T : Any>(
     }
 
     override fun clear() = set(null, null)
+
+    override fun equals(other: Any?): Boolean = referenceEquals(other)
+    override fun hashCode(): Int = referenceHashCode()
 }
 
 class ManagedReference<R : Any, T : Any>(
     // override val storeIdentity: List<R>,
-    override var reference: R? = null,
+    reference: R? = null,
     private val name: String,
     private val expectedType: KClass<*>,
     private val onChanged: ((old: Reference<R, T>, new: Reference<R, T>) -> Unit)? = null
 ) : MutableReference<R, T> {
 
+    private var _reference: R? = reference
     private var _resolved: T? = null
+
+    /**
+     * Assigning a different key is the same as `set(newKey, null)`: the object resolved for the old key is
+     * dropped, and onChanged is called. Assigning the same key does nothing.
+     */
+    override var reference: R?
+        get() = _reference
+        set(value) {
+            if (value != _reference) set(value, null)
+        }
 
     override var resolved: T?
         get() = _resolved
@@ -95,7 +120,7 @@ class ManagedReference<R : Any, T : Any>(
         if (this._resolved != value || this.reference != ref) {
             val old = ReferenceImmutable(reference, resolved)
             value?.let { validateType(value) }
-            this.reference = ref
+            this._reference = ref
             this._resolved = value
             onChanged?.invoke(old, this)
         } else {
@@ -105,11 +130,8 @@ class ManagedReference<R : Any, T : Any>(
 
     override fun clear() = set(null, null)
 
-    override fun hashCode(): Int = reference.hashCode()
-    override fun equals(other: Any?): Boolean = when (other) {
-        !is Reference<*, *> -> false
-        else -> other.reference == reference
-    }
+    override fun equals(other: Any?): Boolean = referenceEquals(other)
+    override fun hashCode(): Int = referenceHashCode()
 
     override fun toString(): String = "ManagedReference($reference)"
 }

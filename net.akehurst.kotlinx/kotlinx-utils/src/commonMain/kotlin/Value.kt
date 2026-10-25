@@ -54,30 +54,40 @@ data class MutableValueDefault<T>(
 
 }
 
-data class ManagedValue<T>(
-    override var value: T,
+/**
+ * A value that checks its type and reports changes, whether changed with [set] or by assigning [value].
+ * `null` is always allowed. Equality is identity: each ManagedValue is a separate slot.
+ */
+class ManagedValue<T>(
+    value: T,
     private val name: String,
     private val expectedType: KClass<*>,
     private val onChanged: ((old:T?, new:T?) -> Unit)? = null,
 ) : MutableValueAbstract<T>() {
 
+    private var _value: T = value.also { validateType(it) }
+
+    override var value: T
+        get() = _value
+        set(value) {
+            if (_value != value) {
+                validateType(value)
+                val old = _value
+                _value = value
+                onChanged?.invoke(old, value)
+            } else {
+                // already set
+            }
+        }
+
     private fun validateType(element: T) {
-        if (!expectedType.isInstance(element)) {
+        if (null != element && !expectedType.isInstance(element)) {
             throw IllegalArgumentException(
                 "Managed Value violation on '$name': Expected '${expectedType.simpleName}', but got '${element?.let { it::class.simpleName }}'."
             )
         }
     }
 
-    override fun set(value: T) {
-        if (this.value != value) {
-            val old = this.value
-            validateType(value)
-            super.set(value)
-            onChanged?.invoke(old, value)
-        } else {
-            // already set
-        }
-    }
+    override fun toString(): String = "ManagedValue($_value)"
 }
 

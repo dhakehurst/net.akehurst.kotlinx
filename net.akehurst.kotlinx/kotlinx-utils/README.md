@@ -88,8 +88,10 @@ title.set("final")   // prints "draft -> final"
 title.set(42)        // throws IllegalArgumentException: not a String
 ```
 
-`ManagedValue.set` does nothing if the new value equals the current one. The type check and
-`onChanged` only happen in `set()`: assigning `title.value` directly skips them.
+`set(x)` and assigning `title.value = x` behave the same: the type is checked, and `onChanged` is
+called. Both do nothing if the new value equals the current one. The starting value is checked too
+(but doesn't call `onChanged`). `null` is always allowed. Two `ManagedValue` objects are only equal if
+they are the same object.
 
 ## References
 
@@ -112,8 +114,14 @@ owner.set("alice", alice)   // prints "bob -> alice"
 owner.clear()               // prints "alice -> null"
 ```
 
-`ManagedReference` objects are equal when their `reference` keys are equal. `ReferenceExt.mutable`
-casts a `Reference` to `MutableReference`.
+Assigning a different key, `owner.reference = "carol"`, is the same as `owner.set("carol", null)`:
+the object resolved for the old key is dropped and `onChanged` is called. Resolve it again to get the
+new object. Assigning the same key does nothing.
+
+All references are equal when their `reference` keys are equal, whatever their class: a
+`ReferenceImmutable("k")` equals a `ManagedReference` with key `"k"`. Classes that implement
+`Reference` should do the same, using `referenceEquals` and `referenceHashCode`.
+`ReferenceExt.mutable` casts a `Reference` to `MutableReference`.
 
 ## Reference stores
 
