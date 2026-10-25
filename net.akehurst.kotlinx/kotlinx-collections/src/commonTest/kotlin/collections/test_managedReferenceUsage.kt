@@ -18,6 +18,7 @@
 package net.akehurst.kotlinx.collections
 
 import net.akehurst.kotlinx.utils.ManagedReference
+import net.akehurst.kotlinx.utils.ManagedResolvableReference
 import net.akehurst.kotlinx.utils.Reference
 import net.akehurst.kotlinx.utils.ReferenceImmutable
 import kotlin.test.*
@@ -129,5 +130,46 @@ class test_managedReferenceUsage {
 
         single.reference = "k2" // old reference had key k1: removes the reference with key k1
         assertTrue(all.isEmpty())
+    }
+
+    @Test
+    fun single_reference_subsetting_a_collection_keeps_the_collection_correct_when_its_key_changes() {
+        // Like omg's generated onChanged for a single reference that subsets a collection of references:
+        // remove the old reference from the superset and add the new one.
+        val all = ManagedOrderedSet<Reference<Any, String>>("all", Reference::class)
+        val single = ManagedReference<Any, String>(null, "single", String::class) { old, new ->
+            all.remove(old)
+            if (null != new.reference) all.add(new)
+        }
+
+        single.set("k1", "V1")
+        assertEquals(listOf<Reference<Any, String>>(ReferenceImmutable("k1", null)), all.toList())
+
+        single.set("k2", "V2")
+        assertEquals(1, all.size)
+        val element = all.first()
+        assertEquals("k2", element.reference)
+        assertEquals("V2", element.resolved)
+
+        single.clear()
+        assertTrue(all.isEmpty())
+    }
+
+    @Test
+    fun collection_of_managed_resolvable_references_resolves_and_checks_type() {
+        val c = ManagedOrderedSet<ManagedResolvableReference<Any, String>>("c", ManagedResolvableReference::class)
+        val r1 = ManagedResolvableReference<Any, String>("k1", "r1", String::class)
+        c.add(r1)
+
+        r1.resolved = "V1" // e.g. done by a store's resolve
+        assertEquals("V1", c.first().resolved)
+        assertFailsWith<IllegalArgumentException> {
+            @Suppress("UNCHECKED_CAST")
+            (r1 as ManagedResolvableReference<Any, Any>).resolved = 42
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        assertTrue((c as MutableCollection<Reference<Any, String>>).remove(ReferenceImmutable("k1", null)))
+        assertTrue(c.isEmpty())
     }
 }

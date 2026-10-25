@@ -21,6 +21,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import net.akehurst.kotlinx.utils.ReferenceExt.mutable
+import net.akehurst.kotlinx.utils.ReferenceExt.mutableOrNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -131,7 +134,9 @@ class test_ManagedReferenceAndValue {
         val managed = ManagedReference<String, Any>("k", "r", String::class)
         val default = MutableReferenceDefault<String, Any>("k")
         val immutable = ReferenceImmutable<String, Any>("k", "V")
-        val all = listOf<Any>(managed, default, immutable)
+        val resolvable = ResolvableReferenceDefault<String, Any>("k")
+        val managedResolvable = ManagedResolvableReference<String, Any>("k", "r", String::class)
+        val all = listOf<Any>(managed, default, immutable, resolvable, managedResolvable)
         for (a in all) for (b in all) {
             assertEquals(a, b, "$a should equal $b")
             assertEquals(a.hashCode(), b.hashCode(), "hashCode of $a and $b")
@@ -145,5 +150,68 @@ class test_ManagedReferenceAndValue {
         val list = mutableListOf<Reference<String, Any>>(managed)
         assertTrue(list.remove(ReferenceImmutable("k", null)))
         assertTrue(list.isEmpty())
+    }
+
+    // --- onChanged gets fixed snapshots ---
+
+    @Test
+    fun managedReference_onChanged_new_is_a_fixed_snapshot() {
+        val news = mutableListOf<Reference<String, Any>>()
+        val r = ManagedReference<String, Any>(null, "r", String::class) { _, new -> news += new }
+        r.set("k1", "V1")
+        r.reference = "k2"
+
+        assertEquals(2, news.size)
+        assertTrue(news.none { it === r }, "onChanged must not pass the ManagedReference itself")
+        assertTrue(news.none { it is MutableReference<*, *> }, "the snapshot's key can't be changed")
+        // the snapshots keep the values from the time of the change
+        assertEquals("k1", news[0].reference)
+        assertEquals("V1", news[0].resolved)
+        assertEquals("k2", news[1].reference)
+        assertNull(news[1].resolved)
+    }
+
+    // --- ResolvableReference: key fixed, resolved can be set ---
+
+    @Test
+    fun resolvableReferenceDefault_resolved_can_be_set() {
+        val r = ResolvableReferenceDefault<String, Any>("k")
+        assertNull(r.resolved)
+        r.resolved = "V"
+        assertEquals("V", r.resolved)
+        assertEquals("k", r.reference)
+        assertEquals("W", ResolvableReferenceDefault<String, Any>("k", "W").resolved)
+    }
+
+    @Test
+    fun resolvable_references_are_not_mutable_references() {
+        val plain: Reference<String, Any> = ResolvableReferenceDefault("k")
+        val managed: Reference<String, Any> = ManagedResolvableReference("k", "r", String::class)
+        for (r in listOf(plain, managed)) {
+            assertTrue(r is ResolvableReference<*, *>)
+            assertNull(r.mutableOrNull, "$r")
+            assertFailsWith<ClassCastException> { r.mutable }
+        }
+        // the existing classes are still mutable, and resolvable
+        val slot: Reference<String, Any> = ManagedReference("k", "r", String::class)
+        assertTrue(slot is ResolvableReference<*, *>)
+        assertNotNull(slot.mutableOrNull)
+    }
+
+    @Test
+    fun managedResolvableReference_checks_the_resolved_type() {
+        val r = ManagedResolvableReference<String, Any>("k", "r", String::class)
+        r.resolved = "V"
+        assertEquals("V", r.resolved)
+        val e = assertFailsWith<IllegalArgumentException> { r.resolved = 42 }
+        assertEquals("Managed Reference violation on 'r': Expected reference to 'String', but got 'Int'.", e.message)
+        assertEquals("V", r.resolved)
+        r.resolved = null
+        assertNull(r.resolved)
+    }
+
+    @Test
+    fun managedResolvableReference_checks_the_type_given_at_construction() {
+        assertFailsWith<IllegalArgumentException> { ManagedResolvableReference<String, Any>("k", "r", String::class, 42) }
     }
 }

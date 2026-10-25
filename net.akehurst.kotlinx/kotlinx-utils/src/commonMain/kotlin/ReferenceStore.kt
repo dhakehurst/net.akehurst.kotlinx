@@ -81,15 +81,14 @@ class ReferenceStoreByHashMap<R : Any> : ReferenceStore<R> {
 object ReferenceStoreExt {
     /**
      * returns the object fo the given reference if found.
-     * Also, if the reference is mutable, will resolve the reference
+     * Also, if the reference is a [ResolvableReference] and the object is found, sets it as the resolved value.
      */
     inline fun <R : Any, reified T : Any> ReferenceStore<R>.resolve(reference: Reference<R, T>): T? {
         return reference.reference?.let { ref ->
             val value = this[T::class, ref]
-            value?.let { v ->
-                if (reference is MutableReference) {
-                    reference.set(ref, v)
-                }
+            if (null != value && reference is ResolvableReference<*, *>) {
+                @Suppress("UNCHECKED_CAST")
+                (reference as ResolvableReference<R, T>).resolved = value
             }
             value
         }
@@ -206,13 +205,14 @@ object HierarchicalReferenceStoreExt {
 
     /**
      * Finds the object for the given reference anywhere in the tree of stores (see [HierarchicalReferenceStore.findInTree]).
-     * Also, if the reference is mutable and the object is found, sets it as the resolved value.
+     * Also, if the reference is a [ResolvableReference] and the object is found, sets it as the resolved value.
      */
     inline fun <R : Any, reified T : Any> HierarchicalReferenceStore<R>.resolve(reference: Reference<R, T>): T? {
         return reference.reference?.let { ref ->
             val value = rootReferenceStore.findInTree(T::class, ref)
-            if (null != value && reference is MutableReference) {
-                reference.set(ref, value)
+            if (null != value && reference is ResolvableReference<*, *>) {
+                @Suppress("UNCHECKED_CAST")
+                (reference as ResolvableReference<R, T>).resolved = value
             }
             value
         }

@@ -105,4 +105,15 @@ class test_ReferenceStoreByHashMap {
 		assertEquals("resolved-value", ref.resolved)
 	}
 
+	@Test
+	fun testResolveSetsResolvableReferences() {
+		store[String::class, "k"] = "v"
+		val plain = ResolvableReferenceDefault<String, String>("k")
+		val managed = ManagedResolvableReference<String, String>("k", "m", String::class)
+		assertEquals("v", store.resolve(plain))
+		assertEquals("v", store.resolve(managed))
+		assertEquals("v", plain.resolved)
+		assertEquals("v", managed.resolved)
+	}
+
 }

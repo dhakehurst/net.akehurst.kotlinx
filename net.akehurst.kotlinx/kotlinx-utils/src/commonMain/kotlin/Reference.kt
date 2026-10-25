@@ -32,7 +32,19 @@ interface Reference<R : Any, out T : Any> {
     val resolved: T?
 }
 
-interface MutableReference<R : Any, T : Any> : Reference<R, T> {
+/**
+ * A reference whose key is fixed, but whose resolved object can be set, e.g. by a store's resolve.
+ * Use these for references held in collections, so their key (and so their hash code) can't change.
+ */
+interface ResolvableReference<R : Any, T : Any> : Reference<R, T> {
+    override var resolved: T?
+}
+
+/**
+ * A reference whose key can also be changed. Use these for a single-valued reference property,
+ * never as an element of a collection or a map key, because equality and hash code follow the key.
+ */
+interface MutableReference<R : Any, T : Any> : ResolvableReference<R, T> {
     override var reference: R?
     fun set(ref: R?, value: T?)
     fun clear()
@@ -43,6 +55,15 @@ fun Reference<*, *>.referenceEquals(other: Any?): Boolean = other is Reference<*
 
 /** Hash code for [Reference] implementations, consistent with [referenceEquals]. */
 fun Reference<*, *>.referenceHashCode(): Int = reference.hashCode()
+
+/** The type check used by the managed references: [element] must be an instance of [expectedType]. */
+internal fun checkManagedReferenceType(name: String, expectedType: KClass<*>, element: Any) {
+    if (!expectedType.isInstance(element)) {
+        throw IllegalArgumentException(
+            "Managed Reference violation on '$name': Expected reference to '${expectedType.simpleName}', but got '${element::class.simpleName}'."
+        )
+    }
+}
 
 data class ReferenceImmutable<R : Any, T : Any>(
     override val reference: R?
@@ -59,6 +80,35 @@ data class ReferenceImmutable<R : Any, T : Any>(
     override fun hashCode(): Int = referenceHashCode()
 }
 
+
+/** A reference with a fixed key whose resolved object can be set. */
+class ResolvableReferenceDefault<R : Any, T : Any>(
+    override val reference: R?,
+    override var resolved: T? = null
+) : ResolvableReference<R, T> {
+    override fun equals(other: Any?): Boolean = referenceEquals(other)
+    override fun hashCode(): Int = referenceHashCode()
+    override fun toString(): String = "ResolvableReference($reference)"
+}
+
+/** A reference with a fixed key whose resolved object can be set, and must be an instance of [expectedType]. */
+class ManagedResolvableReference<R : Any, T : Any>(
+    override val reference: R?,
+    private val name: String,
+    private val expectedType: KClass<*>,
+    resolved: T? = null
+) : ResolvableReference<R, T> {
+
+    override var resolved: T? = resolved?.also { checkManagedReferenceType(name, expectedType, it) }
+        set(value) {
+            value?.let { checkManagedReferenceType(name, expectedType, it) }
+            field = value
+        }
+
+    override fun equals(other: Any?): Boolean = referenceEquals(other)
+    override fun hashCode(): Int = referenceHashCode()
+    override fun toString(): String = "ManagedResolvableReference($reference)"
+}
 
 object ReferenceExt {
     inline val <REF : Any, T : Any> Reference<REF, T>.mutable get() = this as MutableReference
@@ -108,21 +158,17 @@ class ManagedReference<R : Any, T : Any>(
             set(reference, value)
         }
 
-    private fun validateType(element: T) {
-        if (!expectedType.isInstance(element)) {
-            throw IllegalArgumentException(
-                "Managed Reference violation on '$name': Expected reference to '${expectedType.simpleName}', but got '${element::class.simpleName}'."
-            )
-        }
-    }
-
+    /**
+     * onChanged is given fixed snapshots of the reference before and after the change, never this object,
+     * so a callback can safely put them in a collection.
+     */
     override fun set(ref: R?, value: T?) {
         if (this._resolved != value || this.reference != ref) {
             val old = ReferenceImmutable(reference, resolved)
-            value?.let { validateType(value) }
+            value?.let { checkManagedReferenceType(name, expectedType, it) }
             this._reference = ref
             this._resolved = value
-            onChanged?.invoke(old, this)
+            onChanged?.invoke(old, ReferenceImmutable(ref, value))
         } else {
             // already set
         }

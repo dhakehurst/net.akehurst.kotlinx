@@ -262,4 +262,19 @@ class test_HierarchicalReferenceStore {
 		assertEquals("L", ref.resolved) // stores don't track references
 		assertNull(root.resolve(ref))
 	}
+
+	@Test
+	fun resolve_sets_resolvable_references() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val child = HierarchicalReferenceStoreByHashMap(root, "child")
+		val c1 = Circle("c1")
+		child.set(Circle::class, "c1", c1)
+		val plain = ResolvableReferenceDefault<String, Shape>("c1")
+		val managed = ManagedResolvableReference<String, Shape>("c1", "m", Shape::class)
+
+		assertSame(c1, root.resolve(plain))
+		assertSame(c1, root.resolve(managed))
+		assertSame(c1, plain.resolved)
+		assertSame(c1, managed.resolved)
+	}
 }

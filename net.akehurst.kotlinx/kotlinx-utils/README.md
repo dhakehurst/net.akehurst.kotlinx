@@ -99,11 +99,21 @@ A `Reference<R, T>` holds a key (`reference`, of type `R`) for an object of type
 itself once it has been looked up (`resolved`). A reference can exist before the object it points to,
 and be resolved later from a [reference store](#reference-stores).
 
-| Class | Use |
-|---|---|
-| `ReferenceImmutable(reference, resolved)` | A fixed reference |
-| `MutableReferenceDefault(reference)` | A reference you can change with `set(ref, value)` and `clear()` |
-| `ManagedReference(reference, name, expectedType, onChanged)` | Checks the type of the resolved object and reports changes |
+There are three levels, each adding to the one before:
+
+| Interface | Key | Resolved object | Use for |
+|---|---|---|---|
+| `Reference` | fixed | read only | Reading |
+| `ResolvableReference` | fixed | can be set, e.g. by a store's `resolve` | Elements of collections of references |
+| `MutableReference` | can change | can be set | A single-valued reference property |
+
+| Class | Level | Use |
+|---|---|---|
+| `ReferenceImmutable(reference, resolved)` | `Reference` | A fixed reference, e.g. a snapshot |
+| `ResolvableReferenceDefault(reference, resolved)` | `ResolvableReference` | A collection element |
+| `ManagedResolvableReference(reference, name, expectedType, resolved)` | `ResolvableReference` | A collection element that checks the type of the resolved object |
+| `MutableReferenceDefault(reference)` | `MutableReference` | A property you can change with `set(ref, value)` and `clear()` |
+| `ManagedReference(reference, name, expectedType, onChanged)` | `MutableReference` | A property that checks the type of the resolved object and reports changes |
 
 ```kotlin
 val owner = ManagedReference<String, Any>("bob", "owner", Person::class) { old, new ->
@@ -118,10 +128,20 @@ Assigning a different key, `owner.reference = "carol"`, is the same as `owner.se
 the object resolved for the old key is dropped and `onChanged` is called. Resolve it again to get the
 new object. Assigning the same key does nothing.
 
+`onChanged` is given fixed snapshots (`ReferenceImmutable`) of the reference before and after the
+change, never the `ManagedReference` itself, so a callback can put them in a collection.
+
 All references are equal when their `reference` keys are equal, whatever their class: a
 `ReferenceImmutable("k")` equals a `ManagedReference` with key `"k"`. Classes that implement
 `Reference` should do the same, using `referenceEquals` and `referenceHashCode`.
-`ReferenceExt.mutable` casts a `Reference` to `MutableReference`.
+
+Because equality and hash code follow the key, a reference whose key can change (a
+`MutableReference`) must not be put in a collection or used as a map key: if its key changed, a
+hash-based set could no longer find it, or could hold two references with the same key. Put
+`ResolvableReference`s in collections instead: their key is fixed, and a store can still resolve them.
+
+`ReferenceExt.mutable` casts a `Reference` to `MutableReference`, and `mutableOrNull` gives `null` if
+it isn't one (e.g. for a `ResolvableReference`).
 
 ## Reference stores
 
