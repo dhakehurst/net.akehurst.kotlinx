@@ -37,13 +37,15 @@ interface MutableReference<R : Any, T : Any> : Reference<R, T> {
 }
 
 data class ReferenceImmutable<R : Any, T : Any>(
-    override var reference: R?
+    override val reference: R?
 ) : Reference<R, T> {
     constructor(reference: R?, resolved: T?) : this(reference) {
         this.resolved = resolved
     }
 
+    // Set only by the constructor; kept out of the primary constructor so equality stays based on reference only.
     override var resolved: T? = null
+        private set
 }
 
 

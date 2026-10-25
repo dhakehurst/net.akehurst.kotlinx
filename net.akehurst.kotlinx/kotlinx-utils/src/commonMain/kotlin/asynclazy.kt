@@ -19,6 +19,7 @@ package net.akehurst.kotlinx.utils
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.concurrent.Volatile
 import kotlin.properties.ReadOnlyProperty
 import kotlin.reflect.KProperty
 
@@ -36,10 +37,16 @@ private class AsyncLazyDelegate<T>(
     }
 }
 
-class AsyncLazy<out T>(val initializer: suspend () -> T) {
+class AsyncLazy<out T>(initializer: suspend () -> T) {
     private object UNINITIALIZED_VALUE
 
     private val mutex = Mutex()
+
+    // Dropped once the value is computed, so anything it captured can be garbage collected.
+    private var initializer: (suspend () -> T)? = initializer
+
+    // Volatile so the unlocked fast path in await() always sees a fully published value.
+    @Volatile
     private var _cachedValue: Any? = UNINITIALIZED_VALUE
 
     fun isInitialized(): Boolean = _cachedValue !== UNINITIALIZED_VALUE
@@ -64,8 +71,9 @@ class AsyncLazy<out T>(val initializer: suspend () -> T) {
                 @Suppress("UNCHECKED_CAST")
                 v2 as T
             } else {
-                val result = initializer()
+                val result = initializer!!()
                 _cachedValue = result
+                initializer = null
                 result
             }
         }
