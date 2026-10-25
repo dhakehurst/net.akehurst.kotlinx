@@ -52,17 +52,9 @@ fun String.toRegexFromGlob(separator: Char, options: Set<RegexOption> = emptySet
         val ch = globStr[i]
         when (ch) {
             '\\' -> {
-                if (++i >= globStr.length) {
-                    regex += '\\'
-                } else {
-                    val next = globStr[i]
-                    when (next) {
-                        ',' -> Unit /* escape not needed */
-                        'Q', 'E' ->  regex += "\\\\" /* extra escape needed */
-                        else -> regex += '\\'
-                    }
-                    regex += next
-                }
+                // '\' makes the next character literal; a '\' at the end is a literal '\'.
+                val next = if (++i >= globStr.length) '\\' else globStr[i]
+                regex += next.escapedAsLiteral(inCharacterClass > 0)
             }
             '*' -> {
                 if (inCharacterClass == 0) {
@@ -123,6 +115,16 @@ fun String.toRegexFromGlob(separator: Char, options: Set<RegexOption> = emptySet
     }
 
     return Regex(regex, options)
+}
+
+/**
+ * This character as a literal in a regex, escaped only where needed, in a form valid on both JVM and JS (unicode mode).
+ * JS (unicode mode) rejects escapes of ordinary characters, e.g. '\a', and of '-' outside a character class.
+ */
+private fun Char.escapedAsLiteral(inCharacterClass: Boolean): String = when {
+    this in "\\^$.|?*+()[]{}/" -> "\\$this"
+    inCharacterClass && this == '-' -> "\\-"
+    else -> this.toString()
 }
 
 /**

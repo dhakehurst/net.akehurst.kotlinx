@@ -67,7 +67,7 @@ import net.akehurst.kotlinx.text.toRegexFromGlob
 | `[abc]`, `[a-z]` | One of the characters, never the separator |
 | `[!abc]` | One character not in the list, never the separator |
 | `{a,b,c}` | Any one of the alternatives |
-| `\` | Makes the next character literal, e.g. `\*` or `\{` |
+| `\` | Makes the next character literal, e.g. `\*`, `\{` or `\d` (a `d`, not a digit). A `\` at the end matches a `\` |
 
 An unmatched `[`, `]` or `{` throws an exception. The whole name must match, as with `Regex.matches`.
 
