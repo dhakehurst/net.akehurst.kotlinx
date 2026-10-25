@@ -10,6 +10,7 @@ A collection of useful multiplatform extensions to the kotlin stdlib
 - [Filesystem](net.akehurst.kotlinx/kotlinx-filesystem-api/README.md)
 - [Logging](net.akehurst.kotlinx/kotlinx-logging-api/README.md)
 - [Reflection](net.akehurst.kotlinx/kotlinx-reflect/README.md)
+- [Utils](net.akehurst.kotlinx/kotlinx-utils/README.md): globs, managed values and references, reference stores, unique ids, async lazy
 - Collections
   - OrderedSet
   - Stack 
