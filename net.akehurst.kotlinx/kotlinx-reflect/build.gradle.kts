@@ -8,11 +8,11 @@ dependencies {
 }
 
 
-exportPublic {
-    exportPatterns.set(listOf(
-        "net.akehurst.kotlinx.reflect.test.*",
-    ))
-}
+//exportPublic {
+//    exportPatterns.set(listOf(
+//        "net.akehurst.kotlinx.reflect.test.*",
+//    ))
+//}
 
 // Runs the JVM tests again with the registry backend, so JVM behaves exactly like JS, Wasm and Native
 val jvmTestRegistry by tasks.registering(Test::class) {

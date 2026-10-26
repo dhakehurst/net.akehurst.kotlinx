@@ -102,15 +102,13 @@ open class FileSystemFromVfs(
     val root get() = DirectoryHandleVfs(this, null,_vfsRoot)
 
     suspend fun getDirectory(resourcePath: String): DirectoryHandle? {
-        return _vfsRoot[resourcePath].takeIfExists()?.let {
-            DirectoryHandleVfs(this, null,it)
-        }
+        val vfs = _vfsRoot[resourcePath]
+        return if (vfs.exists() && vfs.isDirectory()) DirectoryHandleVfs(this, null, vfs) else null
     }
 
     suspend fun getFile(resourcePath: String): FileHandle? {
-        return _vfsRoot[resourcePath].takeIfExists()?.let {
-            FileHandleVfs(this, null,it)
-        }
+        val vfs = _vfsRoot[resourcePath]
+        return if (vfs.exists() && vfs.isFile()) FileHandleVfs(this, null, vfs) else null
     }
 
     suspend fun exists(resourcePath: VfsFile): Boolean {

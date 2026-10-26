@@ -195,8 +195,8 @@ actual object UserFileSystemDefault : UserFileSystem {
 
                 else -> error("DirectoryHandle is not a DirectoryHandleWasmJS: ${parent::class.simpleName}")
             }
-        } catch (t: Throwable) {
-            t.printStackTrace()
+        } catch (_: Throwable) {
+            // printStackTrace() here throws an NPE on wasm, as a DOMException has no stack
             return null
         }
     }
@@ -213,8 +213,8 @@ actual object UserFileSystemDefault : UserFileSystem {
 
                 else -> error("DirectoryHandle is not a DirectoryHandleWasmJS: ${parent::class.simpleName}")
             }
-        } catch (t: Throwable) {
-            t.printStackTrace()
+        } catch (_: Throwable) {
+            // printStackTrace() here throws an NPE on wasm, as a DOMException has no stack
             return null
         }
     }
@@ -273,7 +273,7 @@ actual object UserFileSystemDefault : UserFileSystem {
             val bytes = handle.getFile().bytes()
             val byteArray = ByteArray(bytes.byteLength) { bytes[it].toKotlinByte() }
             val zipFs = ZipVfs(byteArray.openAsync())
-            return DirectoryHandleKorio(FileSystemKorio, null, zipFs)
+            return FileSystemFromVfs(zipFs).root
         } catch (t: Throwable) {
             t.printStackTrace()
             return null
