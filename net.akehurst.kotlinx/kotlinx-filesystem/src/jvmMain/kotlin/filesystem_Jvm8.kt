@@ -305,7 +305,7 @@ actual object UserFileSystemDefault : UserFileSystem {
             val handle = (file as FileHandleJVM).handle
             val byteArray = handle.readBytes()
             val zipFs = ZipVfs(byteArray.openAsync())
-            return DirectoryHandleKorio(FileSystemKorio, null, zipFs)
+            return FileSystemFromVfs(zipFs).root
         } catch (t: Throwable) {
             t.printStackTrace()
             return null
