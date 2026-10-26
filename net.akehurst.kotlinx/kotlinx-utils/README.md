@@ -241,8 +241,8 @@ val json = Json {
 }
 ```
 
-It writes `null`, `String`, `Boolean`, `Int`, `Long`, `Float`, `Double`, `List` and `Map` as plain
-JSON. Map keys are written with `toString()`. Any other object is passed to `customSerialize`, which
+It writes `null`, `String`, `Boolean`, `Int`, `Long`, `Float`, `Double`, `List`, `Set` and `Map` as
+plain JSON. Map keys are written with `toString()`. Any other object is passed to `customSerialize`, which
 returns a class name and a `JsonObject`; the class name is written under the key `#class`. When
 reading, an object with a `#class` key is passed to `customDeserialize`.
 
@@ -259,9 +259,18 @@ AnySerializer(
 )
 ```
 
-Values don't always come back with the same type. Whole numbers are read as `Long`, so an `Int`
-comes back as a `Long`. Numbers with a `.` are read as `Double`, and numbers in exponent form with no
-`.` (such as `1e-7`) are read as a `String`. A top-level `null` is read as `Unit`.
+Plain JSON doesn't record which number or collection type a value had, so values don't always come
+back with the same type:
+
+| Written | Read back as |
+|---|---|
+| `Int`, `Long` | `Long` (whole numbers) |
+| `Float`, `Double` | `Double` (numbers with a `.` or an exponent, e.g. `1.5`, `1e-7`). On JS a whole `Double` such as `2.0` is written as `2`, so it is read as a `Long` |
+| `Set` | `List` |
+| `Map` with non-`String` keys | `Map` with `String` keys |
+
+Reading `null` as `Any` throws a `SerializationException`; read it as `Any?` (e.g. with
+`AnySerializer().nullable`) to allow `null`. `null` inside a list or map is read as `null`.
 
 ## Other helpers
 
