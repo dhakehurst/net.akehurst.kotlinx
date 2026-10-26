@@ -18,6 +18,7 @@
 package net.akehurst.kotlinx.utils
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -50,6 +51,7 @@ class AnySerializer(
         is Float -> JsonPrimitive(value)
         is Double -> JsonPrimitive(value)
         is List<*> -> JsonArray(value.map { serializeAny(it) })
+        is Set<*> -> JsonArray(value.map { serializeAny(it) }) // read back as a List
         is Map<*, *> -> JsonObject(value.entries.associate { (k, v) -> k.toString() to serializeAny(v) })
         else -> {
             val (className, jsonObject) = customSerialize.invoke(value)
@@ -62,7 +64,8 @@ class AnySerializer(
     override fun deserialize(decoder: Decoder): Any {
         val jsonDecoder = decoder as JsonDecoder
         val element = jsonDecoder.decodeJsonElement()
-        return deserializeJsonElement(element) ?: Unit
+        // Reading null as Any? is handled before this is called; here the result must not be null.
+        return deserializeJsonElement(element) ?: throw SerializationException("Found null, but expected a value of type Any. Read it as Any? to allow null.")
     }
 
     private fun deserializeJsonElement(element: JsonElement): Any? = when (element) {
@@ -84,7 +87,7 @@ class AnySerializer(
         return when {
             primitive.isString -> primitive.content
             primitive.content == "true" || primitive.content == "false" -> primitive.boolean
-            primitive.content.contains('.') -> primitive.doubleOrNull ?: primitive.content
+            primitive.content.any { it == '.' || it == 'e' || it == 'E' } -> primitive.doubleOrNull ?: primitive.content
             else -> primitive.longOrNull ?: primitive.intOrNull ?: primitive.content
         }
     }

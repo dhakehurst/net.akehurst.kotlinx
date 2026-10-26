@@ -17,21 +17,36 @@
 
 package net.akehurst.kotlinx.utils
 
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+
+/**
+ * Generates identities of the form `<commonPrefix><prefix>_<number>`, numbered separately per prefix.
+ * Safe to call from several threads.
+ */
+@OptIn(ExperimentalAtomicApi::class)
 class UniqueIdentityGenerator(
     val commonPrefix:String = ""
 ) {
 
     companion object {
+        /** Goes between the prefix and the number, so different prefixes can never give the same identity. */
+        const val SEPARATOR = "_"
         val GLOBAL = UniqueIdentityGenerator()
     }
 
-    internal val next = mutableMapOf<String, Long>()
+    // The map is never changed in place; each update swaps in a new map, so concurrent calls never share a number.
+    private val next = AtomicReference(emptyMap<String, Long>())
 
     fun generate(prefix: String = "id"): String {
         val p = commonPrefix+prefix
-        val num = next[p] ?: 0L
-        next[p] = num + 1
-        return "${p}${num}"
+        while (true) {
+            val current = next.load()
+            val num = current[p] ?: 0L
+            if (next.compareAndSet(current, current + (p to num + 1))) {
+                return "${p}${SEPARATOR}${num}"
+            }
+        }
     }
 
 }

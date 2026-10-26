@@ -20,6 +20,12 @@ package net.akehurst.kotlinx.utils
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import net.akehurst.kotlinx.utils.ReferenceExt.mutable
+import net.akehurst.kotlinx.utils.ReferenceExt.mutableOrNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class test_ManagedReferenceAndValue {
 
@@ -35,5 +41,177 @@ class test_ManagedReferenceAndValue {
         val v = ManagedValue<Any>("a", "v", String::class)
         val e = assertFailsWith<IllegalArgumentException> { v.set(42) }
         assertEquals("Managed Value violation on 'v': Expected 'String', but got 'Int'.", e.message)
+    }
+
+    @Test
+    fun managedReference_clear_when_unresolved_clears_reference() {
+        val r = ManagedReference<String, Any>("key", "r", String::class)
+        r.clear()
+        assertEquals(null, r.reference)
+    }
+
+    @Test
+    fun managedReference_set_new_reference_when_unresolved() {
+        var changes = 0
+        val r = ManagedReference<String, Any>("a", "r", String::class, onChanged = { _, _ -> changes++ })
+        r.set("b", null)
+        assertEquals("b", r.reference)
+        assertEquals(1, changes)
+    }
+
+    @Test
+    fun managedReference_set_same_reference_and_value_does_nothing() {
+        var changes = 0
+        val r = ManagedReference<String, Any>("a", "r", String::class, onChanged = { _, _ -> changes++ })
+        r.set("a", null)
+        assertEquals(0, changes)
+    }
+
+    // --- ManagedValue ---
+
+    @Test
+    fun managedValue_initial_value_is_checked() {
+        assertFailsWith<IllegalArgumentException> { ManagedValue<Any>(42, "v", String::class) }
+    }
+
+    @Test
+    fun managedValue_null_is_allowed() {
+        val log = mutableListOf<String>()
+        val v = ManagedValue<String?>(null, "v", String::class) { old, new -> log += "$old -> $new" }
+        v.set("a")
+        v.set(null)
+        assertNull(v.get())
+        assertEquals(listOf("null -> a", "a -> null"), log)
+    }
+
+    @Test
+    fun managedValue_assigning_value_is_checked_and_reported() {
+        val log = mutableListOf<String>()
+        val v = ManagedValue<Any>("a", "v", String::class) { old, new -> log += "$old -> $new" }
+        v.value = "b"
+        assertFailsWith<IllegalArgumentException> { v.value = 42 }
+        assertEquals("b", v.get())
+        assertEquals(listOf("a -> b"), log)
+    }
+
+    @Test
+    fun managedValue_equality_is_identity() {
+        val a = ManagedValue<Any>("x", "a", String::class)
+        val b = ManagedValue<Any>("x", "a", String::class)
+        assertEquals(a, a)
+        assertNotEquals(a, b)
+    }
+
+    // --- ManagedReference: assigning the key ---
+
+    @Test
+    fun managedReference_assigning_new_key_clears_resolved_and_reports() {
+        val changes = mutableListOf<String>()
+        val r = ManagedReference<String, Any>(null, "r", String::class) { old, new ->
+            changes += "${old.reference}:${old.resolved} -> ${new.reference}:${new.resolved}"
+        }
+        r.set("k1", "V1")
+        r.reference = "k2"
+        assertEquals("k2", r.reference)
+        assertNull(r.resolved)
+        assertEquals(listOf("null:null -> k1:V1", "k1:V1 -> k2:null"), changes)
+    }
+
+    @Test
+    fun managedReference_assigning_same_key_keeps_resolved() {
+        var changes = 0
+        val r = ManagedReference<String, Any>(null, "r", String::class) { _, _ -> changes++ }
+        r.set("k1", "V1")
+        r.reference = "k1"
+        assertEquals("V1", r.resolved)
+        assertEquals(1, changes)
+    }
+
+    // --- Reference equality: by key, across all Reference classes ---
+
+    @Test
+    fun references_with_same_key_are_equal_whatever_their_class() {
+        val managed = ManagedReference<String, Any>("k", "r", String::class)
+        val default = MutableReferenceDefault<String, Any>("k")
+        val immutable = ReferenceImmutable<String, Any>("k", "V")
+        val resolvable = ResolvableReferenceDefault<String, Any>("k")
+        val managedResolvable = ManagedResolvableReference<String, Any>("k", "r", String::class)
+        val all = listOf<Any>(managed, default, immutable, resolvable, managedResolvable)
+        for (a in all) for (b in all) {
+            assertEquals(a, b, "$a should equal $b")
+            assertEquals(a.hashCode(), b.hashCode(), "hashCode of $a and $b")
+        }
+        assertNotEquals<Any>(managed, MutableReferenceDefault<String, Any>("other"))
+    }
+
+    @Test
+    fun list_remove_with_a_ReferenceImmutable_removes_the_managed_reference() {
+        val managed = ManagedReference<String, Any>("k", "r", String::class)
+        val list = mutableListOf<Reference<String, Any>>(managed)
+        assertTrue(list.remove(ReferenceImmutable("k", null)))
+        assertTrue(list.isEmpty())
+    }
+
+    // --- onChanged gets fixed snapshots ---
+
+    @Test
+    fun managedReference_onChanged_new_is_a_fixed_snapshot() {
+        val news = mutableListOf<Reference<String, Any>>()
+        val r = ManagedReference<String, Any>(null, "r", String::class) { _, new -> news += new }
+        r.set("k1", "V1")
+        r.reference = "k2"
+
+        assertEquals(2, news.size)
+        assertTrue(news.none { it === r }, "onChanged must not pass the ManagedReference itself")
+        assertTrue(news.none { it is MutableReference<*, *> }, "the snapshot's key can't be changed")
+        // the snapshots keep the values from the time of the change
+        assertEquals("k1", news[0].reference)
+        assertEquals("V1", news[0].resolved)
+        assertEquals("k2", news[1].reference)
+        assertNull(news[1].resolved)
+    }
+
+    // --- ResolvableReference: key fixed, resolved can be set ---
+
+    @Test
+    fun resolvableReferenceDefault_resolved_can_be_set() {
+        val r = ResolvableReferenceDefault<String, Any>("k")
+        assertNull(r.resolved)
+        r.resolved = "V"
+        assertEquals("V", r.resolved)
+        assertEquals("k", r.reference)
+        assertEquals("W", ResolvableReferenceDefault<String, Any>("k", "W").resolved)
+    }
+
+    @Test
+    fun resolvable_references_are_not_mutable_references() {
+        val plain: Reference<String, Any> = ResolvableReferenceDefault("k")
+        val managed: Reference<String, Any> = ManagedResolvableReference("k", "r", String::class)
+        for (r in listOf(plain, managed)) {
+            assertTrue(r is ResolvableReference<*, *>)
+            assertNull(r.mutableOrNull, "$r")
+            assertFailsWith<ClassCastException> { r.mutable }
+        }
+        // the existing classes are still mutable, and resolvable
+        val slot: Reference<String, Any> = ManagedReference("k", "r", String::class)
+        assertTrue(slot is ResolvableReference<*, *>)
+        assertNotNull(slot.mutableOrNull)
+    }
+
+    @Test
+    fun managedResolvableReference_checks_the_resolved_type() {
+        val r = ManagedResolvableReference<String, Any>("k", "r", String::class)
+        r.resolved = "V"
+        assertEquals("V", r.resolved)
+        val e = assertFailsWith<IllegalArgumentException> { r.resolved = 42 }
+        assertEquals("Managed Reference violation on 'r': Expected reference to 'String', but got 'Int'.", e.message)
+        assertEquals("V", r.resolved)
+        r.resolved = null
+        assertNull(r.resolved)
+    }
+
+    @Test
+    fun managedResolvableReference_checks_the_type_given_at_construction() {
+        assertFailsWith<IllegalArgumentException> { ManagedResolvableReference<String, Any>("k", "r", String::class, 42) }
     }
 }
