@@ -116,4 +116,39 @@ class test_ReferenceStoreByHashMap {
 		assertEquals("v", managed.resolved)
 	}
 
+	@Test
+	fun testResolveNotFoundKeepsResolvedByDefault() {
+		val ref = MutableReferenceDefault<String, String>("k")
+		ref.resolved = "old"
+		assertNull(store.resolve(ref))
+		assertEquals("old", ref.resolved)
+	}
+
+	@Test
+	fun testResolveNotFoundClearsWhenAsked() {
+		store[String::class, "k"] = "v"
+		val ref = ResolvableReferenceDefault<String, String>("k")
+		store.resolve(ref)
+		store.remove(String::class, "k")
+
+		assertNull(store.resolve(ref, clearIfNotFound = true))
+		assertNull(ref.resolved)
+	}
+
+	@Test
+	fun testResolveFoundWithClearIfNotFoundStillSets() {
+		store[String::class, "k"] = "v"
+		val ref = ResolvableReferenceDefault<String, String>("k")
+		assertEquals("v", store.resolve(ref, clearIfNotFound = true))
+		assertEquals("v", ref.resolved)
+	}
+
+	@Test
+	fun testResolveNoKeyNeverClears() {
+		val ref = MutableReferenceDefault<String, String>(null)
+		ref.resolved = "by value"
+		assertNull(store.resolve(ref, clearIfNotFound = true))
+		assertEquals("by value", ref.resolved)
+	}
+
 }

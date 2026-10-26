@@ -277,4 +277,47 @@ class test_HierarchicalReferenceStore {
 		assertSame(c1, plain.resolved)
 		assertSame(c1, managed.resolved)
 	}
+
+	// --- resolve when the key is not found ---
+
+	@Test
+	fun resolve_not_found_keeps_resolved_by_default() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val child = HierarchicalReferenceStoreByHashMap(root, "child")
+		child.set(String::class, "leaf", "L")
+		val ref = MutableReferenceDefault<String, String>("leaf")
+		root.resolve(ref)
+		child.remove(String::class, "leaf")
+
+		assertNull(root.resolve(ref))
+		assertEquals("L", ref.resolved)
+	}
+
+	@Test
+	fun resolve_not_found_clears_when_asked_and_reports_once() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val child = HierarchicalReferenceStoreByHashMap(root, "child")
+		child.set(String::class, "leaf", "L")
+		val changes = mutableListOf<String>()
+		val ref = ManagedReference<String, String>("leaf", "ref", String::class) { old, new -> changes += "${old.resolved} -> ${new.resolved}" }
+		root.resolve(ref)
+		child.remove(String::class, "leaf")
+
+		assertNull(root.resolve(ref, clearIfNotFound = true))
+		assertNull(root.resolve(ref, clearIfNotFound = true)) // already clear: no further change
+
+		assertNull(ref.resolved)
+		assertEquals("leaf", ref.reference) // the key is kept
+		assertEquals(listOf("null -> L", "L -> null"), changes)
+	}
+
+	@Test
+	fun resolve_no_key_never_clears() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val ref = MutableReferenceDefault<String, String>(null)
+		ref.resolved = "by value"
+
+		assertNull(root.resolve(ref, clearIfNotFound = true))
+		assertEquals("by value", ref.resolved)
+	}
 }

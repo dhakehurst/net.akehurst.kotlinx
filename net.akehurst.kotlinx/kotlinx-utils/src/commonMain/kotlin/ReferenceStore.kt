@@ -82,11 +82,14 @@ object ReferenceStoreExt {
     /**
      * returns the object fo the given reference if found.
      * Also, if the reference is a [ResolvableReference] and the object is found, sets it as the resolved value.
+     *
+     * If nothing is found, the reference's resolved value is left as it is, unless [clearIfNotFound] is true:
+     * then it is set to null. A reference with no key is never changed.
      */
-    inline fun <R : Any, reified T : Any> ReferenceStore<R>.resolve(reference: Reference<R, T>): T? {
+    inline fun <R : Any, reified T : Any> ReferenceStore<R>.resolve(reference: Reference<R, T>, clearIfNotFound: Boolean = false): T? {
         return reference.reference?.let { ref ->
             val value = this[T::class, ref]
-            if (null != value && reference is ResolvableReference<*, *>) {
+            if ((null != value || clearIfNotFound) && reference is ResolvableReference<*, *>) {
                 @Suppress("UNCHECKED_CAST")
                 (reference as ResolvableReference<R, T>).resolved = value
             }
@@ -206,11 +209,14 @@ object HierarchicalReferenceStoreExt {
     /**
      * Finds the object for the given reference anywhere in the tree of stores (see [HierarchicalReferenceStore.findInTree]).
      * Also, if the reference is a [ResolvableReference] and the object is found, sets it as the resolved value.
+     *
+     * If nothing is found, the reference's resolved value is left as it is, unless [clearIfNotFound] is true:
+     * then it is set to null. A reference with no key is never changed.
      */
-    inline fun <R : Any, reified T : Any> HierarchicalReferenceStore<R>.resolve(reference: Reference<R, T>): T? {
+    inline fun <R : Any, reified T : Any> HierarchicalReferenceStore<R>.resolve(reference: Reference<R, T>, clearIfNotFound: Boolean = false): T? {
         return reference.reference?.let { ref ->
             val value = rootReferenceStore.findInTree(T::class, ref)
-            if (null != value && reference is ResolvableReference<*, *>) {
+            if ((null != value || clearIfNotFound) && reference is ResolvableReference<*, *>) {
                 @Suppress("UNCHECKED_CAST")
                 (reference as ResolvableReference<R, T>).resolved = value
             }

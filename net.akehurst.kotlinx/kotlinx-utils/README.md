@@ -162,7 +162,17 @@ when looked up as `Any::class`.
 
 `store.remove(Person::class, "alice")` removes an entry; setting a `null` value does the same.
 Removing doesn't change references that were already resolved: they keep the old object in
-`resolved` until you change them. Resolving them again returns `null`, but leaves `resolved` as it was.
+`resolved`. So a non-null `resolved` means the object was found once, not that it is still in the store.
+
+When `resolve` finds nothing for a key, it returns `null` and by default leaves `resolved` as it was.
+That makes it safe to run again and again, and it never wipes a reference that was set by value to an
+object that isn't in a store. To make references follow removals, pass `clearIfNotFound = true`:
+
+```kotlin
+store.resolve(ref, clearIfNotFound = true)   // not found: ref.resolved becomes null
+```
+
+A reference with no key is never changed by `resolve`. Both stores' `resolve` take `clearIfNotFound`.
 
 `HierarchicalReferenceStoreByHashMap(parent, identity)` is a store with a parent, so stores form a
 tree. `get` and `set` only use the store itself. To find an object anywhere in the tree, use
