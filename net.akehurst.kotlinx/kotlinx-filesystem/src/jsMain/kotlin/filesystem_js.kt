@@ -73,7 +73,7 @@ data class FileHandleJS(
 
 actual object UserFileSystemDefault : UserFileSystem {
 
-    override suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
+    actual override suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
         return when {
             name.isEmpty() -> parent
             parent is DirectoryHandleJS -> {
@@ -98,12 +98,12 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
+    actual override suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
         return selectDirectoryFromDialog("Choose Directory",null, mode)
     }
 
     @OptIn(ExperimentalWebApi::class)
-    override suspend fun selectDirectoryFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
+    actual override suspend fun selectDirectoryFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
         return try {
             val dpo: DirectoryPickerOptions = when (accessMode) {
                 FileAccessMode.READ_ONLY -> unsafeJso { mode = FileSystemPermissionMode.read }
@@ -119,7 +119,7 @@ actual object UserFileSystemDefault : UserFileSystem {
 
     // the open file picker has no access mode; write permission is requested by createWritable when writing
     @OptIn(ExperimentalWebApi::class)
-    override suspend fun selectExistingFileFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
+    actual override suspend fun selectExistingFileFromDialog(dialogTitle:String,current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         return try {
             val cur = current as? DirectoryHandleJS
             val picked = when (cur) {
@@ -136,7 +136,7 @@ actual object UserFileSystemDefault : UserFileSystem {
     }
 
     @OptIn(ExperimentalWebApi::class)
-    override suspend fun selectNewFileFromDialog(dialogTitle:String,parent: DirectoryHandle): FileHandle? {
+    actual override suspend fun selectNewFileFromDialog(dialogTitle:String,parent: DirectoryHandle): FileHandle? {
         return try {
             val cur = parent as? DirectoryHandleJS
             val handle: FileSystemFileHandle = when (cur) {
@@ -166,7 +166,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         return parent
     }
 
-    override suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> =
+    actual override suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> =
         try {
             when (dir) {
                 is DirectoryHandleJS -> {
@@ -197,7 +197,7 @@ actual object UserFileSystemDefault : UserFileSystem {
             emptyList()
         }
 
-    override suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
+    actual override suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
         return try {
             when (parent) {
                 is DirectoryHandleJS -> {
@@ -215,7 +215,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
+    actual override suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
         return try {
             when (parent) {
                 is DirectoryHandleJS -> {
@@ -233,7 +233,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun exists(entry: FileSystemObjectHandle): Boolean  {
+    actual override suspend fun exists(entry: FileSystemObjectHandle): Boolean  {
         return when (entry) {
             is FileHandleJS -> try { entry.handle.getFile(); true } catch (_: Exception) { false }
             is DirectoryHandleJS -> try { entry.handle.values(); true } catch (_: Exception) { false }
@@ -241,7 +241,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun readFileContent(file: FileHandle): String? =
+    actual override suspend fun readFileContent(file: FileHandle): String? =
         try {
             when (file) {
                 is FileHandleJS -> {
@@ -255,7 +255,7 @@ actual object UserFileSystemDefault : UserFileSystem {
             null
         }
 
-    override suspend fun writeFileContent(file: FileHandle, content: String) {
+    actual override suspend fun writeFileContent(file: FileHandle, content: String) {
         try {
             when (file) {
                 is FileHandleJS -> {
@@ -271,7 +271,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
+    actual override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
         return try {
             val handle = (file as FileHandleJS).handle
             val arrBuf = handle.getFile().arrayBuffer()

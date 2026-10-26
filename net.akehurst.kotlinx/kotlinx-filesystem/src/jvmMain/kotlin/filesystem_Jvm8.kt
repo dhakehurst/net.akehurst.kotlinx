@@ -67,7 +67,7 @@ data class FileHandleJVM(
 
 actual object UserFileSystemDefault : UserFileSystem {
 
-    override suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
+    actual override suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? {
         return when {
             name.isEmpty() -> parent
             parent is DirectoryHandleJVM -> {
@@ -84,7 +84,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
+    actual override suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? {
         val file = File(fullPath)
         return if (file.exists() && file.isDirectory) {
             DirectoryHandleJVM(this, null, file)
@@ -93,7 +93,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun selectDirectoryFromDialog(dialogTitle:String, current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
+    actual override suspend fun selectDirectoryFromDialog(dialogTitle:String, current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
         try {
             return if (EventQueue.isDispatchThread()) {
                 chooseDirectory2(dialogTitle,current as DirectoryHandleJVM?)
@@ -126,7 +126,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun selectExistingFileFromDialog(dialogTitle:String, current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
+    actual override suspend fun selectExistingFileFromDialog(dialogTitle:String, current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
         try {
             return if (EventQueue.isDispatchThread()) {
                 if (useNativeDialog) {
@@ -192,7 +192,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun selectNewFileFromDialog(dialogTitle:String, parent: DirectoryHandle): FileHandle? {
+    actual override suspend fun selectNewFileFromDialog(dialogTitle:String, parent: DirectoryHandle): FileHandle? {
         val file = chooseFile(dialogTitle,parent as DirectoryHandleJVM)
         return if (null != file) {
             val jFile = (file as FileHandleJVM).handle
@@ -206,7 +206,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> {
+    actual override suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> {
         try {
             return when (dir) {
                 is DirectoryHandleJVM -> {
@@ -229,7 +229,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
+    actual override suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? {
         try {
             return when (parent) {
                 is DirectoryHandleJVM -> {
@@ -246,7 +246,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
+    actual override suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? {
         try {
             return when (parent) {
                 is DirectoryHandleJVM -> {
@@ -263,7 +263,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun exists(entry: FileSystemObjectHandle): Boolean {
+    actual override suspend fun exists(entry: FileSystemObjectHandle): Boolean {
         return when (entry) {
             is DirectoryHandleJVM -> entry.handle.exists()
             is FileHandleJVM -> entry.handle.exists()
@@ -271,7 +271,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun readFileContent(file: FileHandle): String? {
+    actual override suspend fun readFileContent(file: FileHandle): String? {
         try {
             return when (file) {
                 is FileHandleJVM -> {
@@ -286,7 +286,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun writeFileContent(file: FileHandle, content: String) {
+    actual override suspend fun writeFileContent(file: FileHandle, content: String) {
         try {
             return when (file) {
                 is FileHandleJVM -> {
@@ -300,7 +300,7 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
+    actual override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
         try {
             val handle = (file as FileHandleJVM).handle
             val byteArray = handle.readBytes()

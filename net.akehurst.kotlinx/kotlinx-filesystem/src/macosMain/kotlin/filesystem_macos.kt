@@ -24,16 +24,16 @@ import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
 
 actual object UserFileSystemDefault : UserFileSystem {
     //actual var useDispatcher: Boolean = false
-    override suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? = TODO()
-    override suspend fun exists(entry: FileSystemObjectHandle): Boolean = TODO()
-    override suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? = TODO()
-    override suspend fun selectDirectoryFromDialog(dialogTitle: String, current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? = TODO()
-    override suspend fun selectExistingFileFromDialog(dialogTitle: String, current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? = TODO()
-    override suspend fun selectNewFileFromDialog(dialogTitle: String, parent: DirectoryHandle): FileHandle? = TODO()
-    override suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> = TODO()
-    override suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? = TODO()
-    override suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? = TODO()
-    override suspend fun readFileContent(file: FileHandle): String? = TODO()
-    override suspend fun writeFileContent(file: FileHandle, content: String): Unit = TODO()
-    override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? = TODO()
+    actual override suspend fun getEntry(parent: DirectoryHandle, name: String): FileSystemObjectHandle? = TODO()
+    actual override suspend fun exists(entry: FileSystemObjectHandle): Boolean = TODO()
+    actual override suspend fun getDirectory(fullPath: String, mode: FileAccessMode): DirectoryHandle? = TODO()
+    actual override suspend fun selectDirectoryFromDialog(dialogTitle: String, current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? = TODO()
+    actual override suspend fun selectExistingFileFromDialog(dialogTitle: String, current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? = TODO()
+    actual override suspend fun selectNewFileFromDialog(dialogTitle: String, parent: DirectoryHandle): FileHandle? = TODO()
+    actual override suspend fun listDirectoryContent(dir: DirectoryHandle): List<FileSystemObjectHandle> = TODO()
+    actual override suspend fun createNewFile(parent: DirectoryHandle, name: String): FileHandle? = TODO()
+    actual override suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle? = TODO()
+    actual override suspend fun readFileContent(file: FileHandle): String? = TODO()
+    actual override suspend fun writeFileContent(file: FileHandle, content: String): Unit = TODO()
+    actual override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? = TODO()
 }
