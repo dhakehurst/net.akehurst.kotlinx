@@ -17,6 +17,8 @@ kotlin {
             dependencies {
                 // Windows Credential Manager (SecretSourceWindowsCredentialManager)
                 implementation(libs.jna.platform)
+                // KeePassXC browser-integration protocol (SecretSourceKeePassXC): NaCl crypto_box
+                implementation(libs.lazysodium.java)
             }
         }
 
