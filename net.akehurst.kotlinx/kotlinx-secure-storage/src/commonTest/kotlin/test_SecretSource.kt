@@ -53,3 +53,27 @@ class test_SecretSourceEnvironment {
         assertNull(sut.read("NAK_SECRET_SOURCE_TEST_NOT_SET_7f3a"))
     }
 }
+
+class test_SecretSourcePrompt {
+
+    @Test
+    fun asks_once_and_remembers() = runTest {
+        var asked = 0
+        val sut = SecretSourcePrompt { key -> asked++; "answer-$key" }
+        assertEquals("answer-a", sut.read("a"))
+        assertEquals("answer-a", sut.read("a"))
+        assertEquals(1, asked)
+        sut.forget()
+        sut.read("a")
+        assertEquals(2, asked)
+    }
+
+    @Test
+    fun cancel_gives_null_and_asks_again_next_time() = runTest {
+        var asked = 0
+        val sut = SecretSourcePrompt { asked++; null }
+        assertNull(sut.read("a"))
+        assertNull(sut.read("a"))
+        assertEquals(2, asked)
+    }
+}
