@@ -44,3 +44,12 @@ class test_SecretSource {
         assertNull(reg.getOrNull("other"))
     }
 }
+
+class test_SecretSourceEnvironment {
+
+    @Test
+    fun unset_variable_gives_null() = runTest {
+        val sut = SecretSourceEnvironment()
+        assertNull(sut.read("NAK_SECRET_SOURCE_TEST_NOT_SET_7f3a"))
+    }
+}

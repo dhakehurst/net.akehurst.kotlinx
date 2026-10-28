@@ -88,6 +88,16 @@ class test_SecureStorageDatastore {
         )
     }
 
+    @Test
+    fun secretSource_reads_from_encrypted_storage() = runTest {
+        val datastore = createDatastore(encrypt = true, withMasterKey = true)
+        datastore.write("rm/david", "s3cret")
+        val sut = SecretSourceSecureStorage("secure", datastore)
+
+        assertEquals("s3cret", sut.read("rm/david"))
+        assertNull(sut.read("other"))
+    }
+
     // Happy path tests
     @Test
     fun testWriteAndReadString() = runTest {
