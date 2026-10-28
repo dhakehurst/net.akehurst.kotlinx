@@ -13,6 +13,13 @@ kotlin {
             }
         }
 
+        jvmMain {
+            dependencies {
+                // Windows Credential Manager (SecretSourceWindowsCredentialManager)
+                implementation(libs.jna.platform)
+            }
+        }
+
         commonTest {
             dependencies {
                 implementation(libs.kotlinx.coroutines.test)
