@@ -44,6 +44,7 @@ inline fun <T> Set<T>.transitiveClosure(accumulate: Boolean = true, function: (T
 
 /**
  * inline so it can be used with a suspend function as argument
+ * each element appears once, in the order it is first found
  */
 inline fun <T> List<T>.transitiveClosure(function: (T) -> List<T>): List<T> {
     val result: MutableList<T> = this.toMutableList()
@@ -57,6 +58,9 @@ inline fun <T> List<T>.transitiveClosure(function: (T) -> List<T>): List<T> {
             newThings.addAll(s)
         }
         newThings.removeAll(result)
+        val distinctNew = newThings.distinct() // an element may be reached from more than one element in the same step
+        newThings.clear()
+        newThings.addAll(distinctNew)
         newStuff = result.addAll(newThings)
     }
     return result
