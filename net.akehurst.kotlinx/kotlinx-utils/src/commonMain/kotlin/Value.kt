@@ -35,7 +35,7 @@ interface MutableValue<T> : Value<T> {
 }
 
 object ValueExt {
-    val <T> Value<T>.mutable: MutableValue<T> get() = this as MutableValue<T>
+    inline val <T> Value<T>.mutable: MutableValue<T> get() = this as MutableValue<T>
 }
 
 abstract class MutableValueAbstract<T>(

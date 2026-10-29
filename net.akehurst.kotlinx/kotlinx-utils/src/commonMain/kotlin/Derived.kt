@@ -69,7 +69,7 @@ interface MutableDerived<T> : Derived<T> {
 }
 
 object DerivedExt {
-    val <T> Derived<T>.mutable: MutableDerived<T> get() = this as MutableDerived<T>
+    inline val <T> Derived<T>.mutable: MutableDerived<T> get() = this as MutableDerived<T>
 }
 
 /**
