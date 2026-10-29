@@ -58,3 +58,34 @@ class ManagedDerived<out T>(
 
     override fun toString(): String = "ManagedDerived($name)"
 }
+
+/**
+ * A derived value that can also be set: [set] writes the stored values it is derived from,
+ * so that the derivation then gives the new value. Use it only where such an inverse exists;
+ * a derived value that cannot be set is a plain [Derived].
+ */
+interface MutableDerived<T> : Derived<T> {
+    fun set(value: T)
+}
+
+object DerivedExt {
+    val <T> Derived<T>.mutable: MutableDerived<T> get() = this as MutableDerived<T>
+}
+
+/**
+ * A [ManagedDerived] that can be set. [inverse] updates the stored values so that [derivation] gives the new value.
+ */
+class ManagedMutableDerived<T>(
+    private val name: String,
+    expectedType: KClass<*>,
+    derivation: () -> T,
+    private val inverse: (T) -> Unit
+) : MutableDerived<T> {
+
+    private val derived = ManagedDerived(name, expectedType, derivation)
+
+    override fun get(): T = derived.get()
+    override fun set(value: T) = inverse(value)
+
+    override fun toString(): String = "ManagedMutableDerived($name)"
+}

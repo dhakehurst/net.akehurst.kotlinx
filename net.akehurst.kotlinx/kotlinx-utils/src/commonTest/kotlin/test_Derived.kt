@@ -55,4 +55,25 @@ class test_Derived {
         val e = assertFailsWith<IllegalStateException> { d.get() }
         assertEquals("Managed Derived violation on 'Thing.label': Expected 'String', but derivation gave 'Int'.", e.message)
     }
+
+    private class Named(var declaredName: String?) {
+        val nameDerived: MutableDerived<String?> = ManagedMutableDerived("Named.name", String::class, { declaredName }, { declaredName = it })
+    }
+
+    @Test
+    fun ManagedMutableDerived_set_writes_through_inverse() {
+        val n = Named("a")
+        assertEquals("a", n.nameDerived.get())
+        n.nameDerived.set("b")
+        assertEquals("b", n.declaredName)
+        assertEquals("b", n.nameDerived.get())
+    }
+
+    @Test
+    fun mutable_ext_casts_settable_derived() {
+        val n = Named("a")
+        val d: Derived<String?> = n.nameDerived
+        with(DerivedExt) { d.mutable.set("c") }
+        assertEquals("c", n.declaredName)
+    }
 }
