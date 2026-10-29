@@ -16,9 +16,13 @@
 
 package net.akehurst.kotlinx.collections
 
-fun <T> Set<T>.transitiveClosure(function: (T) -> Set<T>): Set<T> {
+/**
+ * inline so it can be used with a suspend function as argument
+ * accumulate = true: all elements reached, accumulate = false: only the elements reached in the last step
+ */
+inline fun <T> Set<T>.transitiveClosure(accumulate: Boolean = true, function: (T) -> Set<T>): Set<T> {
     var result: MutableSet<T> = this.toMutableSet()
-    var newThings: MutableSet<T> = this.toMutableSet()
+    val newThings: MutableSet<T> = this.toMutableSet()
     var newStuff = true
     while (newStuff) {
         val temp = newThings.toSet()
@@ -27,7 +31,36 @@ fun <T> Set<T>.transitiveClosure(function: (T) -> Set<T>): Set<T> {
             val s: Set<T> = function.invoke(nt)
             newThings.addAll(s)
         }
+        if (accumulate) {
+            newThings.removeAll(result)
+            newStuff = result.addAll(newThings)
+        } else {
+            newStuff = result != newThings
+            result = newThings.toMutableSet() //clone it
+        }
+    }
+    return result
+}
+
+/**
+ * inline so it can be used with a suspend function as argument
+ * each element appears once, in the order it is first found
+ */
+inline fun <T> List<T>.transitiveClosure(function: (T) -> List<T>): List<T> {
+    val result: MutableList<T> = this.toMutableList()
+    val newThings: MutableList<T> = this.toMutableList()
+    var newStuff = true
+    while (newStuff) {
+        val temp = newThings.toSet()
+        newThings.clear()
+        for (nt: T in temp) {
+            val s: List<T> = function.invoke(nt)
+            newThings.addAll(s)
+        }
         newThings.removeAll(result)
+        val distinctNew = newThings.distinct() // an element may be reached from more than one element in the same step
+        newThings.clear()
+        newThings.addAll(distinctNew)
         newStuff = result.addAll(newThings)
     }
     return result

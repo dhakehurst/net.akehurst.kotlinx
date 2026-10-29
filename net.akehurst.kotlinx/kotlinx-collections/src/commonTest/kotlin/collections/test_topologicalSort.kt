@@ -196,4 +196,22 @@ class test_transitiveClosure {
         start.transitiveClosure { if (it < 3) setOf(it + 1) else emptySet() }
         assertEquals(setOf(1), start)
     }
+
+    @Test
+    fun list_no_duplicates_when_reached_twice_in_same_step() {
+        // A -> B, C ; B -> D ; C -> D
+        val next = mapOf("A" to listOf("B", "C"), "B" to listOf("D"), "C" to listOf("D"))
+        assertEquals(listOf("A", "B", "C", "D"), listOf("A").transitiveClosure { next[it] ?: emptyList() })
+    }
+
+    @Test
+    fun list_no_duplicates_from_one_element() {
+        assertEquals(listOf("A", "B"), listOf("A").transitiveClosure { if (it == "A") listOf("B", "B") else emptyList() })
+    }
+
+    @Test
+    fun list_cycle_terminates() {
+        val next = mapOf(1 to listOf(2), 2 to listOf(3), 3 to listOf(1))
+        assertEquals(listOf(1, 2, 3), listOf(1).transitiveClosure { next[it] ?: emptyList() })
+    }
 }
