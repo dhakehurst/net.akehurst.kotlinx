@@ -23,6 +23,14 @@ import net.akehurst.kotlinx.filesystem.FileHandleAbstract
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
 import net.akehurst.kotlinx.utils.AnySerializer
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.io.encoding.Base64
 import kotlin.test.*
 
 // In-memory fake implementation of FileHandle
@@ -56,6 +64,8 @@ class FakeFileHandle(
     }
 }
 
+fun fixedPassword(password: String?): MasterPasswordProvider = { _ -> password }
+
 class test_SecureStorageDatastore {
 
     private lateinit var storageFile: FakeFileHandle
@@ -84,7 +94,7 @@ class test_SecureStorageDatastore {
             keyValueSeparator = "=",
             encrypt = encrypt,
             masterKeyFile = if (withMasterKey) masterKeyFile else null,
-            masterPassword = if (withMasterKey) "testPassword123" else null
+            masterPassword = if (withMasterKey) fixedPassword("testPassword123") else null
         )
     }
 
@@ -296,7 +306,7 @@ class test_SecureStorageDatastore {
             keyValueSeparator = "=",
             encrypt = true,
             masterKeyFile = null,
-            masterPassword = "password"
+            masterPassword = { _ -> "password" }
         )
 
         assertFailsWith<IllegalStateException> {
@@ -416,5 +426,157 @@ class test_SecureStorageDatastore {
         datastore.delete("key") // Should not throw
 
         assertNull(datastore.read("key"))
+    }
+
+    // ---- master password, key file, wrong password ----
+
+    private fun encryptedDatastore(
+        password: MasterPasswordProvider,
+        keyFile: FakeFileHandle = masterKeyFile,
+        file: FakeFileHandle = storageFile,
+    ) = SecureStorageDatastore(
+        secureStorageFile = file,
+        encrypt = true,
+        masterKeyFile = keyFile,
+        masterPassword = password,
+    )
+
+    @Test
+    fun roundTrip_with_password_and_no_serializers_module() = runTest {
+        encryptedDatastore(fixedPassword("pw1")).write("token", "abc=123")
+
+        // a new instance (new session) reads the files written by the first
+        val sut = encryptedDatastore(fixedPassword("pw1"))
+        assertFalse(sut.isUnlocked)
+        assertEquals("abc=123", sut.read("token"))
+        assertEquals("abc=123", sut.readString("token"))
+        assertTrue(sut.isUnlocked)
+        // the value is not stored in plain text
+        assertFalse(storageFile.getContent()!!.contains("abc=123"))
+    }
+
+    @Test
+    fun password_is_asked_lazily_once_and_isNew_says_if_key_file_exists() = runTest {
+        val calls = mutableListOf<Boolean>()
+        val first = encryptedDatastore({ isNew -> calls.add(isNew); "pw" })
+        assertEquals(emptyList(), calls) // not asked at construction
+        assertEquals(emptySet(), first.keys()) // keys need no password
+        assertEquals(emptyList(), calls)
+        first.write("a", "1")
+        first.write("b", "2")
+        assertEquals("1", first.read("a"))
+        assertEquals(listOf(true), calls)
+
+        val second = encryptedDatastore({ isNew -> calls.add(isNew); "pw" })
+        assertEquals("2", second.read("b"))
+        assertEquals(listOf(true, false), calls)
+    }
+
+    @Test
+    fun wrong_password_gives_WrongMasterPasswordException_and_can_retry() = runTest {
+        encryptedDatastore(fixedPassword("right")).write("token", "secret")
+
+        val passwords = mutableListOf("wrong", "right")
+        val sut = encryptedDatastore({ _ -> passwords.removeAt(0) })
+        assertFailsWith<WrongMasterPasswordException> { sut.read("token") }
+        assertFalse(sut.isUnlocked)
+        assertEquals("secret", sut.read("token"))
+    }
+
+    @Test
+    fun cancelled_password_gives_MasterPasswordCancelledException() = runTest {
+        val sut = encryptedDatastore(fixedPassword(null))
+        assertFailsWith<MasterPasswordCancelledException> { sut.write("token", "secret") }
+        assertNull(storageFile.getContent())
+    }
+
+    @Test
+    fun write_before_read_keeps_existing_entries() = runTest {
+        val first = encryptedDatastore(fixedPassword("pw"))
+        first.write("a", "1")
+        first.write("b", "2")
+
+        val second = encryptedDatastore(fixedPassword("pw"))
+        second.write("c", "3") // no read first
+        assertEquals(setOf("a", "b", "c"), second.keys())
+
+        val third = encryptedDatastore(fixedPassword("pw"))
+        assertEquals("1", third.read("a"))
+        assertEquals("2", third.read("b"))
+        assertEquals("3", third.read("c"))
+    }
+
+    @Test
+    fun remove_before_read_keeps_other_entries() = runTest {
+        val first = createDatastore()
+        first.write("a", "1")
+        first.write("b", "2")
+
+        val second = createDatastore()
+        second.remove("a")
+        assertEquals(setOf("b"), createDatastore().keys())
+    }
+
+    @Test
+    fun concurrent_writes_keep_all_entries() = runTest {
+        val sut = encryptedDatastore(fixedPassword("pw"))
+        coroutineScope {
+            (1..20).map { i -> async { sut.write("k$i", "v$i") } }.awaitAll()
+        }
+        val reread = encryptedDatastore(fixedPassword("pw"))
+        assertEquals((1..20).map { "k$it" }.toSet(), reread.keys())
+        assertEquals("v7", reread.read("k7"))
+    }
+
+    @Test
+    fun salt_differs_between_two_createKey_calls() = runTest {
+        val f1 = FakeFileHandle(null, "k1")
+        val f2 = FakeFileHandle(null, "k2")
+        Encryption().createKey(f1, "same password")
+        Encryption().createKey(f2, "same password")
+        val j1 = Json.parseToJsonElement(f1.getContent()!!).jsonObject
+        val j2 = Json.parseToJsonElement(f2.getContent()!!).jsonObject
+        assertEquals(1, j1["version"]!!.jsonPrimitive.int)
+        val salt1 = Base64.decode(j1["salt"]!!.jsonPrimitive.content)
+        val salt2 = Base64.decode(j2["salt"]!!.jsonPrimitive.content)
+        assertTrue(salt1.size >= 16)
+        assertFalse(salt1.contentEquals(salt2))
+        assertNotEquals(j1["key"], j2["key"])
+    }
+
+    @Test
+    fun loadKey_with_wrong_password_throws_WrongMasterPasswordException() = runTest {
+        Encryption().createKey(masterKeyFile, "right")
+        assertFailsWith<WrongMasterPasswordException> { Encryption().loadKey(masterKeyFile, "wrong") }
+        val e = Encryption()
+        e.loadKey(masterKeyFile, "right")
+        assertTrue(e.isLoaded)
+    }
+
+    @Test
+    fun reset_deletes_key_and_values_and_asks_for_a_new_password() = runTest {
+        val sut = encryptedDatastore(fixedPassword("forgotten"))
+        sut.write("token", "secret")
+        assertTrue(sut.isUnlocked)
+
+        sut.reset()
+        assertFalse(sut.isUnlocked)
+        assertTrue(masterKeyFile.getContent().isNullOrEmpty())
+        assertTrue(storageFile.getContent().isNullOrEmpty())
+        assertEquals(emptySet(), sut.keys())
+
+        val calls = mutableListOf<Boolean>()
+        val fresh = encryptedDatastore({ isNew -> calls.add(isNew); "new" })
+        assertEquals(emptySet(), fresh.keys())
+        fresh.write("token", "secret2")
+        assertEquals(listOf(true), calls)
+        assertEquals("secret2", encryptedDatastore(fixedPassword("new")).read("token"))
+    }
+
+    @Test
+    fun string_values_work_without_serializers_module_unencrypted() = runTest {
+        val sut = SecureStorageDatastore(secureStorageFile = storageFile, encrypt = false)
+        sut.write("k", "v=1")
+        assertEquals("v=1", SecureStorageDatastore(secureStorageFile = storageFile, encrypt = false).read("k"))
     }
 }

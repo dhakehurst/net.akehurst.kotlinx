@@ -14,69 +14,102 @@
  * limitations under the License.
  */
 
+
 package net.akehurst.kotlinx.secure.storage
 
+import dev.whyoleg.cryptography.BinarySize.Companion.bytes
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.AES
-import dev.whyoleg.cryptography.algorithms.SHA256
 import dev.whyoleg.cryptography.algorithms.PBKDF2
-import dev.whyoleg.cryptography.BinarySize.Companion.bytes
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
+import dev.whyoleg.cryptography.algorithms.SHA256
+import dev.whyoleg.cryptography.random.CryptographyRandom
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import net.akehurst.kotlinx.filesystem.api.FileHandle
+import kotlin.io.encoding.Base64
 
-@OptIn(ExperimentalEncodingApi::class)
+/**
+ * Holds the AES-GCM key used to encrypt values.
+ *
+ * The key is random. It is stored in a key file, encrypted ("wrapped") with a key derived from a master password
+ * using PBKDF2-SHA256 and a random salt. The key file is JSON:
+ * ```
+ * {"version":1,"kdf":"PBKDF2-SHA256","iterations":600000,"salt":"<base64>","key":"<base64 wrapped key>"}
+ * ```
+ * Key files written by older versions (just the base64 wrapped key, derived with an all-zero salt) can still be loaded;
+ * [loadKey] rewrites them in the current format with a new random salt.
+ */
 class Encryption(
-    private val provider: CryptographyProvider = CryptographyProvider.Default
+    private val provider: CryptographyProvider = CryptographyProvider.Default,
+    /** PBKDF2 iterations used when a key file is written; the value is stored in the key file, so it can change later */
+    val pbkdf2Iterations: Int = DEFAULT_PBKDF2_ITERATIONS,
 ) {
 
+    companion object {
+        const val KEY_FILE_VERSION = 1
+        const val KDF_PBKDF2_SHA256 = "PBKDF2-SHA256"
+        const val SALT_SIZE_BYTES = 16
+        const val DEFAULT_PBKDF2_ITERATIONS = 600_000 // OWASP recommendation for PBKDF2-HMAC-SHA256
+        internal const val LEGACY_PBKDF2_ITERATIONS = 100_000
+    }
+
+    private class KeyFileContent(val iterations: Int, val salt: ByteArray, val wrappedKey: ByteArray, val isLegacy: Boolean)
+
     var encryptionKey: AES.GCM.Key? = null
+        private set
 
     val isLoaded: Boolean get() = null != encryptionKey
 
-    /**
-     * Creates a new encryption key from a master password and stores it encrypted in the key file
-     */
-    suspend fun createKey(keyFile: FileHandle, masterPassword: String) {
-        // Generate a random AES encryption key
-        val aes = provider.get(AES.GCM)
-        val encryptionKey = aes.keyGenerator().generateKey()
-        val encryptionKeyBytes = encryptionKey.encodeToByteArray(AES.Key.Format.RAW)
-
-        // Derive a master key from the master password to encrypt the encryption key
-        val masterKey = deriveKeyFromPassword(masterPassword)
-        val masterCipher = masterKey.cipher()
-        val encryptedKeyBytes = masterCipher.encrypt(encryptionKeyBytes)
-
-        // Store the encrypted key in the file
-        val encodedKey = Base64.encode(encryptedKeyBytes)
-        keyFile.writeContent(encodedKey)
-
-        loadKey(keyFile, masterPassword)
+    /** forget the loaded key (the key file is not changed) */
+    fun unload() {
+        encryptionKey = null
     }
 
     /**
-     * Loads the encryption key from file and decrypts it with the master password
+     * Creates a new random encryption key, stores it in the key file wrapped with the master password, and loads it.
+     * Any existing key file is replaced.
      */
-    suspend fun loadKey(keyFile: FileHandle, masterPassword: String) {
-        // Read the encrypted key from file
-        val encodedKey = keyFile.readContent() ?: throw IllegalStateException("Key file is empty")
-        val encryptedKeyBytes = Base64.decode(encodedKey)
-
-        // Derive the master key from password
-        val masterKey = deriveKeyFromPassword(masterPassword)
-        val masterCipher = masterKey.cipher()
-        val decryptedKeyBytes = masterCipher.decrypt(encryptedKeyBytes)
-
-        // Reconstruct the AES encryption key from the decrypted bytes
+    suspend fun createKey(keyFile: FileHandle, masterPassword: String) {
         val aes = provider.get(AES.GCM)
-        val keyDecoder = aes.keyDecoder()
-        val key = keyDecoder.decodeFromByteArray(AES.Key.Format.RAW, decryptedKeyBytes)
+        val key = aes.keyGenerator().generateKey()
+        writeKeyFile(keyFile, key, masterPassword)
         this.encryptionKey = key
     }
 
     /**
-     * Encrypts a string with an AES.GCM key
+     * Loads the encryption key from the key file and unwraps it with the master password.
+     * @throws WrongMasterPasswordException if the password does not unlock the key
+     * @throws InvalidKeyFileException if the key file is empty or not in a known format
+     */
+    suspend fun loadKey(keyFile: FileHandle, masterPassword: String) {
+        val text = keyFile.readContent()
+        if (text.isNullOrBlank()) throw InvalidKeyFileException("Key file '${keyFile.name}' is empty.")
+        val content = parseKeyFile(text)
+
+        val masterKey = deriveKeyFromPassword(masterPassword, content.salt, content.iterations)
+        val keyBytes = try {
+            masterKey.cipher().decrypt(content.wrappedKey)
+        } catch (e: Exception) {
+            // AES-GCM authentication fails when the password (hence the derived key) is wrong
+            throw WrongMasterPasswordException(cause = e)
+        }
+        val key = provider.get(AES.GCM).keyDecoder().decodeFromByteArray(AES.Key.Format.RAW, keyBytes)
+        this.encryptionKey = key
+
+        if (content.isLegacy) {
+            // re-wrap the same key with a random salt; the stored values stay readable
+            writeKeyFile(keyFile, key, masterPassword)
+        }
+    }
+
+    /**
+     * Encrypts a string with the loaded key
      */
     suspend fun encryptString(plaintext: String): String {
         val cipher = encryptionKey?.cipher() ?: error("Master encryption key is not loaded.")
@@ -85,7 +118,7 @@ class Encryption(
     }
 
     /**
-     * Decrypts a string with an AES.GCM key
+     * Decrypts a string with the loaded key
      */
     suspend fun decryptString(ciphertext: String): String {
         val encryptedData = Base64.decode(ciphertext)
@@ -94,26 +127,69 @@ class Encryption(
         return decryptedBytes.decodeToString()
     }
 
-    /**
-     * Derives an AES.GCM key from a master password using PBKDF2
-     * (used for encrypting the stored encryption key)
-     */
-    private suspend fun deriveKeyFromPassword(password: String): AES.GCM.Key {
-        val pbkdf2 = provider.get(PBKDF2)
-        val salt = ByteArray(16) { 0 } // Use zero-filled salt for deterministic key derivation
+    private suspend fun writeKeyFile(keyFile: FileHandle, key: AES.GCM.Key, masterPassword: String) {
+        val salt = CryptographyRandom.nextBytes(SALT_SIZE_BYTES)
+        val masterKey = deriveKeyFromPassword(masterPassword, salt, pbkdf2Iterations)
+        val wrappedKey = masterKey.cipher().encrypt(key.encodeToByteArray(AES.Key.Format.RAW))
+        val json = buildJsonObject {
+            put("version", KEY_FILE_VERSION)
+            put("kdf", KDF_PBKDF2_SHA256)
+            put("iterations", pbkdf2Iterations)
+            put("salt", Base64.encode(salt))
+            put("key", Base64.encode(wrappedKey))
+        }
+        writeOwnerOnly(keyFile, json.toString())
+    }
 
-        // Use PBKDF2 secretDerivation API
-        val secretDerivation = pbkdf2.secretDerivation(
+    private fun parseKeyFile(text: String): KeyFileContent {
+        val trimmed = text.trim()
+        return if (trimmed.startsWith("{")) {
+            val obj: JsonObject = try {
+                Json.parseToJsonElement(trimmed).jsonObject
+            } catch (e: Exception) {
+                throw InvalidKeyFileException("Key file is not valid JSON.", e)
+            }
+            val version = (obj["version"] as? JsonPrimitive)?.intOrNull
+            if (version != KEY_FILE_VERSION) throw InvalidKeyFileException("Key file version '$version' is not supported.")
+            val kdf = (obj["kdf"] as? JsonPrimitive)?.contentOrNull
+            if (kdf != KDF_PBKDF2_SHA256) throw InvalidKeyFileException("Key file kdf '$kdf' is not supported.")
+            val iterations = (obj["iterations"] as? JsonPrimitive)?.intOrNull
+                ?: throw InvalidKeyFileException("Key file has no 'iterations'.")
+            val salt = obj.base64("salt")
+            val key = obj.base64("key")
+            KeyFileContent(iterations, salt, key, isLegacy = false)
+        } else {
+            // format before version 1: base64 wrapped key, all-zero salt
+            val key = try {
+                Base64.decode(trimmed)
+            } catch (e: Exception) {
+                throw InvalidKeyFileException("Key file is not in a known format.", e)
+            }
+            KeyFileContent(LEGACY_PBKDF2_ITERATIONS, ByteArray(SALT_SIZE_BYTES), key, isLegacy = true)
+        }
+    }
+
+    private fun JsonObject.base64(name: String): ByteArray {
+        val s = (this[name] as? JsonPrimitive)?.contentOrNull ?: throw InvalidKeyFileException("Key file has no '$name'.")
+        return try {
+            Base64.decode(s)
+        } catch (e: Exception) {
+            throw InvalidKeyFileException("Key file '$name' is not valid base64.", e)
+        }
+    }
+
+    /**
+     * Derives an AES-GCM key from a master password using PBKDF2-SHA256
+     * (used for wrapping the stored encryption key)
+     */
+    private suspend fun deriveKeyFromPassword(password: String, salt: ByteArray, iterations: Int): AES.GCM.Key {
+        val secretDerivation = provider.get(PBKDF2).secretDerivation(
             digest = SHA256,
-            iterations = 100_000,
-            outputSize = 32.bytes, // 256 bits = 32 bytes for AES-256
+            iterations = iterations,
+            outputSize = 32.bytes, // AES-256
             salt = salt
         )
         val derivedKeyBytes = secretDerivation.deriveSecret(password.encodeToByteArray())
-
-        // Decode the derived bytes as an AES key
-        val aes = provider.get(AES.GCM)
-        val keyDecoder = aes.keyDecoder()
-        return keyDecoder.decodeFromByteArray(AES.Key.Format.RAW, derivedKeyBytes.toByteArray())
+        return provider.get(AES.GCM).keyDecoder().decodeFromByteArray(AES.Key.Format.RAW, derivedKeyBytes.toByteArray())
     }
 }
