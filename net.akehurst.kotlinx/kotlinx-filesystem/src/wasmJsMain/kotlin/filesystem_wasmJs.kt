@@ -33,6 +33,9 @@ import net.akehurst.kotlinx.filesystem.api.UserFileSystem
 import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
 import web.blob.bytes
 import web.blob.text
+import web.blob.arrayBuffer
+import js.buffer.toByteArray
+import js.typedarrays.toUint8Array
 import web.experimental.ExperimentalWebApi
 import web.fs.*
 import web.streams.close
@@ -62,7 +65,9 @@ data class FileHandleWasmJS(
 
     override suspend fun exists(): Boolean = fileSystem.exists(this)
     override suspend fun readContent(): String? = fileSystem.readFileContent(this)
+    override suspend fun readBytes(): ByteArray? = fileSystem.readFileBytes(this)
     override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
+    override suspend fun writeBytes(content: ByteArray) = fileSystem.writeFileBytes(this, content)
     override suspend fun openAsZipDirectory(): DirectoryHandle? = fileSystem.openFileAsZipDirectory(this)
 }
 
@@ -250,6 +255,33 @@ actual object UserFileSystemDefault : UserFileSystem {
             t.printStackTrace()
             null
         }
+
+    actual override suspend fun readFileBytes(file: FileHandle): ByteArray? =
+        try {
+            when (file) {
+                is FileHandleWasmJS -> file.handle.getFile().arrayBuffer().toByteArray()
+                else -> error("FileHandle is not a FileHandleWasmJS: ${file::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            null
+        }
+
+    actual override suspend fun writeFileBytes(file: FileHandle, content: ByteArray) {
+        try {
+            when (file) {
+                is FileHandleWasmJS -> {
+                    val w = file.handle.createWritable()
+                    w.write(content.toUint8Array())
+                    w.close()
+                }
+
+                else -> error("FileHandle is not a FileHandleWasmJS: ${file::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
+        }
+    }
 
     actual override suspend fun writeFileContent(file: FileHandle, content: String) {
         try {

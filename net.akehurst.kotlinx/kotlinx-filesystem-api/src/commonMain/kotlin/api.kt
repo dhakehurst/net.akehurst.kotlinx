@@ -97,7 +97,17 @@ interface FileHandle : FileSystemObjectHandle {
      */
     val nameWithoutExtension: String get() = name.substringBeforeLast('.')
 
+    /**
+     * the content of the file decoded as UTF-8 text.
+     * Use [readBytes] for binary files, which decoding would corrupt.
+     */
     suspend fun readContent(): String?
+
+    /**
+     * the raw bytes of the file, not decoded.
+     * return null if the file does not exist or cannot be read
+     */
+    suspend fun readBytes(): ByteArray?
 
     /**
      * replace the content of the file.
@@ -105,6 +115,12 @@ interface FileHandle : FileSystemObjectHandle {
      * the browser only shows that prompt when called soon after a user action such as a click.
      */
     suspend fun writeContent(content: String)
+
+    /**
+     * replace the content of the file with these bytes, written as they are.
+     * In a browser (JS/Wasm) this asks for write permission as [writeContent] does.
+     */
+    suspend fun writeBytes(content: ByteArray)
 
     /**
      * open this file as a zip archive; the returned directory is the root of the archive
@@ -157,7 +173,14 @@ interface UserFileSystem : FileSystem {
 
     suspend fun readFileContent(file: FileHandle): String?
 
+    /**
+     * the raw bytes of the file; return null if the file does not exist or cannot be read
+     */
+    suspend fun readFileBytes(file: FileHandle): ByteArray?
+
     suspend fun writeFileContent(file: FileHandle, content: String)
+
+    suspend fun writeFileBytes(file: FileHandle, content: ByteArray)
 
     suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle?
 }

@@ -132,6 +132,30 @@ class test_FileSystemFromVfs {
         assertEquals("world", zipRoot.directory("sub")!!.file("b.txt")!!.readContent())
     }
 
+    @Test
+    fun openAsZipDirectory_readBytes_notUtf8() = runTest {
+        val notUtf8 = byteArrayOf(0x00, 0xFF.toByte(), 0xFE.toByte(), 0x80.toByte())
+        val zipBytes = MemoryVfsMix("binary.bin" to notUtf8).createZipFromTree()
+        val fs = FileSystemFromVfs(MemoryVfsMix("test.zip" to zipBytes))
+        val zipRoot = fs.getFile("test.zip")!!.openAsZipDirectory()
+        assertContentEquals(notUtf8, zipRoot!!.file("binary.bin")!!.readBytes())
+    }
+
+    // --- bytes ---
+
+    @Test
+    fun readBytes() = runTest {
+        assertContentEquals("hello".encodeToByteArray(), fileSystem().getFile("a.txt")!!.readBytes())
+    }
+
+    @Test
+    fun writeBytes_thenReadBytes() = runTest {
+        val bytes = byteArrayOf(0x00, 0xFF.toByte(), 0x80.toByte())
+        val fs = fileSystem()
+        fs.getFile("a.txt")!!.writeBytes(bytes)
+        assertContentEquals(bytes, fs.getFile("a.txt")!!.readBytes())
+    }
+
     // --- create when the name already exists ---
 
     @Test
