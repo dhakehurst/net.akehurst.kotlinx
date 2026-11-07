@@ -46,7 +46,9 @@ class test_HandleAbstract {
     ) : FileHandleAbstract() {
         override suspend fun exists(): Boolean = true
         override suspend fun readContent(): String? = null
+        override suspend fun readBytes(): ByteArray? = null
         override suspend fun writeContent(content: String) {}
+        override suspend fun writeBytes(content: ByteArray) {}
         override suspend fun openAsZipDirectory(): DirectoryHandle? = null
     }
 

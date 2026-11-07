@@ -34,6 +34,8 @@ expect object UserFileSystemDefault : UserFileSystem {
     override suspend fun createNewDirectory(parent: DirectoryHandle, name: String): DirectoryHandle?
     override suspend fun exists(entry: FileSystemObjectHandle): Boolean
     override suspend fun readFileContent(file: FileHandle): String?
+    override suspend fun readFileBytes(file: FileHandle): ByteArray?
     override suspend fun writeFileContent(file: FileHandle, content: String)
+    override suspend fun writeFileBytes(file: FileHandle, content: ByteArray)
     override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle?
 }

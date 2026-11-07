@@ -55,9 +55,15 @@ class test_UserFileSystemDefault {
             zos.putNextEntry(ZipEntry("sub/b.txt"))
             zos.write("world".toByteArray())
             zos.closeEntry()
+            zos.putNextEntry(ZipEntry("binary.bin"))
+            zos.write(notUtf8)
+            zos.closeEntry()
         }
         return zip
     }
+
+    // bytes that are not valid UTF-8, so decoding them as text would change them
+    private val notUtf8 = byteArrayOf(0x00, 0xFF.toByte(), 0xFE.toByte(), 0x80.toByte(), 0x41, 0xC3.toByte())
 
     // --- getDirectory ---
 
@@ -193,7 +199,7 @@ class test_UserFileSystemDefault {
         val zipRoot = root().file("test.zip")!!.openAsZipDirectory()
         assertNotNull(zipRoot)
         val names = zipRoot.listContent().map { it.name }.toSet()
-        assertEquals(setOf("a.txt", "sub"), names)
+        assertEquals(setOf("a.txt", "sub", "binary.bin"), names)
     }
 
     @Test
@@ -205,11 +211,46 @@ class test_UserFileSystemDefault {
     }
 
     @Test
+    fun openFileAsZipDirectory_readBytes_notUtf8() = runTest {
+        writeZip()
+        val zipRoot = root().file("test.zip")!!.openAsZipDirectory()!!
+        assertContentEquals(notUtf8, zipRoot.file("binary.bin")!!.readBytes())
+    }
+
+    @Test
     fun openFileAsZipDirectory_path() = runTest {
         writeZip()
         val zipRoot = root().file("test.zip")!!.openAsZipDirectory()!!
         val b = zipRoot.directory("sub")!!.file("b.txt")!!
         assertTrue(b.path.endsWith("/sub/b.txt"), "path was '${b.path}'")
+    }
+
+    // --- read / write bytes ---
+
+    @Test
+    fun readBytes_notUtf8_isUnchanged() = runTest {
+        File(tmp, "binary.bin").writeBytes(notUtf8)
+        assertContentEquals(notUtf8, root().file("binary.bin")!!.readBytes())
+    }
+
+    @Test
+    fun readBytes_text() = runTest {
+        assertContentEquals("hello".encodeToByteArray(), root().file("a.txt")!!.readBytes())
+    }
+
+    @Test
+    fun readBytes_deletedFile_isNull() = runTest {
+        val f = root().file("a.txt")!!
+        File(tmp, "a.txt").delete()
+        assertNull(f.readBytes())
+    }
+
+    @Test
+    fun writeBytes_thenRead() = runTest {
+        val f = root().createFile("new.bin")!!
+        f.writeBytes(notUtf8)
+        assertContentEquals(notUtf8, File(tmp, "new.bin").readBytes())
+        assertContentEquals(notUtf8, f.readBytes())
     }
 
     // --- create when the name already exists ---

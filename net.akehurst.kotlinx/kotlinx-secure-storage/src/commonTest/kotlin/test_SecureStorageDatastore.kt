@@ -43,6 +43,10 @@ class FakeFileHandle(
 
     override suspend fun readContent(): String? = content
 
+    override suspend fun readBytes(): ByteArray? = content?.encodeToByteArray()
+
+    override suspend fun writeBytes(content: ByteArray) = writeContent(content.decodeToString())
+
     override suspend fun writeContent(content: String) {
         this.content = content
         this.fileExists = true

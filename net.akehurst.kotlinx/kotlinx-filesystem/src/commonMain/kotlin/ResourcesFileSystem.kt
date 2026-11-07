@@ -88,7 +88,15 @@ class FileHandleVfs(
 
     override suspend fun exists(): Boolean = fileSystem.exists(_handle)
     override suspend fun readContent(): String? = _handle.readString()
+    override suspend fun readBytes(): ByteArray? = try {
+        if (_handle.exists()) _handle.readBytes() else null
+    } catch (t: Throwable) {
+        null
+    }
     override suspend fun writeContent(content: String)=_handle.writeString(content)
+    override suspend fun writeBytes(content: ByteArray) {
+        _handle.writeBytes(content)
+    }
     override suspend fun openAsZipDirectory(): DirectoryHandle =
         DirectoryHandleVfs(fileSystem, null, _handle.openAsZip())
 }
@@ -117,5 +125,9 @@ open class FileSystemFromVfs(
 
     suspend fun read(resourcePath: String): String {
         return _vfsRoot[resourcePath].readString()
+    }
+
+    suspend fun readBytes(resourcePath: String): ByteArray {
+        return _vfsRoot[resourcePath].readBytes()
     }
 }

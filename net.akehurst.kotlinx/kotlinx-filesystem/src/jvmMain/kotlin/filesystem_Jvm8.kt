@@ -61,7 +61,9 @@ data class FileHandleJVM(
 
     override suspend fun exists(): Boolean = fileSystem.exists(this)
     override suspend fun readContent(): String? = fileSystem.readFileContent(this)
+    override suspend fun readBytes(): ByteArray? = fileSystem.readFileBytes(this)
     override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
+    override suspend fun writeBytes(content: ByteArray) = fileSystem.writeFileBytes(this, content)
     override suspend fun openAsZipDirectory(): DirectoryHandle? = fileSystem.openFileAsZipDirectory(this)
 }
 
@@ -283,6 +285,29 @@ actual object UserFileSystemDefault : UserFileSystem {
         } catch (t: Throwable) {
             t.printStackTrace()
             return null
+        }
+    }
+
+    actual override suspend fun readFileBytes(file: FileHandle): ByteArray? {
+        try {
+            return when (file) {
+                is FileHandleJVM -> if (file.handle.isFile) file.handle.readBytes() else null
+                else -> error("FileHandle is not a FileHandleJVM: ${file::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            return null
+        }
+    }
+
+    actual override suspend fun writeFileBytes(file: FileHandle, content: ByteArray) {
+        try {
+            when (file) {
+                is FileHandleJVM -> file.handle.writeBytes(content)
+                else -> error("FileHandle is not a FileHandleJVM: ${file::class.simpleName}")
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
         }
     }
 

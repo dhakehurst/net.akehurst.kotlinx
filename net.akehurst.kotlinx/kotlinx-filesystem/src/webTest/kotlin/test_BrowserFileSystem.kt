@@ -94,6 +94,21 @@ class test_BrowserFileSystem {
         assertEquals("changed", a.readContent())
     }
 
+    @Test
+    fun writeBytes_readBytes_notUtf8_isUnchanged() = runTest {
+        val d = testDir() ?: return@runTest
+        val notUtf8 = byteArrayOf(0x00, 0xFF.toByte(), 0xFE.toByte(), 0x80.toByte())
+        val f = d.createFile("binary.bin")!!
+        f.writeBytes(notUtf8)
+        assertContentEquals(notUtf8, f.readBytes())
+    }
+
+    @Test
+    fun readBytes_text() = runTest {
+        val d = testDir() ?: return@runTest
+        assertContentEquals("hello".encodeToByteArray(), d.file("a.txt")!!.readBytes())
+    }
+
     // --- create ---
 
     @Test
