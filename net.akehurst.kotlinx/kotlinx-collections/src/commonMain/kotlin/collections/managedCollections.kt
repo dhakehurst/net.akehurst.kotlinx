@@ -62,7 +62,19 @@ internal fun <E : Any> managedIterator(base: MutableIterator<E>, onRemoved: ((E)
         }
     }
 
+/** The iterator of an empty managed collection (its delegate has not been created yet). Behaves like [managedIterator] over an empty collection. */
+internal object EmptyManagedIterator : MutableIterator<Nothing> {
+    override fun hasNext(): Boolean = false
+    override fun next(): Nothing = throw NoSuchElementException()
+    override fun remove() = throw IllegalStateException("next() must be called before remove()")
+}
+
+/** One shared value: on the JVM every `Reference::class` expression allocates a new ClassReference. */
+private val REFERENCE_KCLASS: KClass<*> = Reference::class
+
 // --- collections ---
+// The delegate of each collection is created on the first add, because most managed collections stay empty
+// (e.g. one per property of every model object). Don't use `by lazy`: a Lazy object costs about as much as it saves.
 
 /**
  * A collection (bag: duplicates allowed, no order guarantees) that checks element types at runtime and calls hooks on mutation.
@@ -73,27 +85,28 @@ internal fun <E : Any> managedIterator(base: MutableIterator<E>, onRemoved: ((E)
  * @param onRemoved Called after an element is removed.
  */
 open class ManagedCollection<E : Any>(
-    private val name: String,
+    protected val name: String,
     private val expectedType: KClass<*>,
     private val onAdded: ((E) -> Unit)? = null,
     private val onRemoved: ((E) -> Unit)? = null
 ) : AbstractMutableCollection<E>() {
 
-    private val delegate = mutableListOf<E>()
+    private var _delegate: MutableList<E>? = null
 
-    override val size: Int get() = delegate.size
+    override val size: Int get() = _delegate?.size ?: 0
 
     /** Checks an element before it is added. This catches elements that got past the compiler via generic upcasts. */
     protected open fun validateType(element: E) = checkManagedType("Collection", name, expectedType, element)
 
     override fun add(element: E): Boolean {
         validateType(element)
+        val delegate = _delegate ?: mutableListOf<E>().also { _delegate = it }
         val res = delegate.add(element)
         if (res) onAdded?.invoke(element)
         return res
     }
 
-    override fun iterator(): MutableIterator<E> = managedIterator(delegate.iterator(), onRemoved)
+    override fun iterator(): MutableIterator<E> = _delegate?.let { managedIterator(it.iterator(), onRemoved) } ?: EmptyManagedIterator
 }
 
 /**
@@ -105,37 +118,42 @@ open class ManagedCollection<E : Any>(
  * @param onRemoved Called after an element is removed (including the old element of a [set]).
  */
 open class ManagedList<E : Any>(
-    private val name: String,
+    protected val name: String,
     private val expectedType: KClass<*>,
     private val onAdded: ((E) -> Unit)? = null,
     private val onRemoved: ((E) -> Unit)? = null
 ) : AbstractMutableList<E>() {
 
-    private val delegate = mutableListOf<E>()
+    private var _delegate: MutableList<E>? = null
 
-    override val size: Int get() = delegate.size
+    /** The delegate, or an [IndexOutOfBoundsException] for any [index] while there is none (the list is empty). */
+    private fun delegateFor(index: Int): MutableList<E> =
+        _delegate ?: throw IndexOutOfBoundsException("Index $index out of bounds for length 0")
 
-    override fun get(index: Int): E = delegate[index]
+    override val size: Int get() = _delegate?.size ?: 0
+
+    override fun get(index: Int): E = delegateFor(index)[index]
 
     /** Checks an element before it is added. This catches elements that got past the compiler via generic upcasts. */
     protected open fun validateType(element: E) = checkManagedType("List", name, expectedType, element)
 
     override fun add(index: Int, element: E) {
         validateType(element)
+        val delegate = _delegate ?: mutableListOf<E>().also { _delegate = it }
         delegate.add(index, element)
         onAdded?.invoke(element)
     }
 
     override fun set(index: Int, element: E): E {
         validateType(element)
-        val oldElement = delegate.set(index, element)
+        val oldElement = delegateFor(index).set(index, element)
         onRemoved?.invoke(oldElement)
         onAdded?.invoke(element)
         return oldElement
     }
 
     override fun removeAt(index: Int): E {
-        val removedElement = delegate.removeAt(index)
+        val removedElement = delegateFor(index).removeAt(index)
         onRemoved?.invoke(removedElement)
         return removedElement
     }
@@ -150,27 +168,28 @@ open class ManagedList<E : Any>(
  * @param onRemoved Called after an element is removed.
  */
 open class ManagedSet<E : Any>(
-    private val name: String,
+    protected val name: String,
     private val expectedType: KClass<*>,
     private val onAdded: ((E) -> Unit)? = null,
     private val onRemoved: ((E) -> Unit)? = null
 ) : AbstractMutableSet<E>() {
 
-    private val delegate = mutableSetOf<E>()
+    private var _delegate: MutableSet<E>? = null
 
-    override val size: Int get() = delegate.size
+    override val size: Int get() = _delegate?.size ?: 0
 
     /** Checks an element before it is added. This catches elements that got past the compiler via generic upcasts. */
     protected open fun validateType(element: E) = checkManagedType("Set", name, expectedType, element)
 
     override fun add(element: E): Boolean {
         validateType(element)
+        val delegate = _delegate ?: mutableSetOf<E>().also { _delegate = it }
         val res = delegate.add(element)
         if (res) onAdded?.invoke(element)
         return res
     }
 
-    override fun iterator(): MutableIterator<E> = managedIterator(delegate.iterator(), onRemoved)
+    override fun iterator(): MutableIterator<E> = _delegate?.let { managedIterator(it.iterator(), onRemoved) } ?: EmptyManagedIterator
 }
 
 /**
@@ -182,30 +201,31 @@ open class ManagedSet<E : Any>(
  * @param onRemoved Called after an element is removed.
  */
 open class ManagedOrderedSet<E : Any>(
-    private val name: String,
+    protected val name: String,
     private val expectedType: KClass<*>,
     private val onAdded: ((E) -> Unit)? = null,
     private val onRemoved: ((E) -> Unit)? = null
 ) : AbstractMutableSet<E>(), MutableOrderedSet<E> {
 
-    private val delegate = linkedSetOf<E>()
+    private var _delegate: LinkedHashSet<E>? = null
 
-    override val size: Int get() = delegate.size
+    override val size: Int get() = _delegate?.size ?: 0
 
     /** Checks an element before it is added. This catches elements that got past the compiler via generic upcasts. */
     protected open fun validateType(element: E) = checkManagedType("OrderedSet", name, expectedType, element)
 
     override fun add(element: E): Boolean {
         validateType(element)
+        val delegate = _delegate ?: linkedSetOf<E>().also { _delegate = it }
         val res = delegate.add(element)
         if (res) onAdded?.invoke(element)
         return res
     }
 
-    override fun iterator(): MutableIterator<E> = managedIterator(delegate.iterator(), onRemoved)
+    override fun iterator(): MutableIterator<E> = _delegate?.let { managedIterator(it.iterator(), onRemoved) } ?: EmptyManagedIterator
 
     override fun get(index: Int): E {
-        delegate.forEachIndexed { i, e ->
+        _delegate?.forEachIndexed { i, e ->
             if (index == i) return e
         }
         throw IndexOutOfBoundsException("$index")
@@ -217,39 +237,40 @@ open class ManagedOrderedSet<E : Any>(
 }
 
 // --- collections of references: check the type of what each reference resolves to ---
+// `name` is a plain constructor parameter here; validateType uses the superclass's `name`.
 
 open class ManagedReferenceCollection<T : Any>(
-    private val name: String,
+    name: String,
     private val referenceType: KClass<T>,
     onAdded: ((Reference<Any, T>) -> Unit)? = null,
     onRemoved: ((Reference<Any, T>) -> Unit)? = null
-) : ManagedCollection<Reference<Any, T>>(name, Reference::class, onAdded, onRemoved) {
+) : ManagedCollection<Reference<Any, T>>(name, REFERENCE_KCLASS, onAdded, onRemoved) {
     override fun validateType(element: Reference<Any, T>) = checkManagedReference("Collection", name, referenceType, element)
 }
 
 open class ManagedReferenceList<T : Any>(
-    private val name: String,
+    name: String,
     private val referenceType: KClass<T>,
     onAdded: ((Reference<Any, T>) -> Unit)? = null,
     onRemoved: ((Reference<Any, T>) -> Unit)? = null
-) : ManagedList<Reference<Any, T>>(name, Reference::class, onAdded, onRemoved) {
+) : ManagedList<Reference<Any, T>>(name, REFERENCE_KCLASS, onAdded, onRemoved) {
     override fun validateType(element: Reference<Any, T>) = checkManagedReference("List", name, referenceType, element)
 }
 
 open class ManagedReferenceSet<T : Any>(
-    private val name: String,
+    name: String,
     private val referenceType: KClass<T>,
     onAdded: ((Reference<Any, T>) -> Unit)? = null,
     onRemoved: ((Reference<Any, T>) -> Unit)? = null
-) : ManagedSet<Reference<Any, T>>(name, Reference::class, onAdded, onRemoved) {
+) : ManagedSet<Reference<Any, T>>(name, REFERENCE_KCLASS, onAdded, onRemoved) {
     override fun validateType(element: Reference<Any, T>) = checkManagedReference("Set", name, referenceType, element)
 }
 
 open class ManagedReferenceOrderedSet<T : Any>(
-    private val name: String,
+    name: String,
     private val referenceType: KClass<T>,
     onAdded: ((Reference<Any, T>) -> Unit)? = null,
     onRemoved: ((Reference<Any, T>) -> Unit)? = null
-) : ManagedOrderedSet<Reference<Any, T>>(name, Reference::class, onAdded, onRemoved) {
+) : ManagedOrderedSet<Reference<Any, T>>(name, REFERENCE_KCLASS, onAdded, onRemoved) {
     override fun validateType(element: Reference<Any, T>) = checkManagedReference("OrderedSet", name, referenceType, element)
 }
