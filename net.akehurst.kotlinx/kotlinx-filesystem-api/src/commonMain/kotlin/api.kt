@@ -16,6 +16,8 @@
 
 package net.akehurst.kotlinx.filesystem.api
 
+import kotlin.time.Instant
+
 interface FileSystem {
 }
 
@@ -123,9 +125,88 @@ interface FileHandle : FileSystemObjectHandle {
     suspend fun writeBytes(content: ByteArray)
 
     /**
-     * open this file as a zip archive; the returned directory is the root of the archive
+     * size, modification time and (for zip entries) compressed size and CRC-32 of this file.
+     * A field is null when the platform or file system does not provide it.
+     * Handles that do not override this return [FileMetadata.UNKNOWN].
      */
-    suspend fun openAsZipDirectory(): DirectoryHandle?
+    suspend fun metadata(): FileMetadata = FileMetadata.UNKNOWN
+
+    /**
+     * open this file as a zip archive; the returned directory is the root of the archive, and is read-only.
+     * The whole file is read into memory.
+     * @throws ZipException if the file is not a zip archive or the archive cannot be read; [ZipException.reason] says why
+     */
+    suspend fun openAsZipDirectory(): DirectoryHandle
+}
+
+/**
+ * metadata of a file; each field is null when it is not known
+ */
+data class FileMetadata(
+    /** uncompressed size in bytes */
+    val size: Long?,
+    val lastModified: Instant?,
+    /** zip entries only: size of the stored (compressed) data in bytes */
+    val compressedSize: Long? = null,
+    /** zip entries only: CRC-32 of the uncompressed content, as an unsigned 32-bit value */
+    val crc32: Long? = null,
+) {
+    companion object {
+        val UNKNOWN = FileMetadata(null, null)
+    }
+}
+
+enum class ZipErrorReason {
+    /** the bytes are not a zip archive (no end of central directory record) */
+    NOT_A_ZIP,
+    /** the archive structure is damaged or inconsistent, or an entry's content does not match its CRC-32 / size */
+    CORRUPT_ARCHIVE,
+    /** the entry is encrypted; reading encrypted entries is not supported */
+    ENCRYPTED_ENTRY,
+    /** the entry uses a compression method other than STORE (0) or DEFLATE (8) */
+    UNSUPPORTED_COMPRESSION_METHOD,
+    /** the archive uses a feature that is not supported, e.g. it is split over several disks */
+    UNSUPPORTED_FEATURE,
+    /** the entry is larger than the limit given when the archive was opened */
+    ENTRY_TOO_LARGE,
+}
+
+class ZipException(
+    val reason: ZipErrorReason,
+    message: String,
+    cause: Throwable? = null
+) : Exception("$reason: $message", cause)
+
+/**
+ * thrown when writing to or creating entries in a read-only file system, such as an opened zip archive
+ */
+class ReadOnlyFileSystemException(message: String) : UnsupportedOperationException(message)
+
+/**
+ * a file found by [walkFiles], with its path relative to the directory the walk started from
+ */
+data class RelativeFile(
+    /** '/'-separated path relative to the start directory, without a leading '/', e.g. "sub/dir/file.txt" */
+    val relativePath: String,
+    val file: FileHandle
+)
+
+/**
+ * all files below this directory, recursively, in the order the directories list them (depth first).
+ * Directories themselves are not included. Use [RelativeFile.relativePath] for glob or other filtering.
+ */
+suspend fun DirectoryHandle.walkFiles(): List<RelativeFile> {
+    val result = mutableListOf<RelativeFile>()
+    suspend fun walk(dir: DirectoryHandle, prefix: String) {
+        for (entry in dir.listContent()) {
+            when (entry) {
+                is FileHandle -> result.add(RelativeFile(prefix + entry.name, entry))
+                is DirectoryHandle -> walk(entry, prefix + entry.name + "/")
+            }
+        }
+    }
+    walk(this, "")
+    return result
 }
 
 enum class FileAccessMode {
@@ -182,5 +263,9 @@ interface UserFileSystem : FileSystem {
 
     suspend fun writeFileBytes(file: FileHandle, content: ByteArray)
 
-    suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle?
+    /**
+     * open the file as a zip archive; see [FileHandle.openAsZipDirectory]
+     * @throws ZipException if the file is not a zip archive or the archive cannot be read
+     */
+    suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle
 }

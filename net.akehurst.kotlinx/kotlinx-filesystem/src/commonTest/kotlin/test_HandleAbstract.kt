@@ -49,7 +49,7 @@ class test_HandleAbstract {
         override suspend fun readBytes(): ByteArray? = null
         override suspend fun writeContent(content: String) {}
         override suspend fun writeBytes(content: ByteArray) {}
-        override suspend fun openAsZipDirectory(): DirectoryHandle? = null
+        override suspend fun openAsZipDirectory(): DirectoryHandle = error("not a zip")
     }
 
     // --- extension ---

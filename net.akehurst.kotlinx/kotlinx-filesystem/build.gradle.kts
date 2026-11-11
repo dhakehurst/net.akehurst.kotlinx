@@ -23,6 +23,12 @@ kotlin {
                 implementation(libs.korlibs.korio)
             }
         }
+        webMain {
+            dependencies {
+                implementation(libs.kotlinx.wrappers.js)
+                implementation(libs.kotlinx.wrappers.browser)
+            }
+        }
         jsMain {
             dependencies {
                 implementation(libs.kotlinx.wrappers.js)

@@ -19,11 +19,11 @@ package net.akehurst.kotlinx.filesystem
 import korlibs.io.file.VfsFile
 import korlibs.io.file.baseName
 import korlibs.io.file.std.jailedLocalVfs
-import korlibs.io.file.std.openAsZip
 import korlibs.io.file.std.resourcesVfs
 import korlibs.io.file.std.userHomeVfs
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
+import net.akehurst.kotlinx.filesystem.api.FileMetadata
 import net.akehurst.kotlinx.filesystem.api.FileSystem
 import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
 
@@ -97,8 +97,16 @@ class FileHandleVfs(
     override suspend fun writeBytes(content: ByteArray) {
         _handle.writeBytes(content)
     }
+    override suspend fun metadata(): FileMetadata {
+        val stat = _handle.stat()
+        if (!stat.exists || stat.isDirectory) return FileMetadata.UNKNOWN
+        return FileMetadata(
+            size = stat.size.takeIf { it >= 0L },
+            lastModified = stat.modifiedTime.unixMillisLong.takeIf { it > 0L }?.let { kotlin.time.Instant.fromEpochMilliseconds(it) }
+        )
+    }
     override suspend fun openAsZipDirectory(): DirectoryHandle =
-        DirectoryHandleVfs(fileSystem, null, _handle.openAsZip())
+        ZipFileSystem.open(_handle.readBytes(), name)
 }
 
 open class FileSystemFromVfs(

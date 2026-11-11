@@ -52,7 +52,7 @@ class FakeFileHandle(
         this.fileExists = true
     }
 
-    override suspend fun openAsZipDirectory() = null
+    override suspend fun openAsZipDirectory(): DirectoryHandle = error("not a zip")
 
     override suspend fun exists(): Boolean = fileExists
 

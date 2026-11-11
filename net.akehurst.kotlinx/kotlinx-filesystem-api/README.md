@@ -180,13 +180,40 @@ these dialogs.
 
 ## Zip files
 
-A file can be opened as a zip archive. The result is a `DirectoryHandle` for the root of the
-archive:
+Zip archives are read by a small zip reader in common code (no Korio). Archives are read-only and
+are held in memory.
 
 ```kotlin
-val zip = dir.file("data.zip")?.openAsZipDirectory() ?: return
-val entry = zip.directory("sub")?.file("b.txt")?.readContent()
+// a file on any file system
+val zip: DirectoryHandle = dir.file("data.zip")!!.openAsZipDirectory()
+
+// bytes from anywhere (download, SharePoint, a database, ...)
+val root = ZipFileSystem.open(bytes, name = "data.zip", options = ZipOptions(maxEntrySize = 100L * 1024 * 1024))
+
+for ((path, file) in root.walkFiles()) {           // all files, with paths relative to root
+    if (!path.endsWith(".json")) continue
+    val md = file.metadata()                        // size, lastModified, compressedSize, crc32
+    if ((md.size ?: 0) > 10_000_000) continue       // check the size before reading
+    val text = file.readContent()
+}
 ```
+
+- Errors throw `ZipException`, whose `reason` is one of `NOT_A_ZIP`, `CORRUPT_ARCHIVE`,
+  `ENCRYPTED_ENTRY`, `UNSUPPORTED_COMPRESSION_METHOD`, `UNSUPPORTED_FEATURE` (multi-disk archives)
+  or `ENTRY_TOO_LARGE`. Encrypted or unsupported entries are still listed; reading them throws.
+- Writing or creating anything in an archive throws `ReadOnlyFileSystemException`.
+- Supported: STORE and DEFLATE entries, ZIP64 (large archives and more than 65535 entries), UTF-8
+  names (flag or Info-ZIP Unicode Path field) and CP437 names otherwise. CRC-32 is checked on read.
+- DEFLATE uses `java.util.zip.Inflater` on the JVM and the browser's `DecompressionStream` on JS and Wasm.
+- Names cannot escape the archive: `\` is read as `/`, and empty, `.` and `..` segments and drive
+  letters are dropped (`../../a.txt` becomes `a.txt`). If two entries end up with the same path,
+  the first is kept.
+- Zip bombs: `metadata().size` is known before reading, `ZipOptions.maxEntrySize` limits reads,
+  and inflating stops at the declared size, so an entry cannot produce more bytes than it claims.
+- Memory: the whole archive is a `ByteArray`, so the practical limit is about 2 GB per archive
+  (less in a browser), plus the full size of each entry while it is read.
+- DOS timestamps have no time zone and are read as UTC; the extended timestamp field (UTC) is used
+  when present.
 
 ## API
 
@@ -196,10 +223,14 @@ Package `net.akehurst.kotlinx.filesystem.api`.
 |---|---|
 | `FileSystemObjectHandle` | Common to files and directories: `name`, `path`, `absolutePath`, `parent`, `exists()` |
 | `DirectoryHandle` | `listContent`, `entry`, `file`, `directory`, `createFile`, `createDirectory`, `getOrCreateFile`, `getOrCreateDirectory` |
-| `FileHandle` | `extension`, `nameWithoutExtension`, `readContent`, `writeContent`, `openAsZipDirectory` |
+| `FileHandle` | `extension`, `nameWithoutExtension`, `readContent`, `readBytes`, `writeContent`, `writeBytes`, `metadata`, `openAsZipDirectory` |
+| `FileMetadata` | `size`, `lastModified`, `compressedSize`, `crc32` (each nullable) |
+| `ZipException`, `ZipErrorReason` | Why a zip archive or entry could not be read |
+| `ReadOnlyFileSystemException` | Thrown when writing to a read-only file system such as a zip archive |
+| `walkFiles()`, `RelativeFile` | All files below a directory, with relative paths |
 | `UserFileSystem` | Getting directories by path, dialogs, and the operations behind the handles |
 | `FileAccessMode` | `READ_ONLY` or `READ_WRITE`, for the browser directory dialog |
 
-The implementations (`UserFileSystemDefault`, `FileSystemKorio`, `FileSystemFromVfs`,
+The implementations (`UserFileSystemDefault`, `ZipFileSystem`, `ZipOptions`, `FileSystemKorio`, `FileSystemFromVfs`,
 `ResourcesFileSystem`, `UserHomeFileSystem`) are in package `net.akehurst.kotlinx.filesystem`, in
 the `kotlinx-filesystem` module.

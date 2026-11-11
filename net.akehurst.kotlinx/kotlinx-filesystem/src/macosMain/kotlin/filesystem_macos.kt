@@ -37,5 +37,5 @@ actual object UserFileSystemDefault : UserFileSystem {
     actual override suspend fun readFileBytes(file: FileHandle): ByteArray? = TODO()
     actual override suspend fun writeFileContent(file: FileHandle, content: String): Unit = TODO()
     actual override suspend fun writeFileBytes(file: FileHandle, content: ByteArray): Unit = TODO()
-    actual override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? = TODO()
+    actual override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle = TODO()
 }

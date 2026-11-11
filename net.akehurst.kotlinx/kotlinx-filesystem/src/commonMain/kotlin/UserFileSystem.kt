@@ -37,5 +37,5 @@ expect object UserFileSystemDefault : UserFileSystem {
     override suspend fun readFileBytes(file: FileHandle): ByteArray?
     override suspend fun writeFileContent(file: FileHandle, content: String)
     override suspend fun writeFileBytes(file: FileHandle, content: ByteArray)
-    override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle?
+    override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle
 }

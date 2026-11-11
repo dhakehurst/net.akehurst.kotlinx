@@ -16,11 +16,10 @@
 
 package net.akehurst.kotlinx.filesystem
 
-import korlibs.io.file.std.ZipVfs
-import korlibs.io.stream.openAsync
 import net.akehurst.kotlinx.filesystem.api.DirectoryHandle
 import net.akehurst.kotlinx.filesystem.api.FileHandle
 import net.akehurst.kotlinx.filesystem.api.FileAccessMode
+import net.akehurst.kotlinx.filesystem.api.FileMetadata
 import net.akehurst.kotlinx.filesystem.api.UserFileSystem
 import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
 import java.awt.EventQueue
@@ -33,6 +32,7 @@ import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.listDirectoryEntries
 import kotlin.printStackTrace
+import kotlin.time.Instant
 
 data class DirectoryHandleJVM(
     val fileSystem: UserFileSystemDefault,
@@ -64,7 +64,15 @@ data class FileHandleJVM(
     override suspend fun readBytes(): ByteArray? = fileSystem.readFileBytes(this)
     override suspend fun writeContent(content: String) = fileSystem.writeFileContent(this, content)
     override suspend fun writeBytes(content: ByteArray) = fileSystem.writeFileBytes(this, content)
-    override suspend fun openAsZipDirectory(): DirectoryHandle? = fileSystem.openFileAsZipDirectory(this)
+    override suspend fun metadata(): FileMetadata = when {
+        handle.isFile -> FileMetadata(
+            size = handle.length(),
+            // File.lastModified() is 0 when unknown
+            lastModified = handle.lastModified().takeIf { it > 0L }?.let { Instant.fromEpochMilliseconds(it) }
+        )
+        else -> FileMetadata.UNKNOWN
+    }
+    override suspend fun openAsZipDirectory(): DirectoryHandle = fileSystem.openFileAsZipDirectory(this)
 }
 
 actual object UserFileSystemDefault : UserFileSystem {
@@ -325,16 +333,9 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    actual override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle? {
-        try {
-            val handle = (file as FileHandleJVM).handle
-            val byteArray = handle.readBytes()
-            val zipFs = ZipVfs(byteArray.openAsync())
-            return FileSystemFromVfs(zipFs).root
-        } catch (t: Throwable) {
-            t.printStackTrace()
-            return null
-        }
+    actual override suspend fun openFileAsZipDirectory(file: FileHandle): DirectoryHandle {
+        val handle = (file as? FileHandleJVM)?.handle ?: error("FileHandle is not a FileHandleJVM: ${file::class.simpleName}")
+        return ZipFileSystem.open(handle.readBytes(), handle.name)
     }
 
 }
