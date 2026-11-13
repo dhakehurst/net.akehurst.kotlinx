@@ -138,6 +138,12 @@ actual object UserFileSystemDefault : UserFileSystem {
     }
 
     private fun chooseDirectorySwing(dialogTitle:String, current: DirectoryHandleJVM?): DirectoryHandle? {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         val fileChooser = JFileChooser()
         fileChooser.currentDirectory = current?.handle
         fileChooser.isMultiSelectionEnabled = false
