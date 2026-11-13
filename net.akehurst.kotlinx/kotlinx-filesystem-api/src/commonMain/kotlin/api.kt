@@ -226,6 +226,12 @@ interface UserFileSystem : FileSystem {
     /**
      * ask the user to choose a directory; return null if they cancel.
      * [accessMode] is passed to the browser directory picker on JS/Wasm; other platforms do not use it.
+     *
+     * The dialog used depends on the platform:
+     *  - JS/Wasm: the browser directory picker (`showDirectoryPicker`).
+     *  - JVM on macOS: the native `java.awt.FileDialog`, with `apple.awt.fileDialogForDirectories=true`.
+     *  - JVM on other OSs (Linux, Windows, ...): `javax.swing.JFileChooser` in `DIRECTORIES_ONLY` mode,
+     *    because the AWT `FileDialog` there cannot select a directory.
      */
     suspend fun selectDirectoryFromDialog(dialogTitle: String, current: DirectoryHandle? = null, accessMode: FileAccessMode = FileAccessMode.READ_WRITE): DirectoryHandle?
 

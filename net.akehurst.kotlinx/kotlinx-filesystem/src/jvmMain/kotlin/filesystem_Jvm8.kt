@@ -103,14 +103,31 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
+    private val isMacOS: Boolean by lazy {
+        System.getProperty("os.name")?.lowercase()?.startsWith("mac") ?: false
+    }
+
+    /**
+     * On macOS this uses the native java.awt.FileDialog (with apple.awt.fileDialogForDirectories=true),
+     * on all other OSs it uses javax.swing.JFileChooser in DIRECTORIES_ONLY mode,
+     * because the AWT FileDialog on Linux (GTK) and Windows cannot select a directory.
+     * The dialog is always shown on the AWT event dispatch thread.
+     */
     actual override suspend fun selectDirectoryFromDialog(dialogTitle:String, current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
         try {
+            val chooser: () -> DirectoryHandle? = {
+                if (isMacOS) {
+                    chooseDirectoryNative(dialogTitle, current as DirectoryHandleJVM?)
+                } else {
+                    chooseDirectorySwing(dialogTitle, current as DirectoryHandleJVM?)
+                }
+            }
             return if (EventQueue.isDispatchThread()) {
-                chooseDirectory2(dialogTitle,current as DirectoryHandleJVM?)
+                chooser()
             } else {
                 var handle: DirectoryHandle? = null
                 EventQueue.invokeAndWait() {
-                    handle = chooseDirectory2(dialogTitle,current as DirectoryHandleJVM?)
+                    handle = chooser()
                 }
                 handle
             }
@@ -120,7 +137,26 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
-    private fun chooseDirectory2(dialogTitle:String, current: DirectoryHandleJVM?): DirectoryHandle? {
+    private fun chooseDirectorySwing(dialogTitle:String, current: DirectoryHandleJVM?): DirectoryHandle? {
+        val fileChooser = JFileChooser()
+        fileChooser.currentDirectory = current?.handle
+        fileChooser.isMultiSelectionEnabled = false
+        fileChooser.fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+        fileChooser.dialogTitle = dialogTitle
+        val result = fileChooser.showOpenDialog(null) // 'null' for parent component
+        return if (result == JFileChooser.APPROVE_OPTION) {
+            fileChooser.selectedFile?.let { selectedDir ->
+                val pf: File? = selectedDir.parentFile
+                val parent = pf?.let { DirectoryHandleJVM(this, null, pf) }
+                DirectoryHandleJVM(this, parent, selectedDir)
+            }
+        } else {
+            null
+        }
+    }
+
+    // macOS only: apple.awt.fileDialogForDirectories has no effect on other OSs
+    private fun chooseDirectoryNative(dialogTitle:String, current: DirectoryHandleJVM?): DirectoryHandle? {
         val parentFrame = Frame(dialogTitle)
         System.setProperty("apple.awt.fileDialogForDirectories", "true")
         val fd = FileDialog(parentFrame, dialogTitle)
