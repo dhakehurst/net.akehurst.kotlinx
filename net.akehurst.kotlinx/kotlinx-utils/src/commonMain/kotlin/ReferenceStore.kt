@@ -32,6 +32,12 @@ interface ReferenceStore<R : Any> {
      * The same as `set(clazz, reference, null)`.
      */
     fun <T : Any> remove(clazz: KClass<T>, reference: R) = set(clazz, reference, null)
+
+    /**
+     * The objects stored in this store under exactly type [clazz] (objects of subtypes stored under other types
+     * are not included), in the order their keys were first stored. Empty if there are none.
+     */
+    fun <T : Any> values(clazz: KClass<T>): List<T>
 }
 
 interface HierarchicalReferenceStore<R : Any> : ReferenceStore<R> {
@@ -59,11 +65,19 @@ interface HierarchicalReferenceStore<R : Any> : ReferenceStore<R> {
      */
     fun <T : Any> findInTree(clazz: KClass<T>, reference: R): T?
 
+    /**
+     * Every object in the whole tree of stores (from the root, whichever store it is called on)
+     * that is an instance of [clazz], stored under any type.
+     * Each object is returned once (compared by identity, `===`), even if it is stored under more than one type or key.
+     * Order: by the type the object is stored under, in the order types were first stored in the tree, then in key order.
+     */
+    fun <T : Any> findAllInTree(clazz: KClass<T>): List<T>
+
     //fun <T : Any> getQualifiedReference(clazz: KClass<T>, qualifiedReference: List<R>): T?
 }
 
 class ReferenceStoreByHashMap<R : Any> : ReferenceStore<R> {
-    private val _map = HashMap<KClass<*>, HashMap<R, Any>>()
+    private val _map = LinkedHashMap<KClass<*>, LinkedHashMap<R, Any>>()
 
     override fun <T : Any> get(clazz: KClass<T>, reference: R): T? = _map[clazz]?.get(reference) as? T
 
@@ -71,11 +85,14 @@ class ReferenceStoreByHashMap<R : Any> : ReferenceStore<R> {
         when (value) {
             null -> _map[clazz]?.remove(reference)
             else -> {
-                val clsMap = _map[clazz] ?: let { HashMap<R, Any>().also { _map[clazz] = it } }
+                val clsMap = _map[clazz] ?: let { LinkedHashMap<R, Any>().also { _map[clazz] = it } }
                 clsMap[reference] = value
             }
         }
     }
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : Any> values(clazz: KClass<T>): List<T> = _map[clazz]?.values?.toList() as List<T>? ?: emptyList()
 }
 
 object ReferenceStoreExt {
@@ -119,9 +136,9 @@ class HierarchicalReferenceStoreByHashMap<R : Any>(
             null == parentReferenceStore -> this
             else -> parentReferenceStore.rootReferenceStore
         }
-    private val _children = mutableMapOf<R, HierarchicalReferenceStore<R>>()
-    private val _map = HashMap<KClass<*>, HashMap<R, Any>>()
-    private val _ownerForReferenceType = HashMap<KClass<*>,ReferenceStore<R>>()
+    private val _children = LinkedHashMap<R, HierarchicalReferenceStore<R>>()
+    private val _map = LinkedHashMap<KClass<*>, LinkedHashMap<R, Any>>()
+    private val _ownerForReferenceType = LinkedHashMap<KClass<*>, ReferenceStore<R>>()
 
     override fun <T : Any> get(clazz: KClass<T>, reference: R): T? =
         _map[clazz]?.get(reference) as? T
@@ -134,7 +151,7 @@ class HierarchicalReferenceStoreByHashMap<R : Any>(
             null -> _map[clazz]?.remove(reference)
             else -> {
                 rootReferenceStore.setOwnerForReferenceType(clazz, this) // throws if another store holds this type
-                val clsMap = _map[clazz] ?: let { HashMap<R, Any>().also { _map[clazz] = it } }
+                val clsMap = _map[clazz] ?: let { LinkedHashMap<R, Any>().also { _map[clazz] = it } }
                 clsMap[reference] = value
             }
         }
@@ -176,6 +193,31 @@ class HierarchicalReferenceStoreByHashMap<R : Any>(
             1 -> matches[0] as T
             else -> error("Reference '$reference' to a '${clazz.simpleName}' matches more than one object: $matches")
         }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : Any> values(clazz: KClass<T>): List<T> = _map[clazz]?.values?.toList() as List<T>? ?: emptyList()
+
+    override fun <T : Any> findAllInTree(clazz: KClass<T>): List<T> {
+        val root = rootReferenceStore
+        if (root !== this) return root.findAllInTree(clazz)
+
+        // Each type is held by exactly one store, recorded in _ownerForReferenceType, so this covers the whole tree.
+        // Seen objects are bucketed by hashCode and compared by identity (no identity hash map in common code).
+        val seen = HashMap<Int, MutableList<Any>>()
+        val result = mutableListOf<T>()
+        for ((type, store) in _ownerForReferenceType) {
+            for (value in store.values(type)) {
+                if (!clazz.isInstance(value)) continue
+                val bucket = seen.getOrPut(value.hashCode()) { mutableListOf() }
+                if (bucket.none { it === value }) {
+                    bucket.add(value)
+                    @Suppress("UNCHECKED_CAST")
+                    result.add(value as T)
+                }
+            }
+        }
+        return result
     }
 
     override fun toString(): String = "HierarchicalReferenceStore '$identity'"

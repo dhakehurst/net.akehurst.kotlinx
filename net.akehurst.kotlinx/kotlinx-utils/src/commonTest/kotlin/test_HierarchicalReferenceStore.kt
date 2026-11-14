@@ -320,4 +320,87 @@ class test_HierarchicalReferenceStore {
 		assertNull(root.resolve(ref, clearIfNotFound = true))
 		assertEquals("by value", ref.resolved)
 	}
+
+	// --- listing objects: values / findAllInTree ---
+
+	@Test
+	fun values_returns_objects_stored_under_exactly_that_type() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val child = HierarchicalReferenceStoreByHashMap(root, "child")
+		val c1 = Circle("c1")
+		val c2 = Circle("c2")
+		val s1 = Square("s1")
+		child.set(Circle::class, "c1", c1)
+		child.set(Circle::class, "c2", c2)
+		child.set(Square::class, "s1", s1)
+
+		assertEquals(listOf(c1, c2), child.values(Circle::class))
+		assertEquals(listOf(s1), child.values(Square::class))
+		assertEquals(emptyList(), root.values(Circle::class)) // values only looks in the store itself
+	}
+
+	@Test
+	fun values_does_not_include_subtypes_stored_under_other_types() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val asShape = Circle("as shape")
+		root.set(Shape::class, "x", asShape)
+		root.set(Circle::class, "c1", Circle("c1"))
+
+		assertEquals(listOf<Shape>(asShape), root.values(Shape::class))
+		assertEquals(emptyList(), root.values(Square::class))
+	}
+
+	@Test
+	fun findAllInTree_finds_subtypes_in_several_child_stores_from_root_and_child() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val circles = HierarchicalReferenceStoreByHashMap(root, "circles")
+		val squares = HierarchicalReferenceStoreByHashMap(root, "squares")
+		val c1 = Circle("c1")
+		val c2 = Circle("c2")
+		val s1 = Square("s1")
+		circles.set(Circle::class, "c1", c1)
+		squares.set(Square::class, "s1", s1)
+		circles.set(Circle::class, "c2", c2)
+		squares.set(String::class, "x", "not a shape")
+
+		val expected = listOf<Shape>(c1, c2, s1) // type first stored, then key
+		assertEquals(expected, root.findAllInTree(Shape::class))
+		assertEquals(expected, circles.findAllInTree(Shape::class))
+		assertEquals(expected, squares.findAllInTree(Shape::class))
+		assertEquals(listOf(s1), circles.findAllInTree(Square::class))
+		assertEquals(emptyList(), root.findAllInTree(Int::class))
+	}
+
+	@Test
+	fun findAllInTree_returns_object_stored_under_two_types_once() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val shapes = HierarchicalReferenceStoreByHashMap(root, "shapes")
+		val circles = HierarchicalReferenceStoreByHashMap(root, "circles")
+		val c1 = Circle("c1")
+		val equalButDifferent = Circle("c1")
+		shapes.set(Shape::class, "c1", c1)
+		circles.set(Circle::class, "c1", c1)
+		circles.set(Circle::class, "alias", c1)
+		circles.set(Circle::class, "other", equalButDifferent)
+
+		val all = root.findAllInTree(Shape::class)
+		assertEquals(2, all.size)
+		assertSame(c1, all[0])
+		assertSame(equalButDifferent, all[1]) // equal (==) but not the same object, so both are listed
+	}
+
+	@Test
+	fun findAllInTree_does_not_return_removed_objects() {
+		val root = HierarchicalReferenceStoreByHashMap<String>(null, "root")
+		val child = HierarchicalReferenceStoreByHashMap(root, "child")
+		val c1 = Circle("c1")
+		val c2 = Circle("c2")
+		child.set(Circle::class, "c1", c1)
+		child.set(Circle::class, "c2", c2)
+
+		child.set(Circle::class, "c1", null)
+
+		assertEquals(listOf<Shape>(c2), root.findAllInTree(Shape::class))
+		assertEquals(listOf(c2), child.values(Circle::class))
+	}
 }
