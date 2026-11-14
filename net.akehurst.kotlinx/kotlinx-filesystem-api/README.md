@@ -97,12 +97,19 @@ File names:
 
 `nameWithoutExtension` matches Kotlin's `File.nameWithoutExtension` (`kotlin.io`).
 
-Reading and writing work on text:
+Reading and writing work on text (UTF-8) or on raw bytes:
 
 ```kotlin
 val text: String? = file.readContent()
 file.writeContent("new content")   // replaces the whole file
+
+val bytes: ByteArray? = file.readBytes()   // not decoded; use this for binary files
+file.writeBytes(bytes!!)                   // written as they are, replaces the whole file
 ```
+
+`readContent` and `readBytes` return null if the file does not exist or cannot be read. Use the byte
+versions for binary files such as images or databases, which decoding as text would corrupt.
+`file.metadata()` gives the size and modification time where the platform provides them.
 
 ## Creating files and directories
 
@@ -159,8 +166,12 @@ Each returns null if the user cancels.
   choose anywhere.
 - The returned handle's `parent` is the directory that contains it when that is known, otherwise
   null.
+- On the JVM, `selectDirectoryFromDialog` uses the system dialog (`java.awt.FileDialog`) on macOS,
+  and a Swing `JFileChooser` that only selects directories on other systems, because the AWT dialog
+  cannot select a directory on Linux or Windows. The Swing dialogs use the system look and feel. The
+  dialog is always shown on the AWT event thread.
 - On the JVM, `selectExistingFileFromDialog` uses a Swing dialog by default, or the system dialog
-  with `useNativeDialog = true`.
+  with `useNativeDialog = true`. `selectNewFileFromDialog` creates the chosen file if it does not exist.
 
 ## Browser (JS and Wasm)
 
@@ -184,7 +195,7 @@ Zip archives are read by a small zip reader in common code (no Korio). Archives 
 are held in memory.
 
 ```kotlin
-// a file on any file system
+// a file on any file system; throws ZipException if it is not a zip archive
 val zip: DirectoryHandle = dir.file("data.zip")!!.openAsZipDirectory()
 
 // bytes from anywhere (download, SharePoint, a database, ...)

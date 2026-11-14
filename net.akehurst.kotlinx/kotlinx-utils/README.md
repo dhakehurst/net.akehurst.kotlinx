@@ -1,7 +1,7 @@
 # kotlinx-utils
 
 Small multiplatform helpers used by the other kotlinx modules: glob patterns, observable values and
-references, reference stores, unique identities, lazy values computed by a `suspend` function, and a
+references, derived (computed) values, reference stores, unique identities, lazy values computed by a `suspend` function, and a
 JSON serializer for `Any`.
 
 ```kotlin
@@ -19,6 +19,7 @@ UniqueIdentityGenerator.GLOBAL.generate("node")   // "node_0", then "node_1", ..
 - [Setup](#setup)
 - [Glob patterns](#glob-patterns)
 - [Values](#values)
+- [Derived values](#derived-values)
 - [References](#references)
 - [Reference stores](#reference-stores)
 - [Unique identities](#unique-identities)
@@ -31,7 +32,7 @@ UniqueIdentityGenerator.GLOBAL.generate("node")   // "node_0", then "node_1", ..
 ## Setup
 
 The module is published to Maven Central under the group `net.akehurst.kotlinx`. It is built for
-JVM, JS, Wasm (JS) and macOS (Arm64).
+JVM, JS and Wasm (JS). The macOS (Arm64) target is switched off for now, because it needs Xcode to build.
 
 ```kotlin
 // build.gradle.kts
@@ -92,6 +93,39 @@ title.set(42)        // throws IllegalArgumentException: not a String
 called. Both do nothing if the new value equals the current one. The starting value is checked too
 (but doesn't call `onChanged`). `null` is always allowed. Two `ManagedValue` objects are only equal if
 they are the same object.
+
+`ValueExt.mutable` casts a `Value` to `MutableValue`.
+
+## Derived values
+
+A `Derived<T>` is the read-only counterpart of `Value<T>` for computed properties: it stores nothing
+and computes its value each time `get()` is called. `MutableDerived<T>` adds `set()`, for derived
+values that have an inverse: `set` writes the stored values the derivation reads, so that it then
+gives the new value.
+
+| Class | Use |
+|---|---|
+| `DerivedDefault(derivation)` | A value computed by `derivation` |
+| `ManagedDerived(name, expectedType, derivation)` | The same, and checks the type of each computed value, like `ManagedValue` |
+| `ManagedMutableDerived(name, expectedType, derivation, inverse)` | A `ManagedDerived` that can be set; `set(x)` calls `inverse(x)` |
+
+```kotlin
+class Person(var first: String, var last: String) {
+    val fullName = ManagedMutableDerived<String>("fullName", String::class,
+        derivation = { "$first $last" },
+        inverse = { v -> first = v.substringBefore(' '); last = v.substringAfter(' ') },
+    )
+}
+
+val p = Person("Ada", "Byron")
+p.fullName.get()                  // "Ada Byron"
+p.fullName.set("Ada Lovelace")    // p.last is now "Lovelace"
+```
+
+`ManagedDerived` throws `IllegalStateException`, naming the property, if the derivation gives a value
+of the wrong type. `null` is always allowed. `DerivedExt.mutable` casts a `Derived` to `MutableDerived`.
+
+Derived collections, whose content is computed in the same way, are in `kotlinx-collections`.
 
 ## References
 
@@ -174,6 +208,9 @@ store.resolve(ref, clearIfNotFound = true)   // not found: ref.resolved becomes 
 
 A reference with no key is never changed by `resolve`. Both stores' `resolve` take `clearIfNotFound`.
 
+`store.values(Person::class)` lists the objects stored under exactly that type, in the order their
+keys were first stored (objects stored under other types, even subtypes, are not included).
+
 `HierarchicalReferenceStoreByHashMap(parent, identity)` is a store with a parent, so stores form a
 tree. `get` and `set` only use the store itself. To find an object anywhere in the tree, use
 `HierarchicalReferenceStoreExt.resolve`, from any store in the tree:
@@ -195,7 +232,16 @@ model.resolve(MutableReferenceDefault<String, Shape>("c1"))    // c1, a Circle i
 - **`resolve` looks in the owner of the reference's type first.** If the object isn't there, it looks
   for an object with the same key, stored under any other type, that is an instance of the
   reference's type. So a reference to `Shape` finds a `Circle`. If more than one object matches, it
-  throws `IllegalStateException`.
+  throws `IllegalStateException`. `findInTree(clazz, key)` does the same lookup without a reference.
+
+`findAllInTree(clazz)` lists every object in the whole tree that is an instance of `clazz`, whichever
+store it is called on and whatever type it was stored under. Each object is listed once (compared with
+`===`), even if it is stored under more than one type or key. The order is by the type it is stored
+under (in the order types were first stored in the tree), then by key order.
+
+```kotlin
+model.findAllInTree(Shape::class)   // [c1, ...]: every Circle, Square, ... in model and shapes
+```
 
 ## Unique identities
 
@@ -303,7 +349,8 @@ Package `net.akehurst.kotlinx.utils`, except `toRegexFromGlob`, which is in `net
 |---|---|
 | `RegexExtension.kt` | `String.toRegexFromGlob` |
 | `Value.kt` | `Value`, `MutableValue`, `ValueImmutable`, `MutableValueAbstract`, `MutableValueDefault`, `ManagedValue`, `ValueExt` |
-| `Reference.kt` | `Reference`, `MutableReference`, `ReferenceImmutable`, `MutableReferenceDefault`, `ManagedReference`, `ReferenceExt` |
+| `Derived.kt` | `Derived`, `MutableDerived`, `DerivedDefault`, `ManagedDerived`, `ManagedMutableDerived`, `DerivedExt` |
+| `Reference.kt` | `Reference`, `ResolvableReference`, `MutableReference`, `ReferenceImmutable`, `ResolvableReferenceDefault`, `ManagedResolvableReference`, `MutableReferenceDefault`, `ManagedReference`, `ReferenceExt` |
 | `ReferenceStore.kt` | `ReferenceStore`, `ReferenceStoreByHashMap`, `HierarchicalReferenceStore`, `HierarchicalReferenceStoreByHashMap`, `ReferenceStoreExt`, `HierarchicalReferenceStoreExt` |
 | `UniqueIdentityGenerator.kt` | `UniqueIdentityGenerator` |
 | `asynclazy.kt` | `asyncLazy`, `AsyncLazy` |
