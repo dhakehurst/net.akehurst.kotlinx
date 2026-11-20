@@ -168,8 +168,13 @@ Each returns null if the user cancels.
   null.
 - On the JVM, `selectDirectoryFromDialog` uses the system dialog (`java.awt.FileDialog`) on macOS,
   and a Swing `JFileChooser` that only selects directories on other systems, because the AWT dialog
-  cannot select a directory on Linux or Windows. The Swing dialogs use the system look and feel. The
-  dialog is always shown on the AWT event thread.
+  cannot select a directory on Linux or Windows. The Swing dialogs use the system look and feel; the
+  app's own look and feel is switched only while the dialog is open and restored when it closes.
+- On the JVM, the dialogs are shown on the AWT event thread from a separate event, and the calling
+  coroutine suspends until the dialog closes. So they can be called from any coroutine, including
+  one running on the AWT event thread, such as Compose Desktop's `rememberCoroutineScope()` in a
+  button's `onClick`. [kotlinx-filesystem-compose-demo](../../kotlinx-filesystem-compose-demo/README.md)
+  shows this.
 - On the JVM, `selectExistingFileFromDialog` uses a Swing dialog by default, or the system dialog
   with `useNativeDialog = true`. `selectNewFileFromDialog` creates the chosen file if it does not exist.
 

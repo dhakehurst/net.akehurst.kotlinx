@@ -22,6 +22,8 @@ import net.akehurst.kotlinx.filesystem.api.FileAccessMode
 import net.akehurst.kotlinx.filesystem.api.FileMetadata
 import net.akehurst.kotlinx.filesystem.api.UserFileSystem
 import net.akehurst.kotlinx.filesystem.api.FileSystemObjectHandle
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.awt.EventQueue
 import java.awt.FileDialog
 import java.awt.Frame
@@ -108,50 +110,89 @@ actual object UserFileSystemDefault : UserFileSystem {
     }
 
     /**
+     * Shows a modal dialog on the AWT event dispatch thread and suspends (without blocking) until it closes.
+     *
+     * The dialog is always started from a fresh event (EventQueue.invokeLater), never directly from the caller,
+     * even when the caller is already on the event dispatch thread. A modal dialog runs a nested event loop;
+     * if that loop ran inside a coroutine dispatcher that itself runs on the event thread (e.g. Compose Desktop's
+     * FlushCoroutineDispatcher), the dispatcher would be re-entered and resume the caller's continuation twice,
+     * which ends the app with a fatal coroutines error. The result is passed back by resuming the continuation,
+     * so the caller continues on its own dispatcher after the dialog has closed.
+     *
+     * If the calling coroutine is cancelled before the dialog is shown, the dialog is not shown;
+     * cancelling while it is open does not close it, and its result is dropped.
+     */
+    private suspend fun <T> showModalOnEdt(dialog: () -> T): T = suspendCancellableCoroutine { cont ->
+        EventQueue.invokeLater {
+            if (cont.isActive) {
+                cont.resumeWith(runCatching(dialog))
+            }
+        }
+    }
+
+    /**
+     * Runs [block] with the platform's system look-and-feel, then restores the look-and-feel the app had before,
+     * so the app's own look-and-feel is changed only while the dialog created and shown in [block] is open.
+     * Existing components are not updated (no SwingUtilities.updateComponentTreeUI), so they keep their UI delegates.
+     */
+    private fun <T> withSystemLookAndFeel(block: () -> T): T {
+        val previous = UIManager.getLookAndFeel()
+        val systemName = UIManager.getSystemLookAndFeelClassName()
+        if (previous == null || previous.javaClass.name == systemName) {
+            return block()
+        }
+        try {
+            UIManager.setLookAndFeel(systemName)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return block()
+        }
+        try {
+            return block()
+        } finally {
+            try {
+                UIManager.setLookAndFeel(previous)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    /**
      * On macOS this uses the native java.awt.FileDialog (with apple.awt.fileDialogForDirectories=true),
      * on all other OSs it uses javax.swing.JFileChooser in DIRECTORIES_ONLY mode,
      * because the AWT FileDialog on Linux (GTK) and Windows cannot select a directory.
-     * The dialog is always shown on the AWT event dispatch thread.
+     * The dialog is shown on the AWT event dispatch thread, see [showModalOnEdt]; it is safe to call from any
+     * coroutine, including one running on the event dispatch thread (e.g. Compose Desktop's rememberCoroutineScope).
      */
     actual override suspend fun selectDirectoryFromDialog(dialogTitle:String, current: DirectoryHandle?, accessMode: FileAccessMode): DirectoryHandle? {
-        try {
-            val chooser: () -> DirectoryHandle? = {
+        return try {
+            showModalOnEdt {
                 if (isMacOS) {
                     chooseDirectoryNative(dialogTitle, current as DirectoryHandleJVM?)
                 } else {
                     chooseDirectorySwing(dialogTitle, current as DirectoryHandleJVM?)
                 }
             }
-            return if (EventQueue.isDispatchThread()) {
-                chooser()
-            } else {
-                var handle: DirectoryHandle? = null
-                EventQueue.invokeAndWait() {
-                    handle = chooser()
-                }
-                handle
-            }
+        } catch (e: CancellationException) {
+            throw e
         } catch (t: Throwable) {
             t.printStackTrace()
-            return null
+            null
         }
     }
 
-    private fun chooseDirectorySwing(dialogTitle:String, current: DirectoryHandleJVM?): DirectoryHandle? {
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
+    // must be called on the event dispatch thread
+    private fun chooseDirectorySwing(dialogTitle:String, current: DirectoryHandleJVM?): DirectoryHandle? = withSystemLookAndFeel {
         val fileChooser = JFileChooser()
         fileChooser.currentDirectory = current?.handle
         fileChooser.isMultiSelectionEnabled = false
         fileChooser.fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
         fileChooser.dialogTitle = dialogTitle
         val result = fileChooser.showOpenDialog(null) // 'null' for parent component
-        return if (result == JFileChooser.APPROVE_OPTION) {
-            fileChooser.selectedFile?.let { selectedDir ->
+        if (result == JFileChooser.APPROVE_OPTION) {
+            // the GTK chooser approves with no selected file when the name field is empty; use the folder being shown
+            (fileChooser.selectedFile ?: fileChooser.currentDirectory)?.let { selectedDir ->
                 val pf: File? = selectedDir.parentFile
                 val parent = pf?.let { DirectoryHandleJVM(this, null, pf) }
                 DirectoryHandleJVM(this, parent, selectedDir)
@@ -162,61 +203,54 @@ actual object UserFileSystemDefault : UserFileSystem {
     }
 
     // macOS only: apple.awt.fileDialogForDirectories has no effect on other OSs
+    // must be called on the event dispatch thread
     private fun chooseDirectoryNative(dialogTitle:String, current: DirectoryHandleJVM?): DirectoryHandle? {
         val parentFrame = Frame(dialogTitle)
-        System.setProperty("apple.awt.fileDialogForDirectories", "true")
-        val fd = FileDialog(parentFrame, dialogTitle)
-        fd.mode = FileDialog.LOAD
-        fd.isMultipleMode = false
-        fd.directory = current?.handle?.absolutePath
-        fd.isVisible = true
-        val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
-        return selectedFile?.let {
-            val pf: File? = selectedFile.parentFile
-            val parent = pf?.let { DirectoryHandleJVM(this, null, pf) }
-            DirectoryHandleJVM(this, parent, it)
+        try {
+            System.setProperty("apple.awt.fileDialogForDirectories", "true")
+            val fd = FileDialog(parentFrame, dialogTitle)
+            fd.mode = FileDialog.LOAD
+            fd.isMultipleMode = false
+            fd.directory = current?.handle?.absolutePath
+            fd.isVisible = true
+            val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
+            return selectedFile?.let {
+                val pf: File? = selectedFile.parentFile
+                val parent = pf?.let { DirectoryHandleJVM(this, null, pf) }
+                DirectoryHandleJVM(this, parent, it)
+            }
+        } finally {
+            System.clearProperty("apple.awt.fileDialogForDirectories")
+            parentFrame.dispose()
         }
     }
 
     actual override suspend fun selectExistingFileFromDialog(dialogTitle:String, current: DirectoryHandle?, accessMode: FileAccessMode, useNativeDialog: Boolean): FileHandle? {
-        try {
-            return if (EventQueue.isDispatchThread()) {
+        return try {
+            showModalOnEdt {
                 if (useNativeDialog) {
-                    chooseFileNative(dialogTitle,current as DirectoryHandleJVM?, FileDialog.LOAD)
+                    chooseFileNative(dialogTitle, current as DirectoryHandleJVM?, FileDialog.LOAD)
                 } else {
-                    chooseFile(dialogTitle,current as DirectoryHandleJVM?)
+                    chooseFile(dialogTitle, current as DirectoryHandleJVM?)
                 }
-            } else {
-                var handle: FileHandle? = null
-                EventQueue.invokeAndWait() {
-                    handle = if (useNativeDialog) {
-                        chooseFileNative(dialogTitle,current as DirectoryHandleJVM?, FileDialog.LOAD)
-                    } else {
-                        chooseFile(dialogTitle,current as DirectoryHandleJVM?)
-                    }
-                }
-                handle
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (t: Throwable) {
             t.printStackTrace()
-            return null
+            null
         }
     }
 
-    private fun chooseFile(dialogTitle:String,current: DirectoryHandleJVM?): FileHandle? {
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
+    // must be called on the event dispatch thread
+    private fun chooseFile(dialogTitle:String,current: DirectoryHandleJVM?): FileHandle? = withSystemLookAndFeel {
         val fileChooser = JFileChooser()
         fileChooser.currentDirectory = current?.handle
         fileChooser.isMultiSelectionEnabled = false
         fileChooser.fileSelectionMode = JFileChooser.FILES_ONLY
         fileChooser.dialogTitle = dialogTitle
         val result = fileChooser.showOpenDialog(null) // 'null' for parent component
-        return if (result == JFileChooser.APPROVE_OPTION) {
+        if (result == JFileChooser.APPROVE_OPTION) {
             val selectedFile = fileChooser.selectedFile
             selectedFile?.let {
                 val pf: File? = selectedFile.parentFile
@@ -228,24 +262,36 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
     }
 
+    // must be called on the event dispatch thread
     private fun chooseFileNative(dialogTitle:String,current: DirectoryHandleJVM?, mode: Int): FileHandle? {
         val parentFrame = Frame(dialogTitle)
-        System.clearProperty("apple.awt.fileDialogForDirectories")
-        val fd = FileDialog(parentFrame, dialogTitle)
-        fd.mode = mode
-        fd.isMultipleMode = false
-        fd.directory = current?.handle?.absolutePath
-        fd.isVisible = true
-        val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
-        return selectedFile?.let {
-            val pf: File? = selectedFile.parentFile
-            val parent = pf?.let { DirectoryHandleJVM(this, null, pf) }
-            FileHandleJVM(this, parent, it)
+        try {
+            System.clearProperty("apple.awt.fileDialogForDirectories")
+            val fd = FileDialog(parentFrame, dialogTitle)
+            fd.mode = mode
+            fd.isMultipleMode = false
+            fd.directory = current?.handle?.absolutePath
+            fd.isVisible = true
+            val selectedFile = fd.file?.let { File(fd.directory + "/" + it) }
+            return selectedFile?.let {
+                val pf: File? = selectedFile.parentFile
+                val parent = pf?.let { DirectoryHandleJVM(this, null, pf) }
+                FileHandleJVM(this, parent, it)
+            }
+        } finally {
+            parentFrame.dispose()
         }
     }
 
     actual override suspend fun selectNewFileFromDialog(dialogTitle:String, parent: DirectoryHandle): FileHandle? {
-        val file = chooseFile(dialogTitle,parent as DirectoryHandleJVM)
+        val file = try {
+            showModalOnEdt { chooseFile(dialogTitle, parent as DirectoryHandleJVM) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            null
+        }
         return if (null != file) {
             val jFile = (file as FileHandleJVM).handle
             when {
