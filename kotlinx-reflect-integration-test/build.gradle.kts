@@ -94,6 +94,12 @@ subprojects {
     dependencies {
         "commonTestImplementation"(kotlin("test"))
         "commonTestImplementation"(kotlin("test-annotations-common"))
+        // Kotlin 2.4.10 no longer resolves kotlin.test.Test etc. for JVM with the default JUnit 4; the main build uses JUnit 5 too
+        "jvmTestImplementation"(kotlin("test-junit5"))
+    }
+
+    tasks.withType<Test>().configureEach {
+        useJUnitPlatform()
     }
 
 }
