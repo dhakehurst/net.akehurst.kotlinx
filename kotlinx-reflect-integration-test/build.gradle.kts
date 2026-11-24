@@ -44,7 +44,7 @@ allprojects {
     }
 
     group = rootProject.name
-    version = "2.4.0"
+    version = "2.4.10-SNAPSHOT"
 
     project.layout.buildDirectory = File(rootProject.projectDir, ".gradle-build/${project.name}")
 
