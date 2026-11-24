@@ -397,27 +397,16 @@ actual object UserFileSystemDefault : UserFileSystem {
     }
 
     actual override suspend fun writeFileBytes(file: FileHandle, content: ByteArray) {
-        try {
-            when (file) {
-                is FileHandleJVM -> file.handle.writeBytes(content)
-                else -> error("FileHandle is not a FileHandleJVM: ${file::class.simpleName}")
-            }
-        } catch (t: Throwable) {
-            t.printStackTrace()
+        when (file) {
+            is FileHandleJVM -> file.handle.writeBytes(content)
+            else -> error("FileHandle is not a FileHandleJVM: ${file::class.simpleName}")
         }
     }
 
     actual override suspend fun writeFileContent(file: FileHandle, content: String) {
-        try {
-            return when (file) {
-                is FileHandleJVM -> {
-                    file.handle.writeText(content)
-                }
-
-                else -> error("FileHandle is not a FileHandleJVM: ${file::class.simpleName}")
-            }
-        } catch (t: Throwable) {
-            t.printStackTrace()
+        when (file) {
+            is FileHandleJVM -> file.handle.writeText(content)
+            else -> error("FileHandle is not a FileHandleJVM: ${file::class.simpleName}")
         }
     }
 

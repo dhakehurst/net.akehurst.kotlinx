@@ -37,6 +37,7 @@ import js.buffer.toByteArray
 import js.typedarrays.toUint8Array
 import web.experimental.ExperimentalWebApi
 import web.fs.*
+import web.streams.abort
 import web.streams.close
 
 
@@ -276,34 +277,38 @@ actual object UserFileSystemDefault : UserFileSystem {
         }
 
     actual override suspend fun writeFileBytes(file: FileHandle, content: ByteArray) {
-        try {
-            when (file) {
-                is FileHandleWasmJS -> {
-                    val w = file.handle.createWritable()
+        when (file) {
+            is FileHandleWasmJS -> {
+                val w = file.handle.createWritable()
+                try {
                     w.write(content.toUint8Array())
                     w.close()
+                } catch (t: Throwable) {
+                    // discard the partly written content, so the file keeps its old content
+                    runCatching { w.abort() }
+                    throw t
                 }
-
-                else -> error("FileHandle is not a FileHandleWasmJS: ${file::class.simpleName}")
             }
-        } catch (t: Throwable) {
-            t.printStackTrace()
+
+            else -> error("FileHandle is not a FileHandleWasmJS: ${file::class.simpleName}")
         }
     }
 
     actual override suspend fun writeFileContent(file: FileHandle, content: String) {
-        try {
-            when (file) {
-                is FileHandleWasmJS -> {
-                    val w = file.handle.createWritable()
+        when (file) {
+            is FileHandleWasmJS -> {
+                val w = file.handle.createWritable()
+                try {
                     w.write(content.toJsString())
                     w.close()
+                } catch (t: Throwable) {
+                    // discard the partly written content, so the file keeps its old content
+                    runCatching { w.abort() }
+                    throw t
                 }
-
-                else -> error("FileHandle is not a FileHandleWasmJS: ${file::class.simpleName}")
             }
-        } catch (t: Throwable) {
-            t.printStackTrace()
+
+            else -> error("FileHandle is not a FileHandleWasmJS: ${file::class.simpleName}")
         }
     }
 

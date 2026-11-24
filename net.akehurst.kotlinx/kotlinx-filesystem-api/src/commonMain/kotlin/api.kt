@@ -115,12 +115,15 @@ interface FileHandle : FileSystemObjectHandle {
      * replace the content of the file.
      * In a browser (JS/Wasm) this asks the user for write permission if the page does not have it yet;
      * the browser only shows that prompt when called soon after a user action such as a click.
+     * Throws the platform's error if the write fails (e.g. an IOException on JVM, a DOMException in a browser
+     * such as NotAllowedError when permission is denied); on a failure in a browser the file keeps its old content.
      */
     suspend fun writeContent(content: String)
 
     /**
      * replace the content of the file with these bytes, written as they are.
      * In a browser (JS/Wasm) this asks for write permission as [writeContent] does.
+     * Throws if the write fails, as [writeContent] does.
      */
     suspend fun writeBytes(content: ByteArray)
 

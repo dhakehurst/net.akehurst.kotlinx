@@ -253,6 +253,22 @@ class test_UserFileSystemDefault {
         assertContentEquals(notUtf8, f.readBytes())
     }
 
+    // --- write failures are reported, not swallowed ---
+
+    @Test
+    fun writeContent_failure_throws() = runTest {
+        val f = (root().entry("sub") as DirectoryHandle).file("b.txt")!!
+        File(tmp, "sub").deleteRecursively()
+        assertFailsWith<java.io.IOException> { f.writeContent("x") }
+    }
+
+    @Test
+    fun writeBytes_failure_throws() = runTest {
+        val f = (root().entry("sub") as DirectoryHandle).file("b.txt")!!
+        File(tmp, "sub").deleteRecursively()
+        assertFailsWith<java.io.IOException> { f.writeBytes(notUtf8) }
+    }
+
     // --- create when the name already exists ---
 
     @Test
