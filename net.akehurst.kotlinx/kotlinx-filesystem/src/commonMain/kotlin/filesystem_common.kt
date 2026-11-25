@@ -20,6 +20,18 @@ import net.akehurst.kotlinx.filesystem.api.*
 
 
 abstract class DirectoryHandleAbstract: DirectoryHandle {
+    // Workaround for a Kotlin/JS bug (fixed in Kotlin 2.5.0, probably KT-90587): when an exported abstract class
+    // does not redeclare a suspend function of an exported interface, a subclass's override of it gets no JS
+    // suspend bridge, and calls through the interface fail with "is not a function". Remove on Kotlin 2.5.0.
+    abstract override suspend fun exists(): Boolean
+    abstract override suspend fun listContent(): List<FileSystemObjectHandle>
+    abstract override suspend fun entry(name: String): FileSystemObjectHandle?
+    abstract override suspend fun createFile(name: String): FileHandle?
+    abstract override suspend fun createDirectory(name: String): DirectoryHandle?
+    // the interface's default methods are not callable on subclasses on JS either (KT-84710), so delegate to them here
+    override suspend fun getOrCreateFile(name: String): FileHandle? = super.getOrCreateFile(name)
+    override suspend fun getOrCreateDirectory(name: String): DirectoryHandle? = super.getOrCreateDirectory(name)
+
 
     override val path: String get() = "${parent?.path?:""}/$name"
     override val absolutePath: String get() = path
@@ -42,6 +54,15 @@ abstract class DirectoryHandleAbstract: DirectoryHandle {
 }
 
 abstract class FileHandleAbstract : FileHandle {
+    // Workaround for the same Kotlin/JS bug, see DirectoryHandleAbstract. Remove on Kotlin 2.5.0.
+    abstract override suspend fun exists(): Boolean
+    abstract override suspend fun readContent(): String?
+    abstract override suspend fun readBytes(): ByteArray?
+    abstract override suspend fun writeContent(content: String)
+    abstract override suspend fun writeBytes(content: ByteArray)
+    abstract override suspend fun openAsZipDirectory(): DirectoryHandle
+    override suspend fun metadata(): FileMetadata = FileMetadata.UNKNOWN
+
     override val extension: String get() = name.substringAfterLast('.', "")
 
     override val path: String get() = "${parent?.path?:""}/$name"
