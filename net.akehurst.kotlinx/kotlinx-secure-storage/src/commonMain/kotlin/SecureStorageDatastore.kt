@@ -37,6 +37,7 @@ typealias MasterPasswordProvider = suspend (isNew: Boolean) -> String?
 
 /**
  * A key/value store kept in [secureStorageFile], one 'key<separator>value' line per entry.
+ * Keys may contain any character: a backslash, line break or the separator in a key is escaped with a backslash.
  * When [encrypt] is true each value is encrypted with a key held in [masterKeyFile], which is unlocked
  * with the master password given by [masterPassword] (asked for only when first needed).
  * Keys are stored in plain text; only values are encrypted.
@@ -58,23 +59,67 @@ class SecureStorageDatastore(
     val keyValueSeparator: String = "=",
 ) : SecureStorage {
 
+    init {
+        require(keyValueSeparator.isNotEmpty()) { "keyValueSeparator must not be empty" }
+        require(keyValueSeparator.none { it == '\\' || it == '\n' || it == '\r' }) { "keyValueSeparator must not contain a backslash or a line break" }
+        require(keyValueSeparator[0] != 'n' && keyValueSeparator[0] != 'r') { "keyValueSeparator must not start with 'n' or 'r' (they are used in escapes)" }
+    }
+
+    /** escapes a backslash, line break or [keyValueSeparator] in a key, so the key fits on one line before the first separator */
+    private fun escapeKey(key: String): String {
+        val sb = StringBuilder()
+        var i = 0
+        while (i < key.length) {
+            when {
+                key.startsWith(keyValueSeparator, i) -> { sb.append('\\').append(keyValueSeparator); i += keyValueSeparator.length }
+                key[i] == '\\' -> { sb.append("\\\\"); i++ }
+                key[i] == '\n' -> { sb.append("\\n"); i++ }
+                key[i] == '\r' -> { sb.append("\\r"); i++ }
+                else -> { sb.append(key[i]); i++ }
+            }
+        }
+        return sb.toString()
+    }
+
+    /** splits a line at the first unescaped [keyValueSeparator]; returns the unescaped key and the value, or null if there is none */
+    private fun splitLine(line: String): Pair<String, String>? {
+        val key = StringBuilder()
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            when {
+                c == '\\' && i + 1 < line.length -> {
+                    when {
+                        line[i + 1] == '\\' -> { key.append('\\'); i += 2 }
+                        line[i + 1] == 'n' -> { key.append('\n'); i += 2 }
+                        line[i + 1] == 'r' -> { key.append('\r'); i += 2 }
+                        line.startsWith(keyValueSeparator, i + 1) -> { key.append(keyValueSeparator); i += 1 + keyValueSeparator.length }
+                        else -> { key.append(c); i++ }
+                    }
+                }
+                // the value may contain the separator (e.g. base64 padding '='), so split only at the first one
+                line.startsWith(keyValueSeparator, i) -> return key.toString() to line.substring(i + keyValueSeparator.length)
+                else -> { key.append(c); i++ }
+            }
+        }
+        return null
+    }
+
     val serializer = object : NakSerializer<Map<String, String>> {
         override val defaultValue: Map<String, String> get() = emptyMap()
 
         override fun write(value: Map<String, String>): String {
             val sb = StringBuilder()
-            value.forEach { (key, value) -> sb.append("$key$keyValueSeparator$value\n") }
+            // values are JSON or base64, so they never contain a line break
+            value.forEach { (key, value) -> sb.append(escapeKey(key)).append(keyValueSeparator).append(value).append('\n') }
             return sb.toString()
         }
 
         override fun read(data: String): Map<String, String> {
             val map = mutableMapOf<String, String>()
             data.lines().forEach { line ->
-                if (line.isNotBlank() && line.contains(keyValueSeparator)) {
-                    // the value may contain the separator (e.g. base64 padding '='), so split only once
-                    val key = line.substringBefore(keyValueSeparator)
-                    val value = line.substringAfter(keyValueSeparator)
-                    map[key] = value
+                if (line.isNotBlank()) {
+                    splitLine(line)?.let { (key, value) -> map[key] = value }
                 }
             }
             return map

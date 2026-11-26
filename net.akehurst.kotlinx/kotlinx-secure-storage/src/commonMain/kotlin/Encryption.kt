@@ -23,6 +23,7 @@ import dev.whyoleg.cryptography.algorithms.AES
 import dev.whyoleg.cryptography.algorithms.PBKDF2
 import dev.whyoleg.cryptography.algorithms.SHA256
 import dev.whyoleg.cryptography.random.CryptographyRandom
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -95,8 +96,11 @@ class Encryption(
         val masterKey = deriveKeyFromPassword(masterPassword, content.salt, content.iterations)
         val keyBytes = try {
             masterKey.cipher().decrypt(content.wrappedKey)
-        } catch (e: Exception) {
-            // AES-GCM authentication fails when the password (hence the derived key) is wrong
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            // AES-GCM authentication fails when the password (hence the derived key) is wrong.
+            // Catch Throwable: in a browser this is a DOMException (OperationError), which is not a kotlin.Exception on JS/wasm.
             throw WrongMasterPasswordException(cause = e)
         }
         val key = provider.get(AES.GCM).keyDecoder().decodeFromByteArray(AES.Key.Format.RAW, keyBytes)

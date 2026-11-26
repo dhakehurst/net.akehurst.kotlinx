@@ -583,4 +583,42 @@ class test_SecureStorageDatastore {
         sut.write("k", "v=1")
         assertEquals("v=1", SecureStorageDatastore(secureStorageFile = storageFile, encrypt = false).read("k"))
     }
+
+    // --- keys containing the separator, line breaks or backslashes are escaped ---
+
+    private val awkwardKeys = listOf("a=b", "=start", "end=", "line\nbreak", "cr\rkey", "back\\slash", "\\=", "\\", "x\\n", "a==b\\\\=\n")
+
+    @Test
+    fun awkward_keys_roundtrip_through_the_file() = runTest {
+        val sut = SecureStorageDatastore(secureStorageFile = storageFile, encrypt = false)
+        awkwardKeys.forEachIndexed { i, k -> sut.write(k, "v$i=") }
+        val content = storageFile.getContent()!!
+        assertEquals(awkwardKeys.size, content.lines().count { it.isNotEmpty() }, "one line per entry")
+        val reloaded = SecureStorageDatastore(secureStorageFile = storageFile, encrypt = false)
+        assertEquals(awkwardKeys.toSet(), reloaded.keys())
+        awkwardKeys.forEachIndexed { i, k -> assertEquals("v$i=", reloaded.read(k), "key '$k'") }
+    }
+
+    @Test
+    fun awkward_keys_roundtrip_with_multi_char_separator_and_encryption() = runTest {
+        fun ds() = SecureStorageDatastore(
+            secureStorageFile = storageFile, encrypt = true, masterKeyFile = masterKeyFile,
+            masterPassword = fixedPassword("pw"), keyValueSeparator = ": "
+        )
+        val keys = awkwardKeys + listOf("a: b", ":", " : ", "a\\: b")
+        val sut = ds()
+        keys.forEach { k -> sut.write(k, "value of $k") }
+        val reloaded = ds()
+        assertEquals(keys.toSet(), reloaded.keys())
+        keys.forEach { k -> assertEquals("value of $k", reloaded.read(k)) }
+    }
+
+    @Test
+    fun separator_that_clashes_with_escapes_is_rejected() {
+        listOf("", "\\", "a\nb", "n", "r=").forEach { sep ->
+            assertFailsWith<IllegalArgumentException>("separator '$sep'") {
+                SecureStorageDatastore(secureStorageFile = storageFile, encrypt = false, keyValueSeparator = sep)
+            }
+        }
+    }
 }
